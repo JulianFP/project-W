@@ -1,0 +1,29 @@
+name: PyPI deploy
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  pypi-deploy:
+    name: Deploying Python Package
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+          # setuptools_scm requires a non-shallow clone of the repository
+          fetch-depth: 0
+
+    - uses: actions/setup-python@v4
+      name: Install Python
+
+    - name: Build SDist
+      run: pipx run build --sdist
+
+    - uses: pypa/gh-action-pypi-publish@master
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
