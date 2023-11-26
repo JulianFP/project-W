@@ -1,0 +1,89 @@
+
+from flask import Flask
+from werkzeug import Client
+
+def _get_auth_headers(
+    client, email: str = "user@test.com", password: str = "user"
+) -> dict[str, str]:
+    response = client.post("/api/login", data={"email": email, "password": password})
+    token = response.json["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+def test_signup_invalid(client: Client):
+    # missing form data
+    res = client.post("/api/signup")
+    # leads to a flask error
+    assert 400 <= res.status_code < 500
+
+    # user email is already in use
+    res = client.post(
+        "/api/signup", data={"email": "user@test.com", "password": "test"})
+    assert res.status_code == 400
+    assert res.json["message"] == "E-Mail is already used by another account"
+
+    # TODO: Add more invalid cases once we have email/password restrictions
+
+def test_signup_valid(client: Client):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2"})
+    assert res.status_code == 200
+    assert res.json["message"] == "Successfully created user. Use /api/login to authenticate yourself"
+
+def test_login_invalid(client: Client):
+    # missing form data
+    res = client.post("/api/login")
+    assert 400 <= res.status_code < 500
+
+    # unknown email
+    res = client.post("/api/login", data={"email": "", "password": ""})
+    assert res.status_code == 400
+    assert res.json["message"] == "Incorrect credentials provided"
+
+    # wrong password
+    res = client.post("/api/login", data={"email": "user@test.com", "password": ""})
+    assert res.status_code == 400
+    assert res.json["message"] == "Incorrect credentials provided"
+
+
+def test_login_valid(client: Client):
+    email = "user@test.com"
+    password = "user"
+    response = client.post("/api/login", data={"email": email, "password": password})
+    assert response.status_code == 200
+    assert "access_token" in response.json
+
+def test_userinfo_invalid(client: Client):
+    # non-admins can't access other users' infos
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.get("/api/userinfo", headers=headers, query_string={"email": "admin@test.com"})
+    assert res.status_code == 403
+    assert res.json["message"] == "You don't have permission to view other accounts' user info"
+
+    # can't access non-existent user info
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.get("/api/userinfo", headers=headers, query_string={"email": "fake@test.com"})
+    assert res.status_code == 400
+    assert res.json["message"] == "No user exists with that email"
+
+
+
+def test_userinfo_valid(client: Client):
+    # non-admins can access their own user info
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.get("/api/userinfo", headers=headers)
+    assert res.status_code == 200
+    assert res.json["email"] == "user@test.com"
+    assert res.json["is_admin"] == False
+
+    # admins can also access their own user info
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.get("/api/userinfo", headers=headers)
+    assert res.status_code == 200
+    assert res.json["email"] == "admin@test.com"
+    assert res.json["is_admin"] == True
+
+    # admins can access other users' info
+    res = client.get("/api/userinfo", headers=headers, query_string={"email": "user@test.com"})
+    assert res.status_code == 200
+    assert res.json["email"] == "user@test.com"
+    assert res.json["is_admin"] == False
