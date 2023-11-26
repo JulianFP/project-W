@@ -27,7 +27,16 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
+    # Argon2 for password hashing
+    "argon2-cffi",
+    # Click for the CLI
     "click",
+    # Flask for the WSGI server
+    "flask",
+    # JWT Flask plugin for session tokens
+    "flask-jwt-extended",
+    # JWT SQL plugin for database management
+    "flask-sqlalchemy",
 ]
 
 [project.optional-dependencies]
