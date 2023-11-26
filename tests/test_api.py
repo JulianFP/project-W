@@ -1,10 +1,11 @@
 
+from typing import Dict
 from flask import Flask
 from werkzeug import Client
 
 def _get_auth_headers(
     client, email: str = "user@test.com", password: str = "user"
-) -> dict[str, str]:
+) -> Dict[str, str]:
     response = client.post("/api/login", data={"email": email, "password": password})
     token = response.json["access_token"]
     return {"Authorization": f"Bearer {token}"}

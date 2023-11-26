@@ -19,7 +19,7 @@ maintainers = [
     { name = "Julian Partanen", email = "your@email.com" },
 ]
 dynamic = ["version"]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
