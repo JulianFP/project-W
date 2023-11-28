@@ -6,7 +6,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, delete_user, db
+from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db
 
 
 def create_app(db_path: str = ".") -> Flask:
@@ -109,6 +109,61 @@ def create_app(db_path: str = ".") -> Flask:
         message, code = delete_user(toDelete)
         return jsonify(message=message), code
 
+    @app.post("/api/changeUserPassword")
+    @jwt_required()
+    def changeUserPassword():
+        thisUser: User = current_user
+        toModify: User = current_user
+
+        #ask for password as confirmation
+        password = request.form['password']
+        if not thisUser.check_password(password):
+            logger.info(" -> incorrect password")
+            return jsonify(message="Incorrect password provided"), 403
+
+        if 'emailModify' in request.form:
+            specifiedEmail = request.form['emailModify']
+            specifiedUser = User.query.where(User.email == specifiedEmail).one_or_none()
+            if not thisUser.is_admin:
+                logger.info(f"Non-admin tried to delete user {specifiedEmail}, denied")
+                return jsonify(message="You don't have permission to modify other users"), 403
+            elif not specifiedUser:
+                logger.info(" -> Invalid user email")
+                return jsonify(message="No user exists with that email"), 400
+            else: toDelete = specifiedUser
+
+        new_password = request.form['new_password']
+        logger.info(f"request to modify user password from {thisUser.email} for user {toModify.email}")
+        message, code = update_user_password(toModify, new_password)
+        return jsonify(message=message), code
+
+    @app.post("/api/changeUserEmail")
+    @jwt_required()
+    def changeUserEmail():
+        thisUser: User = current_user
+        toModify: User = current_user
+
+        #ask for password as confirmation
+        password = request.form['password']
+        if not thisUser.check_password(password):
+            logger.info(" -> incorrect password")
+            return jsonify(message="Incorrect password provided"), 403
+
+        if 'emailModify' in request.form:
+            specifiedEmail = request.form['emailModify']
+            specifiedUser = User.query.where(User.email == specifiedEmail).one_or_none()
+            if not thisUser.is_admin:
+                logger.info(f"Non-admin tried to delete user {specifiedEmail}, denied")
+                return jsonify(message="You don't have permission to modify other users"), 403
+            elif not specifiedUser:
+                logger.info(" -> Invalid user email")
+                return jsonify(message="No user exists with that email"), 400
+            else: toDelete = specifiedUser
+
+        new_email = request.form['new_email']
+        logger.info(f"request to modify user email from {thisUser.email} for user {toModify.email}")
+        message, code = update_user_email(toModify, new_email)
+        return jsonify(message=message), code
 
     with app.app_context():
         db.create_all()

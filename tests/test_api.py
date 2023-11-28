@@ -121,3 +121,67 @@ def test_deleteUser_valid_admin(client: Client):
     assert res.status_code == 200
     assert res.json["message"] == "Successfully deleted user with email user@test.com"
 
+def test_changeUserPassword_invalid(client: Client):
+    #wrong password
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.post("/api/changeUserPassword", headers=headers, data={"password": "xyz", "new_password": "user2"})
+    assert res.status_code == 403
+    assert res.json["message"] == "Incorrect password provided"
+
+    #normal user who tries to modify other user
+    res = client.post("/api/changeUserPassword", headers=headers, data={"password": "user", "new_password": "user2", "emailModify": "admin@test.com"})
+    assert res.status_code == 403
+    assert res.json["message"] == "You don't have permission to modify other users"
+
+    #admin user who tries to modify other user, but email is invalid
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.post("/api/changeUserPassword", headers=headers, data={"password": "admin", "new_password": "abc2", "emailModify": "abc@xyz.com"})
+    assert res.status_code == 400
+    assert res.json["message"] == "No user exists with that email"
+
+def test_changeUserPassword_valid_normal(client: Client):
+    #normal user modifies themselves
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.post("/api/changeUserPassword", headers=headers, data={"password": "user", "new_password": "user2"})
+    assert res.status_code == 200
+    assert res.json["message"] == "Successfully updated user password"
+
+def test_changeUserPassword_valid_admin(client: Client):
+    #admin user deletes other user
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.post("/api/changeUserPassword", headers=headers, data={"password": "admin", "new_password": "user2", "emailDelete": "user@test.com"})
+    assert res.status_code == 200
+    assert res.json["message"] == "Successfully updated user password"
+
+def test_changeUserEmail_invalid(client: Client):
+    #wrong password
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.post("/api/changeUserEmail", headers=headers, data={"password": "xyz", "new_email": "user2@test.com"})
+    assert res.status_code == 403
+    assert res.json["message"] == "Incorrect password provided"
+
+    #normal user who tries to modify other user
+    res = client.post("/api/changeUserEmail", headers=headers, data={"password": "user", "new_email": "user2@test.com", "emailModify": "admin@test.com"})
+    assert res.status_code == 403
+    assert res.json["message"] == "You don't have permission to modify other users"
+
+    #admin user who tries to modify other user, but email is invalid
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.post("/api/changeUserEmail", headers=headers, data={"password": "admin", "new_email": "abc2@xyz.com", "emailModify": "abc@xyz.com"})
+    assert res.status_code == 400
+    assert res.json["message"] == "No user exists with that email"
+
+def test_changeUserEmail_valid_normal(client: Client):
+    #normal user modifies themselves
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.post("/api/changeUserEmail", headers=headers, data={"password": "user", "new_email": "user2@test.com"})
+    assert res.status_code == 200
+    assert res.json["message"] == "Successfully updated user email"
+
+def test_changeUserEmail_valid_admin(client: Client):
+    #admin user deletes other user
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.post("/api/changeUserEmail", headers=headers, data={"password": "admin", "new_email": "user2@test.com", "emailDelete": "user@test.com"})
+    assert res.status_code == 200
+    assert res.json["message"] == "Successfully updated user email"
+

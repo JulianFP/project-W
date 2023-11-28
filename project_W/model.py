@@ -63,3 +63,19 @@ def delete_user(
     logger.info(f" -> Deleted user with email {user.email}")
     
     return (f"Successfully deleted user with email {user.email}"), 200
+
+def update_user_password(
+        user: User, new_password: str
+    ) -> Tuple[str, int]:
+    user.password_hash = hasher.hash(new_password)
+    db.session.commit()
+    logger.info(f" -> Updated password of user {user.email}")
+    return "Successfully updated user password", 200
+
+def update_user_email(
+        user: User, new_email: str
+    ) -> Tuple[str, int]:
+    user.email = new_email
+    db.session.commit()
+    logger.info(f" -> Updated email of user {user.email}")
+    return "Successfully updated user email", 200
