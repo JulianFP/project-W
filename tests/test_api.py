@@ -88,3 +88,36 @@ def test_userinfo_valid(client: Client):
     assert res.status_code == 200
     assert res.json["email"] == "user@test.com"
     assert res.json["is_admin"] == False
+
+def test_deleteUser_invalid(client: Client):
+    #wrong password
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.post("/api/deleteUser", headers=headers, data={"password": "xyz"})
+    assert res.status_code == 403
+    assert res.json["message"] == "Incorrect password provided"
+
+    #normal user who tries to delete other user
+    res = client.post("/api/deleteUser", headers=headers, data={"password": "user", "emailDelete": "admin@test.com"})
+    assert res.status_code == 403
+    assert res.json["message"] == "You don't have permission to delete other users"
+
+    #admin user who tries to delete other user, but email is invalid
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.post("/api/deleteUser", headers=headers, data={"password": "admin", "emailDelete": "abc@xyz.com"})
+    assert res.status_code == 400
+    assert res.json["message"] == "No user exists with that email"
+
+def test_deleteUser_valid_normal(client: Client):
+    #normal user deletes themselves
+    headers = _get_auth_headers(client, "user@test.com", "user")
+    res = client.post("/api/deleteUser", headers=headers, data={"password": "user"})
+    assert res.status_code == 200
+    assert res.json["message"] == "Successfully deleted user with email user@test.com"
+
+def test_deleteUser_valid_admin(client: Client):
+    #admin user deletes other user
+    headers = _get_auth_headers(client, "admin@test.com", "admin")
+    res = client.post("/api/deleteUser", headers=headers, data={"password": "admin", "emailDelete": "user@test.com"})
+    assert res.status_code == 200
+    assert res.json["message"] == "Successfully deleted user with email user@test.com"
+

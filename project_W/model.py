@@ -54,3 +54,12 @@ def add_new_user(
     db.session.commit()
 
     return "Successfully created user. Use /api/login to authenticate yourself", 200
+
+def delete_user(
+        user: User
+    ) -> Tuple[str, int]:
+    db.session.delete(user)
+    db.session.commit()
+    logger.info(f" -> Deleted user with email {user.email}")
+    
+    return (f"Successfully deleted user with email {user.email}"), 200

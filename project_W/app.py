@@ -6,7 +6,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, db
+from .model import User, add_new_user, delete_user, db
 
 
 def create_app(db_path: str = ".") -> Flask:
@@ -81,6 +81,34 @@ def create_app(db_path: str = ".") -> Flask:
         else:
             logger.info(f"Requested user info for {user.email}")
         return jsonify(email=user.email, is_admin=user.is_admin)
+
+    @app.post("/api/deleteUser")
+    @jwt_required()
+    def deleteUser():
+        thisUser: User = current_user
+        toDelete: User = current_user
+
+        #ask for password as confirmation
+        password = request.form['password']
+        if not thisUser.check_password(password):
+            logger.info(" -> incorrect password")
+            return jsonify(message="Incorrect password provided"), 403
+
+        if 'emailDelete' in request.form:
+            specifiedEmail = request.form['emailDelete']
+            specifiedUser = User.query.where(User.email == specifiedEmail).one_or_none()
+            if not thisUser.is_admin:
+                logger.info(f"Non-admin tried to delete user {specifiedEmail}, denied")
+                return jsonify(message="You don't have permission to delete other users"), 403
+            elif not specifiedUser:
+                logger.info(" -> Invalid user email")
+                return jsonify(message="No user exists with that email"), 400
+            else: toDelete = specifiedUser
+
+        logger.info(f"user deletion request from {thisUser.email} for user {toDelete.email}")
+        message, code = delete_user(toDelete)
+        return jsonify(message=message), code
+
 
     with app.app_context():
         db.create_all()
