@@ -125,8 +125,7 @@ def create_app(db_path: str = ".") -> Flask:
             else:
                 toDelete = specifiedUser
 
-        logger.info(f"user deletion request from {
-                    thisUser.email} for user {toDelete.email}")
+        logger.info(f"user deletion request from {thisUser.email} for user {toDelete.email}")
         message, code = delete_user(toDelete)
         return jsonify(message=message), code
 
@@ -157,8 +156,7 @@ def create_app(db_path: str = ".") -> Flask:
                 toDelete = specifiedUser
 
         new_password = request.form['new_password']
-        logger.info(f"request to modify user password from {
-                    thisUser.email} for user {toModify.email}")
+        logger.info(f"request to modify user password from {thisUser.email} for user {toModify.email}")
         message, code = update_user_password(toModify, new_password)
         return jsonify(message=message), code
 
@@ -189,8 +187,7 @@ def create_app(db_path: str = ".") -> Flask:
                 toDelete = specifiedUser
 
         new_email = request.form['new_email']
-        logger.info(f"request to modify user email from {
-                    thisUser.email} for user {toModify.email}")
+        logger.info(f"request to modify user email from {thisUser.email} for user {toModify.email}")
         message, code = update_user_email(toModify, new_email)
         return jsonify(message=message), code
 
