@@ -6,7 +6,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db
+from .model import Job, User, add_new_user, delete_user, list_job_ids_for_all_users, list_job_ids_for_user, submit_job, update_user_password, update_user_email, db
 
 
 def create_app(db_path: str = ".") -> Flask:
@@ -190,6 +190,59 @@ def create_app(db_path: str = ".") -> Flask:
         logger.info(f"request to modify user email from {thisUser.email} for user {toModify.email}")
         message, code = update_user_email(toModify, new_email)
         return jsonify(message=message), code
+    
+    @app.post("/api/jobs/submit")
+    @jwt_required()
+    def submitJob():
+        user: User = current_user
+        file = request.files["file"]
+        file.stream.seek(0)
+        file_name = file.filename
+        audio = file.stream.read()
+        model = request.form.get("model")
+        language = request.form.get("model")
+        job = submit_job(user, file_name, audio, model, language)
+        return jsonify(job_id=job.id)
+    
+    @app.get("/api/jobs/list")
+    @jwt_required()
+    def listJobs():
+        user: User = current_user
+        requested_user = user
+        if "email" in request.args or "all" in request.args:
+            if not user.is_admin:
+                logger.info("Non-admin tried to list other users' jobs, denied")
+                return jsonify(message="You don't have permission to list other users' jobs"), 403
+            
+            if request.args.get("all", type=bool):
+                ids_by_user = list_job_ids_for_all_users()
+                return jsonify([{"user_id": user_id, "job_ids": job_ids} 
+                                for (user_id, job_ids) in ids_by_user.items()]), 200
+            
+            email = request.args["email"]
+            requested_user = User.query.where(User.email == email).one_or_none()
+            if not requested_user:
+                logger.info(f"Admin tried to list jobs of nonexistent user {email}")
+                return jsonify(message="No user exists with that email"), 400
+
+        return jsonify(job_ids=list_job_ids_for_user(requested_user)), 200
+
+    @app.get("/api/jobs/status")
+    @jwt_required()
+    def jobStatus():
+        user: User = current_user
+        job_id = request.args['job_id']
+        job: Job = Job.query.where(Job.id == job_id).one_or_none()
+        # Technically, job IDs aren't secret, so leaking whether they exist
+        # isn't a big deal, but it still seems cleaner this way
+        if not job:
+            if user.is_admin:
+                return jsonify(message="There exists no job with that id"), 404
+            return jsonify(message="You don't have permission to access this job"), 403
+        if job.user_id != user.id and not user.is_admin:
+            return jsonify(message="You don't have permission to access this job"), 403
+        return jsonify(status=job.status)
+        
 
     with app.app_context():
         db.create_all()

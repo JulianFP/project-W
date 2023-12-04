@@ -1,10 +1,13 @@
+from collections import defaultdict
 from dataclasses import dataclass
 import secrets
-from typing import Tuple
+from typing import Dict, List, Tuple
 from argon2 import PasswordHasher
 import argon2
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import exists
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
+import enum
 
 from project_W.logger import get_logger
 
@@ -15,6 +18,7 @@ logger = get_logger("project-W")
 
 @dataclass
 class User(db.Model):
+    __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.Text, nullable=False, unique=True)
     password_hash = db.Column(db.Text, nullable=False)
@@ -97,3 +101,67 @@ def update_user_email(
     db.session.commit()
     logger.info(f" -> Updated email of user {user.email}")
     return "Successfully updated user email", 200
+
+
+class StatusEnum(enum.StrEnum):
+    # The backend has received the job request but no
+    # runner has been assigned yet
+    PENDING_RUNNER = "pending_runner"
+    # A runner has been assigned, and is currently processing
+    # the request
+    RUNNER_IN_PROGRESS = "runner_in_progress"
+    # The runner successfully completed the job and
+    # the transcript is ready for retrieval
+    SUCCESS = "success"
+    # There was an error during the processing of the request
+    FAILED = "failed"
+
+
+@dataclass
+class Job(db.Model):
+    __tablename__ = "jobs"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, ForeignKey("users.id"), index=True, nullable=False)
+    file_name = db.Column(db.Text)
+    audio_data = db.Column(db.BLOB)
+    model = db.Column(db.Text)
+    language = db.Column(db.Text)
+    status = db.Column(db.Enum(StatusEnum))
+    transcript = db.Column(db.Text)
+    error_msg = db.Column(db.Text)
+
+    user = relationship("User", back_populates="jobs")
+    # TODO Add some form of runner token/tag system
+
+
+User.jobs = relationship("Job", order_by=Job.id, back_populates="user")
+
+
+def submit_job(user: User, file_name: str | None, audio: bytes, model: str | None, language: str | None) -> Job:
+    job = Job(
+        user_id=user.id,
+        file_name=file_name,
+        audio_data=audio,
+        model=model,
+        language=language,
+        status=StatusEnum.PENDING_RUNNER,
+    )
+
+    db.session.add(job)
+    db.session.commit()
+
+    logger.info(f"User {user.email} submitted job with file {file_name}")
+    logger.info(f" -> Assigned job id {job.id}")
+
+    return job
+
+def list_job_ids_for_user(user: User) -> List[int]:
+    """Returns a list of all the job IDs associated with this user"""
+    return [job.id for job in db.session.query(Job).filter(Job.user_id == user.id)]
+
+def list_job_ids_for_all_users() -> Dict[int, List[int]]:
+    """For each user, returns a list of all job IDs associated with that user"""
+    d = defaultdict(list)
+    for user_id, job_id in db.session.query(User.id, Job.id).where(User.id == Job.user_id):
+        d[user_id].append(job_id)
+    return d
