@@ -1,35 +1,39 @@
-
 import datetime
-import os
 import secrets
 from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
 from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db
+from .config import loadConfig
 
 
-def create_app(db_path: str = ".") -> Flask:
+def create_app() -> Flask:
     logger = get_logger("project-W")
     app = Flask("project-W")
 
-    jwt_secret_key = os.environ.get("JWT_SECRET_KEY")
-    if jwt_secret_key is not None and len(jwt_secret_key) > 16:
-        logger.info("Setting JWT_SECRET_KEY from supplied env var")
-        JWT_SECRET_KEY = jwt_secret_key
+    #load config from default values < config file < env vars (latest has highest precedence)
+    loadConfig(app, logger)
+
+    #check syntax of JWT_SECRET_KEY and update if necessary
+    JWT_SECRET_KEY = app.config["JWT_SECRET_KEY"]
+    if JWT_SECRET_KEY is not None and len(JWT_SECRET_KEY) > 16:
+        logger.info("Setting JWT_SECRET_KEY from supplied config or env var")
     else:
         logger.warning(
-            "JWT_SECRET_KEY env var not set or too short: generating random secret key"
+            "JWT_SECRET_KEY not set or too short: generating random secret key"
         )
         # new secret key -> invalidates any existing tokens
         JWT_SECRET_KEY = secrets.token_urlsafe(64)
-
-    app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
+        app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 
     # tokens are by default valid for 1 hour
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(minutes=60)
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}/database.db"
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{app.config['DB_PATH']}/database.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    print(app.config["SMTP_SERVER"]["domain"])
+    print(app.config["SMTP_SERVER"]["sender"])
 
     jwt = JWTManager(app)
     db.init_app(app)
