@@ -8,7 +8,9 @@ from sqlalchemy import exists
 from smtplib import SMTP, SMTP_SSL
 from email.message import EmailMessage
 from project_W.logger import get_logger
+from project_W.utils import encode_activation_token, decode_activation_token
 import ssl
+import flask
 
 db = SQLAlchemy()
 hasher = PasswordHasher()
@@ -59,19 +61,45 @@ class User(db.Model):
 
 
 def add_new_user(
-        email: str, password: str, is_admin: bool, smtpConfig: dict
+        email: str, password: str, is_admin: bool
 ) -> Tuple[str, int]:
     email_already_in_use = db.session.query(
         User.query.where(User.email == email).exists()).scalar()
     if email_already_in_use:
         return "E-Mail is already used by another account", 400
+    if not _send_activation_email(email, email):
+        return f"Failed to send activation email to {email}", 400
 
     logger.info(f" -> Created user with email {email}")
     db.session.add(
-        User(email=email, password_hash=hasher.hash(password), is_admin=is_admin))
+        User(email=email, password_hash=hasher.hash(password), is_admin=is_admin, activated=False))
     db.session.commit()
 
-    return "Successfully created user. Use /api/login to authenticate yourself", 200
+    return f"Successful signup for {email}. Please activate your account be clicking on the link provided in the email we just sent you", 200
+
+def activate_user(token: str) -> Tuple[str, int]:
+    secret_key = flask.current_app.config["JWT_SECRET_KEY"]
+    emails = decode_activation_token(token, secret_key)
+    old_email = emails["old_email"]
+    new_email = emails["new_email"]
+
+    if emails is None:
+        logger.info("  -> Invalid user activation token")
+        return "Invalid or expired activation link", 400
+    logger.info(f"  -> activation request for email '{new_email}'")
+    user = db.session.execute(
+        db.select(User).filter(User.email == old_email)
+    ).scalar_one_or_none()
+    if user is None:
+        logger.info(f"  -> Unknown email address '{old_email}' for user activation token")
+        return f"Unknown email address {old_email}", 400
+    if user.activated is True and old_email == new_email:
+        logger.info(f"  -> User with email {old_email} already activated")
+        return f"Account for {old_email} is already activated", 400
+    user.activated = True
+    user.set_email = new_email #update email address (in case activation got issued for changed email address)
+    db.session.commit()
+    return f"Account {new_email} activated", 200
 
 
 def delete_user(
@@ -101,9 +129,27 @@ def update_user_email(
     logger.info(f" -> Updated email of user {user.email}")
     return "Successfully updated user email", 200
 
+def _send_activation_email(old_email: str, new_email: str) -> bool:
+    config = flask.current_app.config
+    secret_key = config["JWT_SECRET_KEY"]
+    token = encode_activation_token(old_email, new_email, secret_key)
+    url = f"{config['URL']}/api/activate?token={token}"
+    logger.info(f" -> Activation url for email {new_email}: {url}")
+    msg_body = (
+        f"To activate your Project-W account,"
+        f"please confirm your email address by clicking on the following link:\n\n"
+        f"{url}\n\n"
+        f"This link will expire within the next 24 hours\n"
+        f"If you did not sign up for an account please disregard this email."
+    )
+    msg_subject = "Project-W account activation"
+    return _send_email(new_email, msg_body, msg_subject)
+
 def _send_email(
-        receiver: str, msg_body: str, msg_subject: str, smtpConfig: dict
+        receiver: str, msg_body: str, msg_subject: str
     ) -> bool:
+    smtpConfig = flask.current_app.config["SMTP_SERVER"]
+
     msg = EmailMessage()
     msg.set_content(msg_body)
     msg["Subject"] = msg_subject

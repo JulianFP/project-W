@@ -1,11 +1,15 @@
 import yaml 
 import logging
 from pathlib import Path
-from flask import Flask
+import flask
+from project_W.logger import get_logger
+
+logger = get_logger("project_W")
 
 # define default config options 
 # default options will be overwritten later if they are defined in config.yml or env vars
 defaultConfig = {
+    "URL": "http://localhost:5000",
     "DB_PATH": ".",
     "JWT_SECRET_KEY": None,
     "SMTP_SERVER": {
@@ -17,7 +21,7 @@ defaultConfig = {
     }
 }
 
-def loadConfig(app: Flask, logger: logging.Logger):
+def loadConfig(app):
     #first set our app.config to the default values defined above
     app.config.update(defaultConfig)
 

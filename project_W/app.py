@@ -4,7 +4,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db, _send_email
+from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db, activate_user
 from .config import loadConfig
 
 
@@ -13,7 +13,7 @@ def create_app() -> Flask:
     app = Flask("project-W")
 
     #load config from default values < config file < env vars (latest has highest precedence)
-    loadConfig(app, logger)
+    loadConfig(app)
 
     #check syntax of JWT_SECRET_KEY and update if necessary
     JWT_SECRET_KEY = app.config["JWT_SECRET_KEY"]
@@ -65,6 +65,12 @@ def create_app() -> Flask:
         logger.info(f"Signup request from {email}")
         message, code = add_new_user(email, password, False)
         return jsonify(message=message), code
+
+    @app.get("/api/activate")
+    def activate():
+        if(token := request.args.get("token", type=str)):
+            return activate_user(token)
+        else: return "You need a token to activate a users email", 400
 
     @app.post("/api/login")
     def login():
