@@ -11,10 +11,9 @@ defaultConfig = {
     "SMTP_SERVER": {
         "domain": None,
         "port": 587,
-        "secure": "tls",
-        "name": None,
+        "secure": "starttls",
+        "sender_email": None,
         "password": None,
-        "sender": None
     }
 }
 

@@ -4,7 +4,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db
+from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db, _send_email
 from .config import loadConfig
 
 
@@ -31,9 +31,6 @@ def create_app() -> Flask:
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(minutes=60)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{app.config['DB_PATH']}/database.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-    print(app.config["SMTP_SERVER"]["domain"])
-    print(app.config["SMTP_SERVER"]["sender"])
 
     jwt = JWTManager(app)
     db.init_app(app)
