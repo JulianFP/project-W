@@ -12,7 +12,10 @@ import flask_test_utils as ftu
 
 @pytest.fixture()
 def app(monkeypatch, tmp_path):
-    monkeypatch.setenv("JWT_SECRET_KEY", "abcdefghijklmnopqrstuvwxyz")
+    temp_db_path = str(tmp_path)
+    monkeypatch.setenv("PROJECT_W_JWT_SECRET_KEY", "abcdefghijklmnopqrstuvwxyz")
+    monkeypatch.setenv("PROJECT_W_DB_PATH", temp_db_path)
+
     monkeypatch.setattr(
         smtplib.SMTP,
         "__init__",
@@ -25,8 +28,7 @@ def app(monkeypatch, tmp_path):
             TESTING_ONLY_LAST_SMTP_MESSAGE=msg
         ),
     )
-    temp_db_path = str(tmp_path)
-    app = create_app(temp_db_path)
+    app = create_app()
     ftu.add_test_users(app)
     yield app
 

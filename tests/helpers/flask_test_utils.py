@@ -12,6 +12,7 @@ def add_test_users(app):
                     email=email,
                     password_hash=ph.hash(name),
                     is_admin=is_admin,
+                    activated=True
                 )
             )
         db.session.commit()
