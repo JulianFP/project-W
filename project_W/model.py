@@ -34,16 +34,14 @@ class User(db.Model):
         self.invalidate_session_tokens()
         self.password_hash = hasher.hash(new_password)
         db.session.commit()
-
-    def set_password(self, current_password: str, new_password: str) -> bool:
-        if self.check_password(current_password):
-            self.set_password_unchecked(new_password)
-            return True
-        return False
+        logger.info(f" -> Updated password of user {self.email}")
 
     def set_email(self, new_email: str):
-        self.email = new_email
         self.invalidate_session_tokens()
+        old_email = self.email
+        self.email = new_email
+        db.session.commit()
+        logger.info(f" -> Updated email from {old_email} to {self.email}")
 
     def check_password(self, password: str) -> bool:
         try:
@@ -67,7 +65,7 @@ def add_new_user(
         User.query.where(User.email == email).exists()).scalar()
     if email_already_in_use:
         return "E-Mail is already used by another account", 400
-    if not _send_activation_email(email, email):
+    if not send_activation_email(email, email):
         return f"Failed to send activation email to {email}", 400
 
     logger.info(f" -> Created user with email {email}")
@@ -76,6 +74,7 @@ def add_new_user(
     db.session.commit()
 
     return f"Successful signup for {email}. Please activate your account be clicking on the link provided in the email we just sent you", 200
+
 
 def activate_user(token: str) -> Tuple[str, int]:
     secret_key = flask.current_app.config["JWT_SECRET_KEY"]
@@ -112,15 +111,6 @@ def delete_user(
     return (f"Successfully deleted user with email {user.email}"), 200
 
 
-def update_user_password(
-    user: User, new_password: str
-) -> Tuple[str, int]:
-    user.set_password_unchecked(new_password)
-    db.session.commit()
-    logger.info(f" -> Updated password of user {user.email}")
-    return "Successfully updated user password", 200
-
-
 def update_user_email(
     user: User, new_email: str
 ) -> Tuple[str, int]:
@@ -129,7 +119,8 @@ def update_user_email(
     logger.info(f" -> Updated email of user {user.email}")
     return "Successfully updated user email", 200
 
-def _send_activation_email(old_email: str, new_email: str) -> bool:
+
+def send_activation_email(old_email: str, new_email: str) -> bool:
     config = flask.current_app.config
     secret_key = config["JWT_SECRET_KEY"]
     token = encode_activation_token(old_email, new_email, secret_key)
@@ -144,6 +135,7 @@ def _send_activation_email(old_email: str, new_email: str) -> bool:
     )
     msg_subject = "Project-W account activation"
     return _send_email(new_email, msg_body, msg_subject)
+
 
 def _send_email(
         receiver: str, msg_body: str, msg_subject: str

@@ -4,7 +4,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, delete_user, update_user_password, update_user_email, db, activate_user
+from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email
 from .config import loadConfig
 
 
@@ -164,8 +164,8 @@ def create_app() -> Flask:
 
         new_password = request.form['new_password']
         logger.info(f"request to modify user password from {thisUser.email} for user {toModify.email}")
-        message, code = update_user_password(toModify, new_password)
-        return jsonify(message=message), code
+        toModify.set_password_unchecked(new_password)
+        return jsonify(message="Successfully updated user password"), 200
 
     @app.post("/api/changeUserEmail")
     @jwt_required()
@@ -195,8 +195,8 @@ def create_app() -> Flask:
 
         new_email = request.form['new_email']
         logger.info(f"request to modify user email from {thisUser.email} for user {toModify.email}")
-        message, code = update_user_email(toModify, new_email)
-        return jsonify(message=message), code
+        send_activation_email(toModify.email, new_email)
+        return jsonify(message="Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"), 200
 
     with app.app_context():
         db.create_all()
