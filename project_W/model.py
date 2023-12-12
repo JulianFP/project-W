@@ -78,6 +78,7 @@ def add_new_user(
 def delete_user(
     user: User
 ) -> Tuple[str, int]:
+    Job.query.filter(Job.user_id == user.id).delete()
     db.session.delete(user)
     db.session.commit()
     logger.info(f" -> Deleted user with email {user.email}")

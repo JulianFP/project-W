@@ -1,3 +1,4 @@
+from io import BytesIO
 import os
 import smtplib
 import sys
@@ -43,3 +44,7 @@ def _auth_fixture(email, password):
 
 user = _auth_fixture("user@test.com", "user")
 admin = _auth_fixture("admin@test.com", "admin")
+
+@pytest.fixture()
+def audio():
+    return (BytesIO(b""), "test.mp3")
