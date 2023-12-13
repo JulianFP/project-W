@@ -1,6 +1,7 @@
 import yaml 
 import logging
 from pathlib import Path
+from typing import Dict
 import flask
 from project_W.logger import get_logger
 
@@ -41,4 +42,9 @@ def loadConfig(app):
 
     #finally do the same thing for env variables (this means env vars have highest precedence)
     #we only load env variables with prefix "PROJECT-W". This prefix will be removed when storing var in app.config
+    fileConfig: Dict = app.config.copy()
     app.config.from_prefixed_env(prefix="PROJECT_W", loads=yaml.safe_load)
+    #the following makes sure that dicts inside our dict get updated and not overwritten. dicts inside dicts in our config are not supported
+    for name, value in fileConfig.items():
+        if isinstance(value, Dict): value.update(app.config[name])
+    app.config = fileConfig
