@@ -47,4 +47,6 @@ def loadConfig(app):
     #the following makes sure that dicts inside our dict get updated and not overwritten. dicts inside dicts in our config are not supported
     for name, value in fileConfig.items():
         if isinstance(value, Dict): value.update(app.config[name])
+    for name, value in app.config.items():
+        if not isinstance(value, Dict): fileConfig[name] = value
     app.config = fileConfig
