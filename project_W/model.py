@@ -96,7 +96,7 @@ def activate_user(token: str) -> Tuple[str, int]:
         logger.info(f"  -> User with email {old_email} already activated")
         return f"Account for {old_email} is already activated", 400
     user.activated = True
-    user.set_email = new_email #update email address (in case activation got issued for changed email address)
+    user.set_email(new_email) #update email address (in case activation got issued for changed email address)
     db.session.commit()
     return f"Account {new_email} activated", 200
 
