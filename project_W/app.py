@@ -104,7 +104,7 @@ def create_app() -> Flask:
                 return jsonify(message="No user exists with that email"), 400
         else:
             logger.info(f"Requested user info for {user.email}")
-        return jsonify(email=user.email, is_admin=user.is_admin)
+        return jsonify(email=user.email, is_admin=user.is_admin, activated=user.activated)
 
     @app.post("/api/deleteUser")
     @jwt_required()
