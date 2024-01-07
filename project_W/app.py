@@ -7,16 +7,15 @@ from .logger import get_logger
 from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email
 from .config import loadConfig
 
-
 def create_app() -> Flask:
     logger = get_logger("project-W")
     app = Flask("project-W")
 
     #load config from default values < config file < env vars (latest has highest precedence)
-    loadConfig(app)
+    app.config.update(loadConfig())
 
     #check syntax of JWT_SECRET_KEY and update if necessary
-    JWT_SECRET_KEY = app.config["JWT_SECRET_KEY"]
+    JWT_SECRET_KEY = app.config["loginSecurity"]["sessionSecretKey"]
     if JWT_SECRET_KEY is not None and len(JWT_SECRET_KEY) > 16:
         logger.info("Setting JWT_SECRET_KEY from supplied config or env var")
     else:
@@ -28,8 +27,8 @@ def create_app() -> Flask:
         app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 
     # tokens are by default valid for 1 hour
-    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(minutes=60)
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{app.config['DB_PATH']}/database.db"
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(minutes=app.config["loginSecurity"]["sessionExpirationTimeMinutes"])
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{app.config['databasePath']}/database.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     jwt = JWTManager(app)
