@@ -59,6 +59,9 @@ def create_app() -> Flask:
 
     @app.post("/api/signup")
     def signup():
+        if app.config["loginSecurity"]["disableSignup"]:
+            return jsonify(message="signup of new accounts is disabled on this server"), 400
+
         email = request.form['email']
         password = request.form['password']
         logger.info(f"Signup request from {email}")

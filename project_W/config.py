@@ -58,6 +58,10 @@ schema = {
                         "pattern": r"^([a-z0-9\-]+\.)+[a-z0-9\-]+$"
                     },
                     "default": []
+                },
+                "disableSignup": {
+                    "type": "boolean",
+                    "default": False
                 }
             },
             "additionalProperties": False,
