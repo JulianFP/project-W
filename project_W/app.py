@@ -4,7 +4,7 @@ from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email
+from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email, is_valid_email, is_valid_password
 from .config import loadConfig
 
 def create_app() -> Flask:
@@ -62,6 +62,12 @@ def create_app() -> Flask:
         email = request.form['email']
         password = request.form['password']
         logger.info(f"Signup request from {email}")
+
+        if not is_valid_email(email): 
+            return jsonify(message=f"{email} is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+        if not is_valid_password(password): 
+            return jsonify(message="password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total"), 400
+
         message, code = add_new_user(email, password, False)
         return jsonify(message=message), code
 
@@ -153,15 +159,18 @@ def create_app() -> Flask:
                 User.email == specifiedEmail).one_or_none()
             if not thisUser.is_admin:
                 logger.info(
-                    f"Non-admin tried to delete user {specifiedEmail}, denied")
+                    f"Non-admin tried to modify user {specifiedEmail}, denied")
                 return jsonify(message="You don't have permission to modify other users"), 403
             elif not specifiedUser:
                 logger.info(" -> Invalid user email")
                 return jsonify(message="No user exists with that email"), 400
             else:
-                toDelete = specifiedUser
+                toModify = specifiedUser
 
         new_password = request.form['new_password']
+        if not is_valid_password(password): 
+            return jsonify(message="password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total"), 400
+
         logger.info(f"request to modify user password from {thisUser.email} for user {toModify.email}")
         toModify.set_password_unchecked(new_password)
         return jsonify(message="Successfully updated user password"), 200
@@ -193,6 +202,9 @@ def create_app() -> Flask:
                 toModify = specifiedUser
 
         new_email = request.form['new_email']
+        if not is_valid_email(new_email): 
+            return jsonify(message=f"{new_email} is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+
         logger.info(f"request to modify user email from {thisUser.email} to {toModify.email}")
         if send_activation_email(toModify.email, new_email): 
             return jsonify(message="Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"), 200

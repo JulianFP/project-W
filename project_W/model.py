@@ -1,16 +1,12 @@
 from dataclasses import dataclass
-import secrets
 from typing import Tuple
 from argon2 import PasswordHasher
-import argon2
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import exists
 from smtplib import SMTP, SMTP_SSL
 from email.message import EmailMessage
 from project_W.logger import get_logger
 from project_W.utils import encode_activation_token, decode_activation_token
-import ssl
-import flask
+import secrets, ssl, argon2, flask, re
 
 db = SQLAlchemy()
 hasher = PasswordHasher()
@@ -137,6 +133,16 @@ def send_activation_email(old_email: str, new_email: str) -> bool:
     msg_subject = "Project-W account activation"
     return _send_email(new_email, msg_body, msg_subject)
 
+def is_valid_email(email: str) -> bool:
+    allowedDomains = flask.current_app.config["loginSecurity"]["allowedEmailDomains"]
+    pattern = r"^\S+@"
+    if allowedDomains == []: pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
+    else: pattern += r"(" + "|".join(allowedDomains) + r")"
+    pattern += r"$"
+    return re.match(pattern, email) is not None
+
+def is_valid_password(password: str) -> bool:
+    return re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{12,}$", password) is not None
 
 def _send_email(
         receiver: str, msg_body: str, msg_subject: str
