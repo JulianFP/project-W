@@ -1,4 +1,3 @@
-from collections import defaultdict
 from dataclasses import dataclass
 import secrets
 from typing import Dict, List, Tuple
@@ -28,6 +27,8 @@ class User(db.Model):
     user_key = db.Column(db.Text, nullable=False,
                          default=lambda: secrets.token_urlsafe(16))
     is_admin = db.Column(db.Boolean, nullable=False)
+
+    jobs = relationship("Job", order_by="Job.id", backref="user", cascade="all,delete-orphan")
 
     def set_password_unchecked(self, new_password: str):
         self.invalidate_session_tokens()
@@ -78,7 +79,6 @@ def add_new_user(
 def delete_user(
     user: User
 ) -> Tuple[str, int]:
-    Job.query.filter(Job.user_id == user.id).delete()
     db.session.delete(user)
     db.session.commit()
     logger.info(f" -> Deleted user with email {user.email}")
@@ -130,12 +130,7 @@ class Job(db.Model):
     status = db.Column(db.Enum(StatusEnum))
     transcript = db.Column(db.Text)
     error_msg = db.Column(db.Text)
-
-    user = relationship("User", back_populates="jobs")
     # TODO Add some form of runner token/tag system
-
-
-User.jobs = relationship("Job", order_by=Job.id, back_populates="user")
 
 
 def submit_job(user: User, file_name: str | None, audio: bytes, model: str | None, language: str | None) -> Job:
@@ -156,13 +151,12 @@ def submit_job(user: User, file_name: str | None, audio: bytes, model: str | Non
 
     return job
 
+
 def list_job_ids_for_user(user: User) -> List[int]:
     """Returns a list of all the job IDs associated with this user"""
-    return [job.id for job in db.session.query(Job).filter(Job.user_id == user.id)]
+    return [job.id for job in user.jobs]
+
 
 def list_job_ids_for_all_users() -> Dict[int, List[int]]:
     """For each user, returns a list of all job IDs associated with that user"""
-    d = defaultdict(list)
-    for user_id, job_id in db.session.query(User.id, Job.id).where(User.id == Job.user_id):
-        d[user_id].append(job_id)
-    return d
+    return {user.id: list_job_ids_for_user(user) for user in db.session.query(User)}
