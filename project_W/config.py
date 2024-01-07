@@ -77,16 +77,19 @@ schema = {
                 },
                 "secure": {
                     "type": "string",
-                    "pattern": r"^ssl|starttls$"
+                    "pattern": r"^ssl|starttls|unencrypted$"
                 },
                 "senderEmail": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 },
                 "password": {
                     "type": "string"
                 }
             },
-            "required": [ "domain", "port", "secure", "senderEmail", "password" ],
+            "required": [ "domain", "port", "secure", "senderEmail", "username", "password" ],
             "additionalProperties": False
         },
         "disableOptionValidation": {

@@ -66,7 +66,7 @@ def add_new_user(
     if email_already_in_use:
         return "E-Mail is already used by another account", 400
     if not send_activation_email(email, email):
-        return f"Failed to send activation email to {email}", 400
+        return f"Failed to send activation email to {email}. Email address may not exist", 400
 
     logger.info(f" -> Created user with email {email}")
     db.session.add(
@@ -124,13 +124,14 @@ def send_activation_email(old_email: str, new_email: str) -> bool:
     config = flask.current_app.config
     secret_key = config["JWT_SECRET_KEY"]
     token = encode_activation_token(old_email, new_email, secret_key)
-    url = f"{config['URL']}/api/activate?token={token}"
+    url = f"{config['url']}/api/activate?token={token}"
     logger.info(f" -> Activation url for email {new_email}: {url}")
     msg_body = (
-        f"To activate your Project-W account,"
+        f"To activate your Project-W account, "
         f"please confirm your email address by clicking on the following link:\n\n"
         f"{url}\n\n"
-        f"This link will expire within the next 24 hours\n"
+        f"This link will expire within the next 24 hours. "
+        f"After this period you will have to request a new activation email over the website\n\n"
         f"If you did not sign up for an account please disregard this email."
     )
     msg_subject = "Project-W account activation"
@@ -140,28 +141,28 @@ def send_activation_email(old_email: str, new_email: str) -> bool:
 def _send_email(
         receiver: str, msg_body: str, msg_subject: str
     ) -> bool:
-    smtpConfig = flask.current_app.config["SMTP_SERVER"]
+    smtpConfig = flask.current_app.config["smtpServer"]
 
     msg = EmailMessage()
     msg.set_content(msg_body)
     msg["Subject"] = msg_subject
-    msg["From"] = smtpConfig["sender_email"]
+    msg["From"] = smtpConfig["senderEmail"]
     msg["To"] = receiver
     context = ssl.create_default_context()
 
     try:
         #default instance for unencrypted and starttls 
         #ssl encrypts from beginning and requires a different instance
-        smtpInstance = SMTP(smtpConfig["domain"], smtpConfig["port"])
-        if smtpConfig["secure"] == "ssl":
-            smtpInstance = SMTP_SSL(smtpConfig["domain"], context=context)
+        smtpInstance = (SMTP_SSL(smtpConfig["domain"], smtpConfig["port"], context=context) 
+            if smtpConfig["secure"] == "ssl" 
+            else SMTP(smtpConfig["domain"], smtpConfig["port"]))
 
         with smtpInstance as server:
             if smtpConfig["secure"] == "starttls": 
                 server.ehlo()
                 server.starttls(context=context)
                 server.ehlo()
-            server.login(smtpConfig["sender_email"], smtpConfig["password"])
+            server.login(smtpConfig["username"], smtpConfig["password"])
             server.send_message(msg)
             logger.info(f" -> successfully sent email to {receiver}")
 

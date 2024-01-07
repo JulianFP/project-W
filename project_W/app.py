@@ -24,7 +24,7 @@ def create_app() -> Flask:
         )
         # new secret key -> invalidates any existing tokens
         JWT_SECRET_KEY = secrets.token_urlsafe(64)
-        app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
+    app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 
     # tokens are by default valid for 1 hour
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(minutes=app.config["loginSecurity"]["sessionExpirationTimeMinutes"])
@@ -184,18 +184,20 @@ def create_app() -> Flask:
                 User.email == specifiedEmail).one_or_none()
             if not thisUser.is_admin:
                 logger.info(
-                    f"Non-admin tried to delete user {specifiedEmail}, denied")
+                    f"Non-admin tried to modify users {specifiedEmail} email, denied")
                 return jsonify(message="You don't have permission to modify other users"), 403
             elif not specifiedUser:
                 logger.info(" -> Invalid user email")
                 return jsonify(message="No user exists with that email"), 400
             else:
-                toDelete = specifiedUser
+                toModify = specifiedUser
 
         new_email = request.form['new_email']
-        logger.info(f"request to modify user email from {thisUser.email} for user {toModify.email}")
-        send_activation_email(toModify.email, new_email)
-        return jsonify(message="Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"), 200
+        logger.info(f"request to modify user email from {thisUser.email} to {toModify.email}")
+        if send_activation_email(toModify.email, new_email): 
+            return jsonify(message="Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"), 200
+        else:
+            return jsonify(message=f"Failed to send activation email to {new_email}. Email address may not exist"), 400
 
     with app.app_context():
         db.create_all()
