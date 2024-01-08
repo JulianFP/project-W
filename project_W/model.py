@@ -75,12 +75,14 @@ def add_new_user(
 def activate_user(token: str) -> Tuple[str, int]:
     secret_key = flask.current_app.config["JWT_SECRET_KEY"]
     emails = decode_activation_token(token, secret_key)
-    old_email = emails["old_email"]
-    new_email = emails["new_email"]
 
     if emails is None:
         logger.info("  -> Invalid user activation token")
         return "Invalid or expired activation link", 400
+
+    old_email = emails["old_email"]
+    new_email = emails["new_email"]
+
     logger.info(f"  -> activation request for email '{new_email}'")
     user = db.session.execute(
         db.select(User).filter(User.email == old_email)

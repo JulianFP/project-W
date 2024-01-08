@@ -83,8 +83,9 @@ def create_app(customConfigPath: str|None = None) -> Flask:
     @app.get("/api/activate")
     def activate():
         if(token := request.args.get("token", type=str)):
-            return activate_user(token)
-        else: return "You need a token to activate a users email", 400
+            message, code = activate_user(token)
+            return jsonify(message=message), code
+        else: return jsonify(message="You need a token to activate a users email"), 400
 
     @app.post("/api/login")
     def login():
