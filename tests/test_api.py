@@ -1,80 +1,143 @@
-
-from typing import Dict
-from flask import Flask
+import pytest, smtplib
 from werkzeug import Client
 
-from tests import get_auth_headers
+#disableSignup has been set in config.yml
+@pytest.mark.parametrize("client", [("[]", "true"), ("[ 'test.com' ]", "true"), ("[ 'test.com', 'sub.test.com' ]", "true")], indirect=True)
+def test_signup_invalid_disabledSignup(client: Client):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
+    assert res.status_code == 400
+    assert res.json["message"] == "signup of new accounts is disabled on this server"
 
-
-def test_signup_invalid(client: Client):
-    # missing form data
+# missing form data
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_signup_invalid_missingFormData(client: Client):
     res = client.post("/api/signup")
     # leads to a flask error
     assert 400 <= res.status_code < 500
 
-    # user email is already in use
+# provided 'email' is not an email address
+@pytest.mark.parametrize("client, email", [(("[]", "false"), "abcdefg"), (("[]", "false"), "user2"), (("[]", "false"), "user2@test"), (("[]", "false"), "user2@test."), (("[]", "false"), "@test.com")], indirect=["client"])
+def test_signup_invalid_invalidEmail1(client: Client, email: str):
     res = client.post(
-        "/api/signup", data={"email": "user@test.com", "password": "test"})
+        "/api/signup", data={"email": email, "password": "user2Password1!"})
+    assert res.status_code == 400
+    assert res.json["message"] == f"'{email}' is not a valid email address"
+    assert res.json["allowedEmailDomains"] == []
+
+# provided 'email's domain is not in 'allowedEmailDomains'
+@pytest.mark.parametrize("client, email", [(("[ 'test.com' ]", "false"), "user2@test.de"), (("[ 'test.com' ]", "false"), "user2@sub.test.com")], indirect=["client"])
+def test_signup_invalid_invalidEmail2(client: Client, email: str):
+    res = client.post(
+        "/api/signup", data={"email": email, "password": "user2Password1!"})
+    assert res.status_code == 400
+    assert res.json["message"] == f"'{email}' is not a valid email address"
+    assert res.json["allowedEmailDomains"] == [ 'test.com' ]
+
+# provided 'password' does not fit criteria
+@pytest.mark.parametrize("client, password", [(("[]", "false"), "user2"), (("[]", "false"), "tooShort58!"), (("[]", "false"), "thispasswordhasnouppercasechars390!"), (("[]", "false"), "THISPASSWORDHASNOLOWERCASE$%=56"), (("[]", "false"), "ThisPasswordHasNoNumbers!"), (("[]", "false"), "ThisPasswordHasNoSymbols123"), (("[]", "false"), "thispasswordhasnouppercasechars390!")], indirect=["client"])
+def test_signup_invalid_invalidPassword(client: Client, password: str):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": password})
+    assert res.status_code == 400
+    assert res.json["message"] == "password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total"
+
+# user email is already in use
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_signup_invalid_emailAlreadyInUse(client: Client):
+    res = client.post(
+        "/api/signup", data={"email": "user@test.com", "password": "user2Password1!"})
     assert res.status_code == 400
     assert res.json["message"] == "E-Mail is already used by another account"
 
-    # TODO: Add more invalid cases once we have email/password restrictions
+# email couldn't been send
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_signup_invalid_brokenSMTP(client: Client, mockedSMTP):
+    mockedSMTP.side_effect = smtplib.SMTPException
 
-
-def test_signup_valid(client: Client):
     res = client.post(
-        "/api/signup", data={"email": "user2@test.com", "password": "user2"})
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
+    assert res.status_code == 400
+    assert res.json["message"] == "Failed to send activation email to user2@test.com. Email address may not exist"
+
+    #smtp stuff
+    assert mockedSMTP.call_count == 1
+
+
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_signup_valid(client: Client, mockedSMTP):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
     assert res.status_code == 200
-    assert res.json["message"] == "Successfully created user. Use /api/login to authenticate yourself"
+    assert res.json["message"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
+
+    #smtp stuff
+    assert mockedSMTP.call_count == 1
 
 
-def test_login_invalid(client: Client):
-    # missing form data
+
+
+# missing form data
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_login_invalid_missingFormData(client: Client):
     res = client.post("/api/login")
     assert 400 <= res.status_code < 500
 
-    # unknown email
-    res = client.post("/api/login", data={"email": "", "password": ""})
+# unknown email
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_login_invalid_unknownEmail(client: Client):
+    res = client.post("/api/login", data={"email": "", "password": "user2Password1!"})
     assert res.status_code == 400
     assert res.json["message"] == "Incorrect credentials provided"
 
-    # wrong password
+# wrong password
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_login_invalid_wrongPassword(client: Client):
     res = client.post(
-        "/api/login", data={"email": "user@test.com", "password": ""})
+        "/api/login", data={"email": "user@test.com", "password": "user2Password1!"})
     assert res.status_code == 400
     assert res.json["message"] == "Incorrect credentials provided"
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_login_valid(client: Client):
     email = "user@test.com"
-    password = "user"
+    password = "userPassword1!"
     response = client.post(
         "/api/login", data={"email": email, "password": password})
     assert response.status_code == 200
     assert "access_token" in response.json
 
 
-def test_userinfo_invalid(client: Client, user, admin):
-    # non-admins can't access other users' infos
+
+
+# non-admins can't access other users' infos
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_userinfo_invalid_noPermissions(client: Client, user):
     res = client.get("/api/userinfo", headers=user,
                      query_string={"email": "admin@test.com"})
     assert res.status_code == 403
     assert res.json["message"] == "You don't have permission to view other accounts' user info"
 
-    # can't access non-existent user info
+# can't access non-existent user info
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_userinfo_invalid_wrongEmail(client: Client, admin):
     res = client.get("/api/userinfo", headers=admin,
                      query_string={"email": "fake@test.com"})
     assert res.status_code == 400
     assert res.json["message"] == "No user exists with that email"
 
 
-def test_userinfo_valid(client: Client, user, admin):
-    # non-admins can access their own user info
+# non-admins can access their own user info
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_userinfo_valid_nonAdmins(client: Client, user):
     res = client.get("/api/userinfo", headers=user)
     assert res.status_code == 200
     assert res.json["email"] == "user@test.com"
     assert res.json["is_admin"] == False
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_userinfo_valid_admins(client: Client, admin):
     # admins can also access their own user info
     res = client.get("/api/userinfo", headers=admin)
     assert res.status_code == 200
@@ -89,118 +152,186 @@ def test_userinfo_valid(client: Client, user, admin):
     assert res.json["is_admin"] == False
 
 
-def test_deleteUser_invalid(client: Client, user, admin):
-    # wrong password
+
+
+# wrong password
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_deleteUser_invalid_wrongPassword(client: Client, user):
     res = client.post("/api/deleteUser", headers=user,
-                      data={"password": "xyz"})
+                      data={"password": "user2Password1!"})
     assert res.status_code == 403
     assert res.json["message"] == "Incorrect password provided"
 
-    # normal user who tries to delete other user
+# normal user who tries to delete other user
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_deleteUser_invalid_noPermissions(client: Client, user):
     res = client.post("/api/deleteUser", headers=user,
-                      data={"password": "user", "emailDelete": "admin@test.com"})
+                      data={"password": "userPassword1!", "emailDelete": "admin@test.com"})
     assert res.status_code == 403
     assert res.json["message"] == "You don't have permission to delete other users"
 
-    # admin user who tries to delete other user, but email is invalid
+# admin user who tries to delete other user, but email is invalid
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_deleteUser_wrongEmail(client: Client, admin):
     res = client.post("/api/deleteUser", headers=admin,
-                      data={"password": "admin", "emailDelete": "abc@xyz.com"})
+                      data={"password": "adminPassword1!", "emailDelete": "abc@xyz.com"})
     assert res.status_code == 400
     assert res.json["message"] == "No user exists with that email"
 
 
-def test_deleteUser_valid_normal(client: Client, user):
-    # normal user deletes themselves
+# normal user deletes themselves
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_deleteUser_valid_nonAdmins(client: Client, user):
     res = client.post("/api/deleteUser", headers=user,
-                      data={"password": "user"})
+                      data={"password": "userPassword1!"})
     assert res.status_code == 200
     assert res.json["message"] == "Successfully deleted user with email user@test.com"
 
-
-def test_deleteUser_valid_admin(client: Client, admin):
-    # admin user deletes other user
+# admin user deletes other user
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_deleteUser_valid_Admins(client: Client, admin):
     res = client.post("/api/deleteUser", headers=admin,
-                      data={"password": "admin", "emailDelete": "user@test.com"})
+                      data={"password": "adminPassword1!", "emailDelete": "user@test.com"})
     assert res.status_code == 200
     assert res.json["message"] == "Successfully deleted user with email user@test.com"
 
 
-def test_changeUserPassword_invalid(client: Client, user, admin):
-    # wrong password
+
+
+# wrong password
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserPassword_invalid_wrongPassword(client: Client, user):
     res = client.post("/api/changeUserPassword", headers=user,
-                      data={"password": "xyz", "new_password": "user2"})
+                      data={"password": "userPassword2!", "new_password": "user2Password1!"})
     assert res.status_code == 403
     assert res.json["message"] == "Incorrect password provided"
 
-    # normal user who tries to modify other user
+# normal user who tries to modify other user
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserPassword_invalid_noPermissions(client: Client, user):
     res = client.post("/api/changeUserPassword", headers=user, data={
-                      "password": "user", "new_password": "user2", "emailModify": "admin@test.com"})
+                      "password": "userPassword1!", "new_password": "user2Password1!", "emailModify": "admin@test.com"})
     assert res.status_code == 403
     assert res.json["message"] == "You don't have permission to modify other users"
 
-    # admin user who tries to modify other user, but email is invalid
+# admin user who tries to modify other user, but email is invalid
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserPassword_invalid_wrongEmail(client: Client, admin):
     res = client.post("/api/changeUserPassword", headers=admin, data={
-                      "password": "admin", "new_password": "abc2", "emailModify": "abc@xyz.com"})
+                      "password": "adminPassword1!", "new_password": "adminPassword2!", "emailModify": "abc@xyz.com"})
     assert res.status_code == 400
     assert res.json["message"] == "No user exists with that email"
 
-
-def test_changeUserPassword_valid_normal(client: Client, user):
-    # normal user modifies themselves
+#new_password does not meet criteria
+@pytest.mark.parametrize("client, password", [(("[]", "false"), "user2"), (("[]", "false"), "tooShort58!"), (("[]", "false"), "thispasswordhasnouppercasechars390!"), (("[]", "false"), "THISPASSWORDHASNOLOWERCASE$%=56"), (("[]", "false"), "ThisPasswordHasNoNumbers!"), (("[]", "false"), "ThisPasswordHasNoSymbols123"), (("[]", "false"), "thispasswordhasnouppercasechars390!")], indirect=["client"])
+def test_changeUserPassword_invalid_invalidPassword(client: Client, password: str, user):
     res = client.post("/api/changeUserPassword", headers=user,
-                      data={"password": "user", "new_password": "user2"})
+                      data={"password": "user", "new_password": password})
+
+
+# normal user modifies themselves
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserPassword_valid_normal(client: Client, user):
+    res = client.post("/api/changeUserPassword", headers=user,
+                      data={"password": "userPassword1!", "new_password": "user2Password1!"})
     assert res.status_code == 200
     assert res.json["message"] == "Successfully updated user password"
 
-
+# admin user deletes other user
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_changeUserPassword_valid_admin(client: Client, admin):
-    # admin user deletes other user
     res = client.post("/api/changeUserPassword", headers=admin, data={
-                      "password": "admin", "new_password": "user2", "emailDelete": "user@test.com"})
+                      "password": "adminPassword1!", "new_password": "admin2Password!", "emailDelete": "user@test.com"})
     assert res.status_code == 200
     assert res.json["message"] == "Successfully updated user password"
 
 
-def test_changeUserEmail_invalid(client: Client, user, admin):
-    # wrong password
+
+
+# wrong password
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserEmail_invalid_wrongPassword(client: Client, user):
     res = client.post("/api/changeUserEmail", headers=user,
-                      data={"password": "xyz", "new_email": "user2@test.com"})
+                      data={"password": "userPassword2!", "new_email": "user2@test.com"})
     assert res.status_code == 403
     assert res.json["message"] == "Incorrect password provided"
 
-    # normal user who tries to modify other user
+# normal user who tries to modify other user
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserEmail_invalid_wrongPassowrd(client: Client, user):
     res = client.post("/api/changeUserEmail", headers=user, data={
-                      "password": "user", "new_email": "user2@test.com", "emailModify": "admin@test.com"})
+                      "password": "userPassword1!", "new_email": "user2@test.com", "emailModify": "admin@test.com"})
     assert res.status_code == 403
     assert res.json["message"] == "You don't have permission to modify other users"
 
-    # admin user who tries to modify other user, but email is invalid
+# admin user who tries to modify other user, but email is invalid
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserEmail_invalid_wrongEmail(client: Client, admin):
     res = client.post("/api/changeUserEmail", headers=admin, data={
-                      "password": "admin", "new_email": "abc2@xyz.com", "emailModify": "abc@xyz.com"})
+                      "password": "adminPassword1!", "new_email": "abc2@xyz.com", "emailModify": "abc@xyz.com"})
     assert res.status_code == 400
     assert res.json["message"] == "No user exists with that email"
 
-
-def test_changeUserEmail_valid_normal(client: Client, user):
-    # normal user modifies themselves
+# provided 'email' is not an email address
+@pytest.mark.parametrize("client, email", [(("[]", "false"), "abcdefg"), (("[]", "false"), "user2"), (("[]", "false"), "user2@test"), (("[]", "false"), "user2@test."), (("[]", "false"), "@test.com")], indirect=["client"])
+def test_changeUserEmail_invalid_invalidEmail1(client: Client, email: str, user):
     res = client.post("/api/changeUserEmail", headers=user,
-                      data={"password": "user", "new_email": "user2@test.com"})
+                      data={"password": "userPassword1!", "new_email": email})
+    assert res.status_code == 400
+    assert res.json["message"] == f"'{email}' is not a valid email address"
+    assert res.json["allowedEmailDomains"] == []
+
+# provided 'email's domain is not in 'allowedEmailDomains'
+@pytest.mark.parametrize("client, email", [(("[ 'test.com' ]", "false"), "user2@test.de"), (("[ 'test.com' ]", "false"), "user2@sub.test.com")], indirect=["client"])
+def test_changeUserEmail_invalid_invalidEmail2(client: Client, email: str, user):
+    res = client.post("/api/changeUserEmail", headers=user,
+                      data={"password": "userPassword1!", "new_email": email})
+    assert res.status_code == 400
+    assert res.json["message"] == f"'{email}' is not a valid email address"
+    assert res.json["allowedEmailDomains"] == [ 'test.com' ]
+
+# email couldn't been send
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_changeUserEmail_invalid_brokenSMTP(client: Client, mockedSMTP, user):
+    mockedSMTP.side_effect = smtplib.SMTPException
+
+    res = client.post("/api/changeUserEmail", headers=user,
+                      data={"password": "userPassword1!", "new_email": "user2@test.com"})
+    assert res.status_code == 400
+    assert res.json["message"] == "Failed to send activation email to user2@test.com. Email address may not exist"
+
+    #smtp stuff
+    assert mockedSMTP.call_count == 1
+
+
+# normal user modifies themselves
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_changeUserEmail_valid_nonAdmin(client: Client, mockedSMTP, user):
+    res = client.post("/api/changeUserEmail", headers=user,
+                      data={"password": "userPassword1!", "new_email": "user2@test.com"})
     assert res.status_code == 200
-    assert res.json["message"] == "Successfully updated user email"
+    assert res.json["message"] == "Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"
 
+    #smtp stuff
+    assert mockedSMTP.call_count == 1
 
-def test_changeUserEmail_valid_admin(client: Client, admin):
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_changeUserEmail_valid_admin(client: Client, mockedSMTP, admin):
     # admin user deletes other user
     res = client.post("/api/changeUserEmail", headers=admin, data={
-                      "password": "admin", "new_email": "user2@test.com", "emailDelete": "user@test.com"})
+                      "password": "adminPassword1!", "new_email": "user2@test.com", "emailDelete": "user@test.com"})
     assert res.status_code == 200
-    assert res.json["message"] == "Successfully updated user email"
+    assert res.json["message"] == "Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"
+
+    #smtp stuff
+    assert mockedSMTP.call_count == 1
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_changeUserPassword_revokes_session(client: Client, user):
     # assume this succeeds, that's not what we're testing here
     res = client.post("/api/changeUserPassword", headers=user,
-                      data={"password": "user", "new_password": "user2"})
+                      data={"password": "userPassword1!", "new_password": "user2Password1!"})
     assert res.status_code == 200
 
     res = client.get("/api/userinfo", headers=user)
@@ -209,10 +340,11 @@ def test_changeUserPassword_revokes_session(client: Client, user):
     assert 400 <= res.status_code < 500
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_changeUserEmail_revokes_session(client: Client, user):
     # assume this succeeds, that's not what we're testing here
     res = client.post("/api/changeUserEmail", headers=user,
-                      data={"password": "user", "new_email": "user2@test.com"})
+                      data={"password": "userPassword1!", "new_email": "user2@test.com"})
     assert res.status_code == 200
 
     res = client.get("/api/userinfo", headers=user)

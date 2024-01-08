@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 from jsonschema import Draft202012Validator, ValidationError, validators
 from platformdirs import user_data_dir, user_config_path, site_config_path
 from pyaml_env import parse_config
@@ -105,20 +105,22 @@ schema = {
     "additionalProperties": False
 }
 
-def findConfigFile() -> Path:
-    searchDirs = [ 
+def findConfigFile(additionalPaths: List[Path] = []) -> Path:
+    defaultSearchDirs = [ 
         user_config_path(appname=programName),
         site_config_path(appname=programName),
         Path(__file__).parent,
         Path.cwd()
     ]
+    searchDirs = additionalPaths + defaultSearchDirs
+
     for dir in searchDirs:
         configDir = dir / "config.yml"
         if configDir.is_file(): return configDir
     raise Exception("couldn't find a config.yml file in any search directory. Please add one")
 
-def loadConfig() -> Dict:
-    configPath = findConfigFile()
+def loadConfig(additionalPaths: List[Path] = []) -> Dict:
+    configPath = findConfigFile(additionalPaths)
     config = parse_config(configPath)
 
     #print warning about option if it is set

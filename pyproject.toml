@@ -48,6 +48,7 @@ dependencies = [
 [project.optional-dependencies]
 tests = [
     "pytest",
+    "pytest-mock",
     "pytest-cov",
     "nbval",
 ]

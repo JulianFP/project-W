@@ -10,7 +10,7 @@ def add_test_users(app):
             db.session.add(
                 User(
                     email=email,
-                    password_hash=ph.hash(name),
+                    password_hash=ph.hash(name + "Password1!"),
                     is_admin=is_admin,
                     activated=True
                 )

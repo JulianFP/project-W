@@ -107,15 +107,6 @@ def delete_user(
     return (f"Successfully deleted user with email {user.email}"), 200
 
 
-def update_user_email(
-    user: User, new_email: str
-) -> Tuple[str, int]:
-    user.set_email(new_email)
-    db.session.commit()
-    logger.info(f" -> Updated email of user {user.email}")
-    return "Successfully updated user email", 200
-
-
 def send_activation_email(old_email: str, new_email: str) -> bool:
     config = flask.current_app.config
     secret_key = config["JWT_SECRET_KEY"]
