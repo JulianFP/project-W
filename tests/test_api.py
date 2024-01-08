@@ -1,5 +1,6 @@
 import pytest, smtplib
 from werkzeug import Client
+from tests import get_auth_headers
 
 #disableSignup has been set in config.yml
 @pytest.mark.parametrize("client", [("[]", "true"), ("[ 'test.com' ]", "true"), ("[ 'test.com', 'sub.test.com' ]", "true")], indirect=True)
@@ -73,7 +74,98 @@ def test_signup_valid(client: Client, mockedSMTP):
 
     #smtp stuff
     assert mockedSMTP.call_count == 1
+    msg = mockedSMTP.mock_calls[3][1][0]
+    assert msg["Subject"] == "Project-W account activation"
+    assert msg["From"] == "alice@example.com"
+    assert msg["To"] == "user2@test.com"
+    body = msg.get_content()
+    assert body.startswith("To activate your Project-W account")
+    
 
+
+
+#no token in query string
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_activate_invalid_noToken(client: Client):
+    res = client.get("/api/activate")
+    assert res.status_code == 400
+    assert res.json["message"] == "You need a token to activate a users email"
+
+#invalid token in query string
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_activate_invalid_invalidToken(client: Client):
+    #hint: tokens are 127 characters long
+    res = client.get("/api/activate", query_string={"token": "safjdDkdf8239hf839fdFsdfas.FDSf239dHF001fdhFDFfuisagu.6asdjgKOPFDdfsFDDgufg898989898dU89789fFDDGudufFD123449FGDjhgdfhgfua5438FD"})
+    #assert res.status_code == 400
+    assert res.json["message"] == "Invalid or expired activation link"
+
+#user deleted before activation
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_activate_invalid_userDeleted(client: Client, mockedSMTP):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
+    assert res.status_code == 200
+
+    msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
+    tokenLine = msgBody.split('\n')[2]
+    token = tokenLine.partition("token=")[2]
+
+    user2 = get_auth_headers(client, "user2@test.com", "user2Password1!")
+    res = client.post("/api/deleteUser", headers=user2,
+                      data={"password": "user2Password1!"})
+    assert res.status_code == 200
+
+    res = client.get("/api/activate", query_string={"token": token})
+    assert res.status_code == 400
+    assert res.json["message"] == "Unknown email address user2@test.com"
+
+#user already activated
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_activate_invalid_userAlreadyActivated(client: Client, mockedSMTP):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
+
+    msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
+    tokenLine = msgBody.split('\n')[2]
+    token = tokenLine.partition("token=")[2]
+
+    res = client.get("/api/activate", query_string={"token": token})
+    assert res.status_code == 200
+
+    res = client.get("/api/activate", query_string={"token": token})
+    assert res.status_code == 400
+    assert res.json["message"] == "Account for user2@test.com is already activated"
+
+
+#valid after accout signup
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_activate_valid_signup(client: Client, mockedSMTP):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
+    assert res.status_code == 200
+
+    msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
+    tokenLine = msgBody.split('\n')[2]
+    token = tokenLine.partition("token=")[2]
+
+    res = client.get("/api/activate", query_string={"token": token})
+    assert res.status_code == 200
+    assert res.json["message"] == "Account user2@test.com activated"
+
+#valid after email address change
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_activate_valid_emailChange(client: Client, mockedSMTP, user):
+    res = client.post("/api/changeUserEmail", headers=user,
+                      data={"password": "userPassword1!", "new_email": "user2@test.com"})
+    assert res.status_code == 200
+
+    msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
+    tokenLine = msgBody.split('\n')[2]
+    token = tokenLine.partition("token=")[2]
+
+    res = client.get("/api/activate", query_string={"token": token})
+    assert res.status_code == 200
+    assert res.json["message"] == "Account user2@test.com activated"
 
 
 
@@ -258,7 +350,7 @@ def test_changeUserEmail_invalid_wrongPassword(client: Client, user):
 
 # normal user who tries to modify other user
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
-def test_changeUserEmail_invalid_wrongPassowrd(client: Client, user):
+def test_changeUserEmail_invalid_noPermissions(client: Client, user):
     res = client.post("/api/changeUserEmail", headers=user, data={
                       "password": "userPassword1!", "new_email": "user2@test.com", "emailModify": "admin@test.com"})
     assert res.status_code == 403
@@ -314,17 +406,31 @@ def test_changeUserEmail_valid_nonAdmin(client: Client, mockedSMTP, user):
 
     #smtp stuff
     assert mockedSMTP.call_count == 1
+    msg = mockedSMTP.mock_calls[3][1][0]
+    assert msg["Subject"] == "Project-W account activation"
+    assert msg["From"] == "alice@example.com"
+    assert msg["To"] == "user2@test.com"
+    body = msg.get_content()
+    assert body.startswith("To activate your Project-W account")
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_changeUserEmail_valid_admin(client: Client, mockedSMTP, admin):
     # admin user deletes other user
     res = client.post("/api/changeUserEmail", headers=admin, data={
-                      "password": "adminPassword1!", "new_email": "user2@test.com", "emailDelete": "user@test.com"})
+                      "password": "adminPassword1!", "new_email": "user2@test.com", "emailModify": "user@test.com"})
     assert res.status_code == 200
     assert res.json["message"] == "Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"
 
     #smtp stuff
     assert mockedSMTP.call_count == 1
+    msg = mockedSMTP.mock_calls[3][1][0]
+    assert msg["Subject"] == "Project-W account activation"
+    assert msg["From"] == "alice@example.com"
+    assert msg["To"] == "user2@test.com"
+    body = msg.get_content()
+    assert body.startswith("To activate your Project-W account")
+
+
 
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
@@ -339,12 +445,18 @@ def test_changeUserPassword_revokes_session(client: Client, user):
     # by changing the user password
     assert 400 <= res.status_code < 500
 
-
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
-def test_changeUserEmail_revokes_session(client: Client, user):
+def test_changeUserEmail_revokes_session(client: Client, mockedSMTP, user):
     # assume this succeeds, that's not what we're testing here
     res = client.post("/api/changeUserEmail", headers=user,
                       data={"password": "userPassword1!", "new_email": "user2@test.com"})
+    assert res.status_code == 200
+
+    msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
+    tokenLine = msgBody.split('\n')[2]
+    token = tokenLine.partition("token=")[2]
+
+    res = client.get("/api/activate", query_string={"token": token})
     assert res.status_code == 200
 
     res = client.get("/api/userinfo", headers=user)

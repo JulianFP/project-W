@@ -1,8 +1,5 @@
 import os
-import smtplib
 import sys
-import flask
-import project_W
 import pytest
 from project_W import create_app
 from tests import get_auth_headers
