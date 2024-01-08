@@ -118,26 +118,41 @@ class StatusEnum(enum.StrEnum):
     FAILED = "failed"
 
 
+# We rarely need to load the entire audio file, so we keep
+# them in a separate table to speed up db operations on jobs.
+@dataclass
+class InputFile(db.Model):
+    __tablename__ = "files"
+    id = db.Column(db.Integer, primary_key=True)
+    # job_id = db.Column(db.Integer, ForeignKey("jobs.id"))
+    job = relationship("Job", back_populates="file")
+    file_name = db.Column(db.Text)
+    audio_data = db.Column(db.BLOB)
+
+
 @dataclass
 class Job(db.Model):
     __tablename__ = "jobs"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, ForeignKey("users.id"), index=True, nullable=False)
-    file_name = db.Column(db.Text)
-    audio_data = db.Column(db.BLOB)
     model = db.Column(db.Text)
     language = db.Column(db.Text)
     status = db.Column(db.Enum(StatusEnum))
     transcript = db.Column(db.Text)
     error_msg = db.Column(db.Text)
+    file_id = db.Column(db.Integer, ForeignKey("files.id"))
+    file = relationship("InputFile", back_populates="job", uselist=False,
+                        single_parent=True, cascade="all,delete-orphan")
     # TODO Add some form of runner token/tag system
 
 
 def submit_job(user: User, file_name: str | None, audio: bytes, model: str | None, language: str | None) -> Job:
     job = Job(
         user_id=user.id,
-        file_name=file_name,
-        audio_data=audio,
+        file=InputFile(
+            file_name=file_name,
+            audio_data=audio
+        ),
         model=model,
         language=language,
         status=StatusEnum.PENDING_RUNNER,
