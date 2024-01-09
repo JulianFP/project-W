@@ -140,5 +140,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-#ignore file where JWT_SECRET_KEY gets imported by run.sh script
+#ignore config files 
 JWT_SECRET_KEY
+config.yml
