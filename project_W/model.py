@@ -8,7 +8,6 @@ import argon2
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
-import enum
 
 from project_W.logger import get_logger
 
@@ -106,20 +105,6 @@ def update_user_email(
     return "Successfully updated user email", 200
 
 
-class StatusEnum(enum.StrEnum):
-    # The backend has received the job request but no
-    # runner has been assigned yet
-    PENDING_RUNNER = "pending_runner"
-    # A runner has been assigned, and is currently processing
-    # the request
-    RUNNER_IN_PROGRESS = "runner_in_progress"
-    # The runner successfully completed the job and
-    # the transcript is ready for retrieval
-    SUCCESS = "success"
-    # There was an error during the processing of the request
-    FAILED = "failed"
-
-
 # We rarely need to load the entire audio file, so we keep
 # them in a separate table to speed up db operations on jobs.
 @dataclass
@@ -139,7 +124,6 @@ class Job(db.Model):
     user_id = db.Column(db.Integer, ForeignKey("users.id"), index=True, nullable=False)
     model = db.Column(db.Text)
     language = db.Column(db.Text)
-    status = db.Column(db.Enum(StatusEnum))
     transcript = db.Column(db.Text)
     error_msg = db.Column(db.Text)
     file_id = db.Column(db.Integer, ForeignKey("files.id"))
@@ -157,7 +141,6 @@ def submit_job(user: User, file_name: str | None, audio: bytes, model: str | Non
         ),
         model=model,
         language=language,
-        status=StatusEnum.PENDING_RUNNER,
     )
 
     db.session.add(job)
@@ -167,6 +150,10 @@ def submit_job(user: User, file_name: str | None, audio: bytes, model: str | Non
     logger.info(f" -> Assigned job id {job.id}")
 
     return job
+
+
+def get_job_by_id(id: int) -> Job | None:
+    return db.session.query(Job).where(Job.id == id).one_or_none()
 
 
 def list_job_ids_for_user(user: User) -> List[int]:

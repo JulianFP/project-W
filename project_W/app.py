@@ -5,10 +5,13 @@ import secrets
 from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
+
+
 from .logger import get_logger
 from .model import Job, User, add_new_user, create_runner, delete_user, \
     get_runner_by_token, list_job_ids_for_all_users, list_job_ids_for_user, \
     submit_job, update_user_password, update_user_email, db
+from .runner_manager import RunnerManager
 
 
 def create_app(db_path: str = ".") -> Flask:
@@ -35,6 +38,8 @@ def create_app(db_path: str = ".") -> Flask:
 
     jwt = JWTManager(app)
     db.init_app(app)
+
+    runner_manager = RunnerManager()
 
     @jwt.user_identity_loader
     def user_identity_loader(user: User):
@@ -243,10 +248,15 @@ def create_app(db_path: str = ".") -> Flask:
             return jsonify(message="You don't have permission to access this job"), 403
         if job.user_id != user.id and not user.is_admin:
             return jsonify(message="You don't have permission to access this job"), 403
-        return jsonify(status=job.status)
+        return jsonify(status=runner_manager.job_status(job))
 
     @app.get("/api/runners/create")
+    @jwt_required()
     def createRunner():
+        user: User = current_user
+        if not user.is_admin:
+            logger.info(f"non-admin ({user.email}) tried to create runner.")
+            return jsonify(message="Only admins may create runner tokens.")
         token, runner = create_runner()
         logger.info(f"Created runner with label '{runner.label}'")
         return token
@@ -255,8 +265,7 @@ def create_app(db_path: str = ".") -> Flask:
     def heartbeat():
         token = request.form["runner_token"]
         runner = get_runner_by_token(token)
-        print(runner)
-        return jsonify({})
+        return runner_manager.heartbeat(runner, request)
 
     with app.app_context():
         db.create_all()
