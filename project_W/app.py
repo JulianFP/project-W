@@ -8,7 +8,7 @@ from .logger import get_logger
 from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email, send_password_reset_email, reset_user_password, is_valid_email, is_valid_password
 from .config import loadConfig
 
-def create_app(customConfigPath: str|None = None) -> Flask:
+def create_app(customConfigPath: Optional[str] = None) -> Flask:
     logger = get_logger("project-W")
     app = Flask("project-W")
 

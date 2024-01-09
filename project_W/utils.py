@@ -24,7 +24,7 @@ def _decode_string_from_token(
 def encode_activation_token(oldEmail: str, newEmail: str, secret_key: str) -> str:
     return _encode_string_as_token(json.dumps({"old_email": oldEmail, "new_email": newEmail}), "activate", secret_key)
 
-def decode_activation_token(token: str, secret_key: str) -> Dict|None:
+def decode_activation_token(token: str, secret_key: str) -> Optional[Dict]:
     one_day_in_secs = 60 * 60 * 24
     decodedData = _decode_string_from_token(token, "activate", secret_key, one_day_in_secs)
     if decodedData is None:
