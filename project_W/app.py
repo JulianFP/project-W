@@ -75,7 +75,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         if not is_valid_email(email): 
             return jsonify(message=f"'{email}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
         if not is_valid_password(password): 
-            return jsonify(message="password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total"), 400
+            return jsonify(message="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
 
         message, code = add_new_user(email, password, False)
         return jsonify(message=message), code
@@ -126,7 +126,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         msg, code = "", 0
         if not is_valid_password(newPassword): 
-            msg, code = "password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total", 400
+            msg, code = "password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total", 400
         elif(token := request.args.get("token", type=str)):
             msg, code = reset_user_password(token, newPassword)
         else: msg, code = "You need a token to reset a users password", 400
@@ -209,7 +209,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         new_password = request.form['new_password']
         if not is_valid_password(password): 
-            return jsonify(message="password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total"), 400
+            return jsonify(message="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
 
         logger.info(f"request to modify user password from {thisUser.email} for user {toModify.email}")
         toModify.set_password_unchecked(new_password)
@@ -247,7 +247,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         logger.info(f"request to modify user email from {thisUser.email} to {toModify.email}")
         if send_activation_email(toModify.email, new_email): 
-            return jsonify(message="Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"), 200
+            return jsonify(message="Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"), 200
         else:
             return jsonify(message=f"Failed to send activation email to {new_email}. Email address may not exist"), 400
 

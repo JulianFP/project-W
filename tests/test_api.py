@@ -41,7 +41,7 @@ def test_signup_invalid_invalidPassword(client: Client, password: str):
     res = client.post(
         "/api/signup", data={"email": "user2@test.com", "password": password})
     assert res.status_code == 400
-    assert res.json["message"] == "password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total"
+    assert res.json["message"] == "password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"
 
 # user email is already in use
 @pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
@@ -280,7 +280,7 @@ def test_resetPassword_invalid_invalidPassword(client: Client, mockedSMTP, passw
     res = client.post(
         "/api/resetPassword", query_string={"token": token}, data={"newPassword": password})
     assert res.status_code == 400
-    assert res.json["message"] == "password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total"
+    assert res.json["message"] == "password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"
 
 #user deleted before password reset
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
@@ -519,7 +519,7 @@ def test_changeUserEmail_valid_nonAdmin(client: Client, mockedSMTP, user):
     res = client.post("/api/changeUserEmail", headers=user,
                       data={"password": "userPassword1!", "new_email": "user2@test.com"})
     assert res.status_code == 200
-    assert res.json["message"] == "Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"
+    assert res.json["message"] == "Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"
 
     #smtp stuff
     assert mockedSMTP.call_count == 1
@@ -537,7 +537,7 @@ def test_changeUserEmail_valid_admin(client: Client, mockedSMTP, admin):
     res = client.post("/api/changeUserEmail", headers=admin, data={
                       "password": "adminPassword1!", "new_email": "user2@test.com", "emailModify": "user@test.com"})
     assert res.status_code == 200
-    assert res.json["message"] == "Successfully requested email address change. Please confirm your new address be clicking on the link provided in the email we just sent you"
+    assert res.json["message"] == "Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"
 
     #smtp stuff
     assert mockedSMTP.call_count == 1
