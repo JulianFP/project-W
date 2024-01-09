@@ -31,9 +31,9 @@ DefaultValidatingValidator = extend_with_default(Draft202012Validator)
 schema = {
     "type": "object",
     "properties": {
-        "url": {
+        "clientURL": {
             "type": "string",
-            "pattern": r"^(http|https):\/\/(([a-z0-9\-]+\.)+[a-z0-9\-]+|localhost)(:[0-9]+)?$",
+            "pattern": r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?$",
         },
         "databasePath": {
             "type": "string",
@@ -55,7 +55,7 @@ schema = {
                     "type": [ "array" ],
                     "items": {
                         "type": "string",
-                        "pattern": r"^([a-z0-9\-]+\.)+[a-z0-9\-]+$"
+                        "pattern": r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+$"
                     },
                     "default": []
                 },
@@ -72,7 +72,7 @@ schema = {
             "properties": {
                 "domain": {
                     "type": "string",
-                    "pattern": r"^([a-z0-9\-]+\.)+[a-z0-9\-]+|localhost$",
+                    "pattern": r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost$",
                 },
                 "port": {
                     "type": "integer",
@@ -101,7 +101,7 @@ schema = {
             "default": False
         }
     },
-    "required": [ "url", "smtpServer" ],
+    "required": [ "clientURL", "smtpServer" ],
     "additionalProperties": False
 }
 

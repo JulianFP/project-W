@@ -5,7 +5,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
 from .logger import get_logger
-from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email, is_valid_email, is_valid_password
+from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email, send_password_reset_email, reset_user_password, is_valid_email, is_valid_password
 from .config import loadConfig
 
 def create_app(customConfigPath: str|None = None) -> Flask:
@@ -82,10 +82,11 @@ def create_app(customConfigPath: str|None = None) -> Flask:
 
     @app.get("/api/activate")
     def activate():
+        msg, code = "", 0
         if(token := request.args.get("token", type=str)):
-            message, code = activate_user(token)
-            return jsonify(message=message), code
-        else: return jsonify(message="You need a token to activate a users email"), 400
+            msg, code = activate_user(token)
+        else: msg, code = "You need a token to activate a users email", 400
+        return jsonify(message=msg), code
 
     @app.post("/api/login")
     def login():
@@ -102,6 +103,35 @@ def create_app(customConfigPath: str|None = None) -> Flask:
 
         logger.info(" -> login successful, returning JWT token")
         return jsonify(access_token=create_access_token(user))
+
+    @app.post("/api/requestPasswordReset")
+    def requestPasswordReset():
+        email = request.form['email']
+        logger.info(f"Password reset request for email {email}")
+        msg, code = f"If an account with the address {email} exists, then we sent a password reset email to this address. Please check your emails", 200
+
+        user: Optional[User] = User.query.where(
+            User.email == email).one_or_none()
+        if user is None:
+            #do not change the output in this case since that would allow anybody to probe for emails which have an account here
+            logger.info(f"  -> password reset request for unknown email address '{email}'")
+        elif not send_password_reset_email(email):
+            msg, code = f"Failed to send password reset email to {email}.", 400
+
+        return jsonify(message=msg), code
+
+    @app.post("/api/resetPassword")
+    def resetPassword():
+        newPassword = request.form['newPassword']
+
+        msg, code = "", 0
+        if not is_valid_password(newPassword): 
+            msg, code = "password invalid. The password needs to have at least one lower case letter, higher case letter, number, special character and at least 12 characters in total", 400
+        elif(token := request.args.get("token", type=str)):
+            msg, code = reset_user_password(token, newPassword)
+        else: msg, code = "You need a token to reset a users password", 400
+        return jsonify(message=msg), code
+
 
     @app.get("/api/userinfo")
     @jwt_required()

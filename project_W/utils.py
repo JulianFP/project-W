@@ -20,6 +20,7 @@ def _decode_string_from_token(
         return None
     return decodedString
 
+
 def encode_activation_token(oldEmail: str, newEmail: str, secret_key: str) -> str:
     return _encode_string_as_token(json.dumps({"old_email": oldEmail, "new_email": newEmail}), "activate", secret_key)
 
@@ -31,3 +32,12 @@ def decode_activation_token(token: str, secret_key: str) -> Dict|None:
     else:
         decodedDict = json.loads(decodedData)
         return decodedDict
+
+def encode_password_reset_token(email: str, secret_key: str) -> str:
+    return _encode_string_as_token(email, "password-reset", secret_key)
+
+def decode_password_reset_token(token: str, secret_key: str) -> Optional[str]:
+    one_hour_in_secs = 60 * 60
+    return _decode_string_from_token(
+        token, "password-reset", secret_key, one_hour_in_secs
+    )

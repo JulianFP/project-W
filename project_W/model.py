@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Optional
 from argon2 import PasswordHasher
 from flask_sqlalchemy import SQLAlchemy
 from smtplib import SMTP, SMTP_SSL
 from email.message import EmailMessage
 from project_W.logger import get_logger
-from project_W.utils import encode_activation_token, decode_activation_token
+from project_W.utils import encode_activation_token, decode_activation_token, encode_password_reset_token, decode_password_reset_token
 import secrets, ssl, argon2, flask, re
 
 db = SQLAlchemy()
@@ -84,9 +84,8 @@ def activate_user(token: str) -> Tuple[str, int]:
     new_email = emails["new_email"]
 
     logger.info(f"  -> activation request for email '{new_email}'")
-    user = db.session.execute(
-        db.select(User).filter(User.email == old_email)
-    ).scalar_one_or_none()
+    user: Optional[User] = User.query.where(
+        User.email == old_email).one_or_none()
     if user is None:
         logger.info(f"  -> Unknown email address '{old_email}' for user activation token")
         return f"Unknown email address {old_email}", 400
@@ -99,6 +98,26 @@ def activate_user(token: str) -> Tuple[str, int]:
     return f"Account {new_email} activated", 200
 
 
+def reset_user_password(token: str, newPassword: str) -> Tuple[str, int]:
+    secret_key = flask.current_app.config["JWT_SECRET_KEY"]
+    email = decode_password_reset_token(token, secret_key)
+
+    if email is None:
+        logger.info("  -> Invalid password reset token")
+        return "Invalid or expired password reset link", 400
+    
+    logger.info(f"  -> initiated password reset for email '{email}'")
+    user: Optional[User] = User.query.where(
+        User.email == email).one_or_none()
+    if user is None:
+        logger.info(f"  -> Unknown email address '{email}' for password reset token")
+        return f"Unknown email address {email}", 400
+    user.set_password_unchecked(newPassword)
+    db.session.commit()
+    logger.info(f"  -> password changed via password reset for user {email}")
+    return f"password changed successfully", 200
+
+
 def delete_user(
     user: User
 ) -> Tuple[str, int]:
@@ -109,11 +128,23 @@ def delete_user(
     return (f"Successfully deleted user with email {user.email}"), 200
 
 
+def is_valid_email(email: str) -> bool:
+    allowedDomains = flask.current_app.config["loginSecurity"]["allowedEmailDomains"]
+    pattern = r"^\S+@"
+    if allowedDomains == []: pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
+    else: pattern += r"(" + "|".join(allowedDomains) + r")"
+    pattern += r"$"
+    return re.match(pattern, email) is not None
+
+def is_valid_password(password: str) -> bool:
+    return re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{12,}$", password) is not None
+
+
 def send_activation_email(old_email: str, new_email: str) -> bool:
     config = flask.current_app.config
     secret_key = config["JWT_SECRET_KEY"]
     token = encode_activation_token(old_email, new_email, secret_key)
-    url = f"{config['url']}/api/activate?token={token}"
+    url = f"{config['clientURL']}/activate?token={token}"
     logger.info(f" -> Activation url for email {new_email}: {url}")
     msg_body = (
         f"To activate your Project-W account, "
@@ -126,16 +157,22 @@ def send_activation_email(old_email: str, new_email: str) -> bool:
     msg_subject = "Project-W account activation"
     return _send_email(new_email, msg_body, msg_subject)
 
-def is_valid_email(email: str) -> bool:
-    allowedDomains = flask.current_app.config["loginSecurity"]["allowedEmailDomains"]
-    pattern = r"^\S+@"
-    if allowedDomains == []: pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
-    else: pattern += r"(" + "|".join(allowedDomains) + r")"
-    pattern += r"$"
-    return re.match(pattern, email) is not None
-
-def is_valid_password(password: str) -> bool:
-    return re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{12,}$", password) is not None
+def send_password_reset_email(email: str) -> bool:
+    config = flask.current_app.config
+    secret_key = config["JWT_SECRET_KEY"]
+    token = encode_password_reset_token(email, secret_key)
+    url = f"{config['clientURL']}/resetPassword?token={token}"
+    logger.info(f" -> Password Reset url for email {email}: {url}")
+    msg_body = (
+        f"To reset the password of your Project-W account, "
+        f"please open the following link and enter a new password:\n\n"
+        f"{url}\n\n"
+        f"This link will expire within the next hour. "
+        f"After this period you will have to request a new password reset email over the website\n\n"
+        f"If you did not request a password reset then you can disregard this email"
+    )
+    msg_subject = "Project-W password reset request"
+    return _send_email(email, msg_body, msg_subject)
 
 def _send_email(
         receiver: str, msg_body: str, msg_subject: str
