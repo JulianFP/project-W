@@ -17,7 +17,7 @@ def client(request, tmp_path):
     temp_db_dir = str(tmp_path)
     configFile = open(temp_config_path, "w")
     configFile.write(
-    f"url: 'https://example.com'\n"
+    f"clientURL: 'https://example.com'\n"
     f"databasePath: '{temp_db_dir}'\n"
     f"loginSecurity:\n"
     f"    sessionSecretKey: 'abcdefghijklmnopqrstuvwxyz'\n"
