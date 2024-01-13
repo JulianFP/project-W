@@ -131,7 +131,7 @@ def delete_user(
 def is_valid_email(email: str) -> bool:
     allowedDomains = flask.current_app.config["loginSecurity"]["allowedEmailDomains"]
     pattern = r"^\S+@"
-    if allowedDomains == []: pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
+    if not allowedDomains: pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
     else: pattern += r"(" + "|".join(allowedDomains) + r")"
     pattern += r"$"
     return re.match(pattern, email) is not None

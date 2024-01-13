@@ -27,6 +27,12 @@ def extend_with_default(validator_class):
 
 DefaultValidatingValidator = extend_with_default(Draft202012Validator)
 
+class findConfigFileException(Exception):
+    pass
+
+class prettyValidationError(ValidationError):
+    pass
+
 #schema for config variables. Will be used for both the config file and env vars
 schema = {
     "type": "object",
@@ -117,7 +123,7 @@ def findConfigFile(additionalPaths: List[Path] = []) -> Path:
     for dir in searchDirs:
         configDir = dir / "config.yml"
         if configDir.is_file(): return configDir
-    raise Exception("couldn't find a config.yml file in any search directory. Please add one")
+    raise findConfigFileException("couldn't find a config.yml file in any search directory. Please add one")
 
 def loadConfig(additionalPaths: List[Path] = []) -> Dict:
     configPath = findConfigFile(additionalPaths)
@@ -141,7 +147,7 @@ def loadConfig(additionalPaths: List[Path] = []) -> Dict:
             else:
                 msg = "The option '" + exc.json_path + "' in your config.yml file has has an invalid value:\n" + exc.message + "\nPlease adjust this value. Maybe you made a typo?"
             logger.exception(msg)
-            raise Exception(msg)
+            raise prettyValidationError(msg)
         else:
             logger.warning("Your config is invalid, some parts of this program will not work properly! Set 'disableOptionValidation' to false to learn more")
 
