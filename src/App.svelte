@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, DarkMode, Label, Input, Button } from 'flowbite-svelte';
+  import GithubIcon from 'flowbite-svelte-icons/GithubSolid.svelte'
   let names = [ "a", "b" ];
 </script>
-
 <div class="min-h-screen bg-white dark:bg-slate-950">
   <Navbar  >
     <NavBrand href="/">
@@ -16,7 +16,9 @@
       <NavLi href="/docs/components/navbar">Navbar</NavLi>
       <NavLi href="/pricing">Contact</NavLi>
       <NavLi href="/contact">Github</NavLi>
-      <img src="assets/github-favicon-dark.svg" class="me-3 h-6 sm:h-9" alt="Github Logo" />
+      <Button color="alternative">
+        Github <GithubIcon />
+      </Button>
     </NavUl>
   </Navbar>
   <main class="w-full mx-auto">
