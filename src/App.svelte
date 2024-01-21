@@ -7,7 +7,7 @@
 <!--fixed: position is relative to browser window, w-full: full width, z-20: 3d pos (closer)-->
 <header class="fixed w-full z-20 top-0 start-0">
   <!--px/py: padding in x/y direction (one small screens: larger x padding for touch)-->
-  <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-100 dark:bg-slate-900">
+  <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-300 dark:bg-slate-900">
     <NavBrand href="/">
       <!--TODO add icon like this: <img src="/images/flowbite-svelte-icon-logo.svg" class="me-3 h-6 sm:h-9" alt="Flowbite Logo" />-->
       <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
@@ -27,7 +27,7 @@
   </Navbar>
 </header>
 
-<main class="overflow-scroll w-screen min-h-screen flex bg-white dark:bg-slate-950">
+<main class="overflow-scroll w-screen min-h-screen flex bg-slate-200 dark:bg-slate-950">
   <!--mt-8: margin to top (this will be "under" navbar), p-2: padding, mx-auto: center, max-w-lg: max width to width of lg-->
   <form class="mt-16 px-4 mx-auto place-self-center flex-initial basis-[42rem]">
     <div class="mb-6">
