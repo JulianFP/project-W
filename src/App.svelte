@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ComponentType } from "svelte";
   import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, DarkMode } from "flowbite-svelte";
   import { GithubSolid } from "flowbite-svelte-icons";
 
@@ -6,7 +7,7 @@
   import Login from "./routes/Login.svelte";
   import About from "./routes/About.svelte";
 
-  const routes = {
+  export const routes: {[key: string]: ComponentType} = {
     "/": Login,
     "/about": About
   };
