@@ -66,19 +66,19 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     @app.post("/api/signup")
     def signup():
         if app.config["loginSecurity"]["disableSignup"]:
-            return jsonify(message="signup of new accounts is disabled on this server"), 400
+            return jsonify(msg="signup of new accounts is disabled on this server"), 400
 
         email = request.form['email']
         password = request.form['password']
         logger.info(f"Signup request from {email}")
 
         if not is_valid_email(email): 
-            return jsonify(message=f"'{email}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+            return jsonify(msg=f"'{email}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
         if not is_valid_password(password): 
-            return jsonify(message="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
+            return jsonify(msg="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
 
         message, code = add_new_user(email, password, False)
-        return jsonify(message=message), code
+        return jsonify(msg=message), code
 
     @app.get("/api/activate")
     def activate():
@@ -86,7 +86,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         if(token := request.args.get("token", type=str)):
             msg, code = activate_user(token)
         else: msg, code = "You need a token to activate a users email", 400
-        return jsonify(message=msg), code
+        return jsonify(msg=msg), code
 
     @app.post("/api/login")
     def login():
@@ -99,7 +99,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         if not (user and user.check_password(password)):
             logger.info(" -> incorrect credentials")
-            return jsonify(message="Incorrect credentials provided"), 400
+            return jsonify(msg="Incorrect credentials provided"), 400
 
         logger.info(" -> login successful, returning JWT token")
         return jsonify(access_token=create_access_token(user))
@@ -118,7 +118,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         elif not send_password_reset_email(email):
             msg, code = f"Failed to send password reset email to {email}.", 400
 
-        return jsonify(message=msg), code
+        return jsonify(msg=msg), code
 
     @app.post("/api/resetPassword")
     def resetPassword():
@@ -130,7 +130,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         elif(token := request.args.get("token", type=str)):
             msg, code = reset_user_password(token, newPassword)
         else: msg, code = "You need a token to reset a users password", 400
-        return jsonify(message=msg), code
+        return jsonify(msg=msg), code
 
 
     @app.get("/api/userinfo")
@@ -141,12 +141,12 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not user.is_admin:
                 logger.info(
                     f"Non-admin tried to access user info of {email}, denied")
-                return jsonify(message="You don't have permission to view other accounts' user info"), 403
+                return jsonify(msg="You don't have permission to view other accounts' user info"), 403
             logger.info(f"Admin requested user info for {user.email}")
             user = User.query.where(User.email == email).one_or_none()
             if not user:
                 logger.info(" -> Invalid user email")
-                return jsonify(message="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email"), 400
         else:
             logger.info(f"Requested user info for {user.email}")
         return jsonify(email=user.email, is_admin=user.is_admin, activated=user.activated)
@@ -161,7 +161,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         password = request.form['password']
         if not thisUser.check_password(password):
             logger.info(" -> incorrect password")
-            return jsonify(message="Incorrect password provided"), 403
+            return jsonify(msg="Incorrect password provided"), 403
 
         if 'emailDelete' in request.form:
             specifiedEmail = request.form['emailDelete']
@@ -170,16 +170,16 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not thisUser.is_admin:
                 logger.info(
                     f"Non-admin tried to delete user {specifiedEmail}, denied")
-                return jsonify(message="You don't have permission to delete other users"), 403
+                return jsonify(msg="You don't have permission to delete other users"), 403
             elif not specifiedUser:
                 logger.info(" -> Invalid user email")
-                return jsonify(message="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email"), 400
             else:
                 toDelete = specifiedUser
 
         logger.info(f"user deletion request from {thisUser.email} for user {toDelete.email}")
         message, code = delete_user(toDelete)
-        return jsonify(message=message), code
+        return jsonify(msg=message), code
 
     @app.post("/api/changeUserPassword")
     @jwt_required()
@@ -191,7 +191,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         password = request.form['password']
         if not thisUser.check_password(password):
             logger.info(" -> incorrect password")
-            return jsonify(message="Incorrect password provided"), 403
+            return jsonify(msg="Incorrect password provided"), 403
 
         if 'emailModify' in request.form:
             specifiedEmail = request.form['emailModify']
@@ -200,20 +200,20 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not thisUser.is_admin:
                 logger.info(
                     f"Non-admin tried to modify password of user {specifiedEmail}, denied")
-                return jsonify(message="You don't have permission to modify other users"), 403
+                return jsonify(msg="You don't have permission to modify other users"), 403
             elif not specifiedUser:
                 logger.info(" -> Invalid user email")
-                return jsonify(message="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email"), 400
             else:
                 toModify = specifiedUser
 
-        new_password = request.form['new_password']
+        newPassword = request.form['newPassword']
         if not is_valid_password(password): 
-            return jsonify(message="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
+            return jsonify(msg="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
 
         logger.info(f"request to modify user password from {thisUser.email} for user {toModify.email}")
-        toModify.set_password_unchecked(new_password)
-        return jsonify(message="Successfully updated user password"), 200
+        toModify.set_password_unchecked(newPassword)
+        return jsonify(msg="Successfully updated user password"), 200
 
     @app.post("/api/changeUserEmail")
     @jwt_required()
@@ -225,7 +225,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         password = request.form['password']
         if not thisUser.check_password(password):
             logger.info(" -> incorrect password")
-            return jsonify(message="Incorrect password provided"), 403
+            return jsonify(msg="Incorrect password provided"), 403
 
         if 'emailModify' in request.form:
             specifiedEmail = request.form['emailModify']
@@ -234,22 +234,22 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not thisUser.is_admin:
                 logger.info(
                     f"Non-admin tried to modify users {specifiedEmail} email, denied")
-                return jsonify(message="You don't have permission to modify other users"), 403
+                return jsonify(msg="You don't have permission to modify other users"), 403
             elif not specifiedUser:
                 logger.info(" -> Invalid user email")
-                return jsonify(message="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email"), 400
             else:
                 toModify = specifiedUser
 
-        new_email = request.form['new_email']
-        if not is_valid_email(new_email): 
-            return jsonify(message=f"'{new_email}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+        newEmail = request.form['newEmail']
+        if not is_valid_email(newEmail): 
+            return jsonify(msg=f"'{newEmail}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
 
         logger.info(f"request to modify user email from {thisUser.email} to {toModify.email}")
-        if send_activation_email(toModify.email, new_email): 
-            return jsonify(message="Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"), 200
+        if send_activation_email(toModify.email, newEmail): 
+            return jsonify(msg="Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"), 200
         else:
-            return jsonify(message=f"Failed to send activation email to {new_email}. Email address may not exist"), 400
+            return jsonify(msg=f"Failed to send activation email to {newEmail}. Email address may not exist"), 400
 
     with app.app_context():
         db.create_all()
