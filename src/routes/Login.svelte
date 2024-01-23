@@ -3,7 +3,8 @@
   import { EyeOutline, EyeSlashOutline } from "flowbite-svelte-icons";
   import { push } from "svelte-spa-router";
 
-  import { postNoJWT } from "../utils/httpRequests";
+  import { post } from "../utils/httpRequests";
+  import { authHeader } from "../utils/stores";
 
   let passwordShow: boolean = false;
   let response: {[key: string]: any}
@@ -16,11 +17,12 @@
     event.preventDefault(); //disable page reload after form submission
 
     //send post request and wait for response
-    response = await postNoJWT("login", {"email": email, "password": password});
+    response = await post("login", {"email": email, "password": password});
 
-    if (response["status"] === 200) {
+    if (response.status === 200) {
+      authHeader.setToken(response.access_token)
       //if it was successfull, forward to different page
-      push("/about")
+      push("/userinfo")
     }
     else {
       error = true; //display error message
@@ -68,7 +70,7 @@
       {/if}
 
       {#if error}
-        <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response["message"]}</Helper>
+        <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response.message}</Helper>
       {/if}
     </form>
   </div>

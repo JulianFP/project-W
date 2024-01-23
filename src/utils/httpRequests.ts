@@ -1,12 +1,27 @@
 import { apiURL } from "./backendConfig"
 
-async function getNoJWT(route: string) {
-  const response = await fetch(apiURL + route);
-  const responseObject = await response.json();
-  return responseObject;
+export async function get(route: string, headers: {[key: string]: string} = {}) {
+  let returnObj: {[key: string]: any};
+
+  try {
+    const response: {[key: string]: any} = await fetch(apiURL + route, {
+      method: "GET",
+      headers: headers
+    });
+    const responseContent: {[key: string]: any} = await response.json();
+    returnObj = Object.assign(response, responseContent);
+  }
+  catch (error) {
+    returnObj = {
+      ok: false,
+      status: 404,
+      message: error.message
+    }
+  }
+  return returnObj;
 }
 
-export async function postNoJWT(route: string, params: {[key: string]: string}) {
+export async function post(route: string, params: {[key: string]: string}, headers: {[key: string]: string} = {}) {
   const form: FormData = new FormData();
   for (let key: string in params) {
     form.set(key, params[key]);
@@ -18,7 +33,7 @@ export async function postNoJWT(route: string, params: {[key: string]: string}) 
     const response: {[key: string]: any} = await fetch(apiURL + route, {
       method: "POST",
       body: form,
-      credentials: "same-origin"
+      header: headers
     });
     const responseContent: {[key: string]: any} = await response.json();
     returnObj = Object.assign(response, responseContent);

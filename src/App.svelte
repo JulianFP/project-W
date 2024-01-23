@@ -6,10 +6,12 @@
   import Router from "svelte-spa-router";
   import Login from "./routes/Login.svelte";
   import About from "./routes/About.svelte";
+  import UserInfo from "./routes/UserInfo.svelte";
 
   export const routes: {[key: string]: ComponentType} = {
     "/": Login,
-    "/about": About
+    "/about": About,
+    "/userinfo": UserInfo
   };
 </script>
 
@@ -29,7 +31,7 @@
     <NavUl >
       <NavLi href="#/" active={true}>Home</NavLi>
       <NavLi href="#/about">About</NavLi>
-      <NavLi href="#/docs/components/navbar">Navbar</NavLi>
+      <NavLi href="#/userinfo">User info</NavLi>
       <NavLi href="#/contact">Contact</NavLi>
       <NavLi href="https://github.com/JulianFP/project-W"><GithubSolid class="mx-auto"/></NavLi>
     </NavUl>

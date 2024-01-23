@@ -1,17 +1,13 @@
-import { Writable, writable } from "svelte/store";
-import { getNoJWT } from "./httpRequests.ts"
+import { writable } from "svelte/store";
 
-function createTokenStore() {
-  const { subscribe, set, update} = writable(0);
+function createAuthHeaderStore() {
+  const { subscribe, set, update} = writable({});
 
   return {
     subscribe,
-    login: async function(username: string, password: string): void {
-      return getNoJWT("login")
-    },
-    forgetToken: function(): void { set(0) }
+    setToken: function(token: string): void { set({"Authorization": "Bearer " + token}) },
+    forgetToken: function(): void { set({}) }
   }
 }
 
-export const token = createTokenStore();
-
+export const authHeader = createAuthHeaderStore();
