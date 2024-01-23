@@ -15,7 +15,7 @@ export async function get(route: string, headers: {[key: string]: string} = {}) 
     returnObj = {
       ok: false,
       status: 404,
-      message: error.message
+      msg: error.message
     }
   }
   return returnObj;
@@ -42,7 +42,7 @@ export async function post(route: string, params: {[key: string]: string}, heade
     returnObj = {
       ok: false,
       status: 404,
-      message: error.message
+      msg: error.message
     }
   }
   return returnObj;

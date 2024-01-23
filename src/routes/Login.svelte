@@ -70,7 +70,7 @@
       {/if}
 
       {#if error}
-        <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response.message}</Helper>
+        <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response.msg}</Helper>
       {/if}
     </form>
   </div>

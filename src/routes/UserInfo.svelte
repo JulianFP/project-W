@@ -11,8 +11,7 @@ let response: Promise<{[key: string]: any}> = get("userinfo", $authHeader);
   <P><Spinner class="me-3" size="4"/>Loading ...</P>
 {:then responseC} 
   {#if !responseC.ok}
-    <P>Error: {responseC.message}</P>
-    {console.log(responseC)}
+    <P>Error: {responseC.msg}</P>
   {:else}
     <P>email address: {responseC.email}</P>
     <P>is admin: {responseC.is_admin}</P>
