@@ -1,10 +1,13 @@
 
+import base64
 import datetime
 import os
 import secrets
 from typing import Optional
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
+
+from project_W.utils import auth_token_from_req
 
 
 from .logger import get_logger
@@ -209,6 +212,7 @@ def create_app(db_path: str = ".") -> Flask:
         model = request.form.get("model")
         language = request.form.get("model")
         job = submit_job(user, file_name, audio, model, language)
+        runner_manager.enqueue_job(job)
         return jsonify(job_id=job.id)
 
     @app.get("/api/jobs/list")
@@ -257,15 +261,66 @@ def create_app(db_path: str = ".") -> Flask:
         if not user.is_admin:
             logger.info(f"non-admin ({user.email}) tried to create runner.")
             return jsonify(message="Only admins may create runner tokens.")
-        token, runner = create_runner()
-        logger.info(f"Created runner with label '{runner.label}'")
-        return token
+        token, _ = create_runner()
+        logger.info(f"Admin {user.email} created runner with token {token}")
+        return jsonify(runner_token=token)
+
+    @app.post("/api/runners/register")
+    def registerRunner():
+        token, error = auth_token_from_req(request)
+        if error:
+            return jsonify(error=error), 400
+        runner = get_runner_by_token(token)
+        if runner is None:
+            return jsonify(error="No runner with that token exists!"), 400
+        if runner_manager.register_runner(runner):
+            logger.info(f"Runner {runner.id} successfully registered!")
+            return jsonify(message="Runner successfully registered!")
+        return jsonify(error="Runner is already registered!"), 400
+
+    @app.post("/api/runners/unregister")
+    def unregisterRunner():
+        token, error = auth_token_from_req(request)
+        if error:
+            return jsonify(error=error), 400
+        runner = get_runner_by_token(token)
+        if runner is None:
+            return jsonify(error="No runner with that token exists!"), 400
+        if runner_manager.unregister_runner(runner):
+            logger.info(f"Runner {runner.id} successfully unregistered!")
+            return jsonify(message="Runner successfully unregistered!")
+        return jsonify(error="Runner is not registered!"), 400
+
+    @app.post("/api/runners/retrieve_job")
+    def retrieveJob():
+        online_runner, error = runner_manager.get_online_runner_for_req(request)
+        if error:
+            return jsonify(error=error), 400
+        job = runner_manager.retrieve_job(online_runner)
+        if not job:
+            return jsonify(error="No job available!"), 400
+        return jsonify(audio=base64.b64encode(job.file.audio_data).decode("ascii"), model=job.model, language=job.language)
+
+    @app.post("/api/runners/submit_job_result")
+    def submitJobResult():
+        online_runner, error = runner_manager.get_online_runner_for_req(request)
+        if error:
+            return jsonify(error=error), 400
+
+        if (error_msg := request.form.get("error_msg")):
+            runner_manager.submit_job_result(online_runner, error_msg, True)
+            return jsonify(message="Successfully submitted failed job!")
+
+        runner_manager.submit_job_result(online_runner, request.form["transcript"], False)
+        return jsonify(message="Transcript successfully submitted!")
 
     @app.post("/api/runners/heartbeat")
     def heartbeat():
-        token = request.form["runner_token"]
+        token, error = auth_token_from_req(request)
+        if error:
+            return jsonify(error=error), 400
         runner = get_runner_by_token(token)
-        return runner_manager.heartbeat(runner, request)
+        return runner_manager.heartbeat(runner, request).jsonify()
 
     with app.app_context():
         db.create_all()

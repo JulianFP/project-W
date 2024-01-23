@@ -1,3 +1,4 @@
+import base64
 from dataclasses import dataclass
 import hashlib
 import re
@@ -20,7 +21,7 @@ logger = get_logger("project-W")
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.Text, nullable=False, unique=True)
+    email = db.Column(db.Text, nullable=False, unique=True, index=True)
     password_hash = db.Column(db.Text, nullable=False)
     # We use this key together with JWT_SECRET_KEY to generate session tokens.
     # That way, we can easily invalidate all existing session tokens by changing
@@ -128,7 +129,18 @@ class Job(db.Model):
     error_msg = db.Column(db.Text)
     file_id = db.Column(db.Integer, ForeignKey("files.id"))
     file = relationship("InputFile", back_populates="job", uselist=False,
-                        single_parent=True, cascade="all,delete-orphan")
+                        single_parent=True, cascade="all,delete-orphan", lazy="subquery")
+
+    def set_error(self, error_msg: str):
+        self.error_msg = error_msg
+        db.session.commit()
+
+    def set_transcript(self, transcript: str):
+        print(self.transcript, self.id)
+        self.transcript = transcript
+        print(self.transcript, self.id)
+        db.session.commit()
+        print(self.transcript, self.id)
     # TODO Add some form of runner token/tag system
 
 
@@ -166,52 +178,39 @@ def list_job_ids_for_all_users() -> Dict[int, List[int]]:
     return {user.id: list_job_ids_for_user(user) for user in db.session.query(User)}
 
 
-def runner_password_hash(password: bytes) -> bytes:
-    return hashlib.sha3_512(password).digest()
+def runner_token_hash(token: str) -> str:
+    return base64.urlsafe_b64encode(
+        hashlib.sha256(token.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
 
 
 @dataclass
 class Runner(db.Model):
     __tablename__ = "runners"
     id = db.Column(db.Integer, primary_key=True)
-    # The runner token consists of a runner label and a password, which
-    # are both just random byte strings assigned by the server. This way,
-    # we can prevent token stealing if the db ever got leaked (because
-    # we don't store the password in plain text), while still using
-    # a crypto-secure hash (sha3_512 in this case) and allowing
-    # efficient db lookups.
-    label = db.Column(db.Text, nullable=False, index=True, unique=True)
-    password_hash = db.Column(db.BLOB, nullable=False)
-
-    def check_password(self, password: bytes) -> bool:
-        return runner_password_hash(password) == self.password_hash
-
-
-RUNNER_TOKEN_PATTERN = re.compile(r"([a-zA-Z0-9\-\_]+)/([a-zA-Z0-9\-\_]+)")
+    # We only store the hash of the token, otherwise a db leak would make
+    # it possible to impersonate any runner. We don't need to use a salted hash
+    # because the token is created by the server and already has sufficient entropy.
+    # The hash itself is stored using base64.
+    token_hash = db.Column(db.Text, nullable=False, unique=True, index=True)
+    # TODO: Add some form of runner tag system
 
 
 def get_runner_by_token(token: str) -> Runner | None:
-    match = RUNNER_TOKEN_PATTERN.match(token)
-    if not match:
-        return None
-    label, password = match.groups()
-    runner: Runner = db.session.query(Runner).where(Runner.label == label).one_or_none()
-    if not runner or not runner.check_password(password.encode('ascii')):
-        return None
-    return runner
+    token_hash = runner_token_hash(token)
+    return db.session.query(Runner).where(Runner.token_hash == token_hash).one_or_none()
 
 
 def create_runner() -> Tuple[str, Runner]:
-    label = secrets.token_urlsafe(16)
-    # Sanity check to ensure we never create two runners with the same label.
-    while db.session.query(Runner).where(Runner.label == label).one_or_none():
-        label = secrets.token_urlsafe(16)
-    password = secrets.token_urlsafe()
-    runner = Runner(
-        label=label,
-        password_hash=runner_password_hash(password.encode('ascii'))
-    )
+    token = secrets.token_urlsafe()
+    token_hash = runner_token_hash(token)
+
+    # Sanity check to ensure that the token and its hash are unique.
+    while db.session.query(Runner).where(Runner.token_hash == token_hash).one_or_none():
+        token = secrets.token_urlsafe()
+        token_hash = runner_token_hash(token)
+
+    runner = Runner(token_hash=token_hash)
     db.session.add(runner)
     db.session.commit()
-    token = f"{label}/{password}"
     return token, runner
