@@ -5,9 +5,17 @@ function createAuthHeaderStore() {
 
   return {
     subscribe,
-    setToken: function(token: string): void { set({"Authorization": "Bearer " + token}) },
-    forgetToken: function(): void { set({}) }
+    setToken: function(token: string): void { 
+      set({"Authorization": "Bearer " + token});
+      loggedIn.set(true);
+    },
+    forgetToken: function(): void { 
+      set({});
+      loggedIn.set(false);
+    }
   }
 }
 
 export const authHeader = createAuthHeaderStore();
+
+export const loggedIn = writable(false);

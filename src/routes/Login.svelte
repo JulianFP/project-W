@@ -5,6 +5,7 @@
 
   import { post } from "../utils/httpRequests";
   import { authHeader } from "../utils/stores";
+  import { destForward } from "../utils/navigation";
 
   let passwordShow: boolean = false;
   let response: {[key: string]: any}
@@ -22,7 +23,7 @@
     if (response.status === 200) {
       authHeader.setToken(response.access_token)
       //if it was successfull, forward to different page
-      push("/userinfo")
+      destForward();
     }
     else {
       error = true; //display error message
@@ -34,7 +35,6 @@
     error = false
   }
 </script>
-
 
 <div class="flex flex-col w-full h-full justify-evenly items-center">
   <Heading tag="h1" class="w-fit" customSize="text-2xl text-center font-extrabold md:text-5xl lg:text-6xl">

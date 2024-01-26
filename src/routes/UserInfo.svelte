@@ -1,12 +1,14 @@
 <script lang="ts">
 import { Spinner, P } from "flowbite-svelte";
 
-import { get } from "./../utils/httpRequests";
-import { authHeader } from "../utils/stores";
+import { getLoggedIn } from "./../utils/httpRequests";
+import { loggedIn } from "../utils/stores";
+import { loginForward } from "../utils/navigation";
 
-let response: Promise<{[key: string]: any}> = get("userinfo", $authHeader);
+$: if(!$loggedIn) loginForward();
+
+let response: Promise<{[key: string]: any}> = getLoggedIn("userinfo");
 </script>
-
 {#await response}
   <P><Spinner class="me-3" size="4"/>Loading ...</P>
 {:then responseC} 

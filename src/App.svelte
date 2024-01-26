@@ -7,11 +7,17 @@
   import Login from "./routes/Login.svelte";
   import About from "./routes/About.svelte";
   import UserInfo from "./routes/UserInfo.svelte";
+  import JobList from "./routes/JobList.svelte";
+  import NotFound from "./routes/NotFound.svelte";
+
+  import { loggedIn } from "./utils/stores";
 
   export const routes: {[key: string]: ComponentType} = {
-    "/": Login,
+    "/": JobList,
+    "/login": Login,
     "/about": About,
-    "/userinfo": UserInfo
+    "/userinfo": UserInfo,
+    "*": NotFound
   };
 </script>
 
@@ -31,7 +37,9 @@
     <NavUl >
       <NavLi href="#/" active={true}>Home</NavLi>
       <NavLi href="#/about">About</NavLi>
-      <NavLi href="#/userinfo">User info</NavLi>
+      {#if $loggedIn}
+        <NavLi href="#/userinfo">User info</NavLi>
+      {/if}
       <NavLi href="#/contact">Contact</NavLi>
       <NavLi href="https://github.com/JulianFP/project-W"><GithubSolid class="mx-auto"/></NavLi>
     </NavUl>
