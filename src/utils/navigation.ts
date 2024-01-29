@@ -1,31 +1,41 @@
+import type { Readable } from "svelte/store";
 import { location, querystring, push, replace } from "svelte-spa-router";
 
-export function loginForward(): void {
-  let locationVal: string;
-  const unsubscribe = location.subscribe((value) => {
-    locationVal = value;
+//handles subscribe/unsubscribe to a store to reduce code reuse/boilerplate
+function getStoreStringValue(store: Readable<string|undefined>): string {
+  let storeVal: string = "";
+  const unsubscribe = store.subscribe((value) => {
+    if(typeof value === "string") storeVal = value;
   });
 
-  if(locationVal && locationVal !== "/"){
-    replace("/login?dest=" + locationVal);
-  }
-  else{
-    replace("/login");
-  }
-
   unsubscribe();
+  return storeVal;
+}
+
+export function loginForward(): void {
+  const currentQueryString: string = getStoreStringValue(querystring);
+  const params = new URLSearchParams(currentQueryString);
+  const locationVal: string = getStoreStringValue(location);
+
+  if(locationVal && locationVal !== "/"){
+    params.set("dest", locationVal);
+  }
+  let newQueryString: string = "";
+  if(params.size > 0) newQueryString = "?" + params.toString();
+
+  replace("/login" + newQueryString);
 }
 
 export function destForward(): void {
-  let querystringVal: string;
-  const unsubscribe = querystring.subscribe((value) => {
-    querystringVal = value;
-  });
+  const currentQueryString: string = getStoreStringValue(querystring);
+  const params = new URLSearchParams(currentQueryString);
 
-  const params = new URLSearchParams(querystringVal);
   const destination: string|null = params.get("dest");
-  if(destination) push(destination);
-  else push("/");
+  params.delete("dest");
+  
+  let newQueryString: string = "";
+  if(params.size > 0) newQueryString = "?" + params.toString();
 
-  unsubscribe();
+  if(destination) push(destination + newQueryString);
+  else push("/" + newQueryString);
 }
