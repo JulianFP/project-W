@@ -13,8 +13,7 @@ function getStoreStringValue(store: Readable<string|undefined>): string {
 }
 
 export function loginForward(): void {
-  const currentQueryString: string = getStoreStringValue(querystring);
-  const params = new URLSearchParams(currentQueryString);
+  const params = new URLSearchParams(getStoreStringValue(querystring));
   const locationVal: string = getStoreStringValue(location);
 
   if(locationVal && locationVal !== "/"){
@@ -27,8 +26,7 @@ export function loginForward(): void {
 }
 
 export function destForward(): void {
-  const currentQueryString: string = getStoreStringValue(querystring);
-  const params = new URLSearchParams(currentQueryString);
+  const params = new URLSearchParams(getStoreStringValue(querystring));
 
   const destination: string|null = params.get("dest");
   params.delete("dest");
@@ -38,4 +36,10 @@ export function destForward(): void {
 
   if(destination) push(destination + newQueryString);
   else push("/" + newQueryString);
+}
+
+export function preserveQuerystringForward(route: string): void {
+  const params = new URLSearchParams(getStoreStringValue(querystring));
+  if(params.size > 0) push(route + "?" + params.toString());
+  else push(route);
 }

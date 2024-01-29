@@ -35,7 +35,7 @@
       <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
       <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project W</span>
     </NavBrand>
-    <div class="flex gap-x-2 sm:gap-x-4 md:order-2">
+    <div class="flex gap-2 sm:gap-4 md:order-2">
       <DarkMode/>
       {#if $loggedIn}
         <Avatar id="avatar-menu" class="cursor-pointer"/>

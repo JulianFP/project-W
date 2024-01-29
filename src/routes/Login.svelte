@@ -1,16 +1,17 @@
 <script lang="ts">
-  import { Heading, Span, Label, Input, Button, Spinner, Helper } from "flowbite-svelte";
-  import { EyeOutline, EyeSlashOutline } from "flowbite-svelte-icons";
-  import { push } from "svelte-spa-router";
+  import { Button, Spinner, Helper } from "flowbite-svelte";
+
+  import GreetingPage from "../components/greetingPage.svelte";
+  import PasswordField from "../components/passwordField.svelte";
+  import EmailField from "../components/emailField.svelte";
 
   import { post } from "../utils/httpRequests";
   import { authHeader } from "../utils/stores";
-  import { destForward } from "../utils/navigation";
+  import { destForward, preserveQuerystringForward } from "../utils/navigation";
 
-  let passwordShow: boolean = false;
+  let error = false;
   let response: {[key: string]: any}
   let waitingForPromise: boolean = false;
-  let error: boolean = false;
   let email: string, password: string;
 
   async function postLogin(event: Event): Promise<void> {
@@ -31,36 +32,13 @@
     }
   }
 
-  function disableError(): void {
-    error = false
-  }
 </script>
+<GreetingPage>
+  <form class="mx-auto max-w-lg" on:submit={postLogin}>
+    <EmailField bind:value={email} bind:error={error}/>
+    <PasswordField bind:value={password} bind:error={error}/>
 
-<div class="flex flex-col w-full h-full justify-evenly items-center">
-  <Heading tag="h1" class="w-fit" customSize="text-2xl text-center font-extrabold md:text-5xl lg:text-6xl">
-    Welcome to <Span gradient>Project W</Span>!
-  </Heading>
-
-  <div class="w-full">
-    <form class="mx-auto max-w-lg" on:submit={postLogin}>
-      <div class="mb-6">
-        <Label for="email" color={error ? "red" : "gray"} class="mb-2">Email address</Label>
-        <Input type="email" id="email" color={error ? "red" : "base"} placeholder="alice@example.com" required bind:value={email} on:input={disableError}/>
-      </div>
-
-      <div class="mb-6">
-        <Label for="password" color={error ? "red" : "gray"} class="mb-2">Password</Label>
-        <Input type={passwordShow ? "text" : "password"} id="password" color={error ? "red" : "base"} placeholder={passwordShow ? "alice's password" : "••••••••••••••••"} required bind:value={password} on:input={disableError}>
-          <button type="button" slot="right" on:click={() => (passwordShow = !passwordShow)} class="bg-transparent">
-            {#if passwordShow}
-              <EyeOutline class="w-6 h-6" />
-            {:else}
-              <EyeSlashOutline class="w-6 h-6" />
-            {/if}
-          </button>
-        </Input>
-      </div>
-
+    <div class="flex max-w-lg justify-between items-center">
       {#if waitingForPromise}
         <Button type="submit" disabled>
           <Spinner class="me-3" size="4" color="white" />Loading ...
@@ -68,10 +46,11 @@
       {:else}
         <Button type="submit">Login</Button>
       {/if}
+      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/signup")}}>Signup instead</Button>
+    </div>
 
-      {#if error}
-        <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response.msg}</Helper>
-      {/if}
-    </form>
-  </div>
-</div>
+    {#if error}
+      <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response.msg}</Helper>
+    {/if}
+  </form>
+</GreetingPage>
