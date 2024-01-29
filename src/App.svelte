@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { ComponentType } from "svelte";
-  import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, DarkMode } from "flowbite-svelte";
+  import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, Avatar, Dropdown, DropdownItem, DarkMode } from "flowbite-svelte";
   import { GithubSolid } from "flowbite-svelte-icons";
+
+  import { location } from "svelte-spa-router";
 
   import Router from "svelte-spa-router";
   import Login from "./routes/Login.svelte";
@@ -10,7 +12,7 @@
   import JobList from "./routes/JobList.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
-  import { loggedIn } from "./utils/stores";
+  import { loggedIn, authHeader } from "./utils/stores";
 
   export const routes: {[key: string]: ComponentType} = {
     "/": JobList,
@@ -19,27 +21,41 @@
     "/userinfo": UserInfo,
     "*": NotFound
   };
+
+  let dropDownOpen = false;
 </script>
 
 <!--fixed: position is relative to browser window, w-full: full width, z-20: 3d pos (closer)-->
 <header class="fixed w-full z-20 top-0 start-0">
   <!--px/py: padding in x/y direction (one small screens: larger x padding for touch)-->
   <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-300 dark:bg-slate-900">
+    <NavHamburger />
     <NavBrand href="#/">
       <!--TODO add icon like this: <img src="/images/flowbite-svelte-icon-logo.svg" class="me-3 h-6 sm:h-9" alt="Flowbite Logo" />-->
       <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
       <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project W</span>
     </NavBrand>
-    <div class="flex md:order-2">
+    <div class="flex gap-x-2 sm:gap-x-4 md:order-2">
       <DarkMode/>
-      <NavHamburger />
+      {#if $loggedIn}
+        <Avatar id="avatar-menu" class="cursor-pointer"/>
+      {/if}
     </div>
-    <NavUl >
+    {#if $loggedIn}
+      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={"#" + $location} bind:open={dropDownOpen}>
+        <!-- TODO: get userinfo for this/>
+        <DropdownHeader>
+          <span class="block text-sm">Bonnie Green</span>
+          <span class="block truncate text-sm font-medium">name@flowbite.com</span>
+        </DropdownHeader>
+        </!-->
+        <DropdownItem href="#/userinfo" on:click={() => {dropDownOpen = false}}>Settings</DropdownItem>
+        <DropdownItem slot="footer" on:click={() => {dropDownOpen = false; authHeader.forgetToken()}}>Log out</DropdownItem>
+      </Dropdown>
+    {/if}
+    <NavUl>
       <NavLi href="#/" active={true}>Home</NavLi>
       <NavLi href="#/about">About</NavLi>
-      {#if $loggedIn}
-        <NavLi href="#/userinfo">User info</NavLi>
-      {/if}
       <NavLi href="#/contact">Contact</NavLi>
       <NavLi href="https://github.com/JulianFP/project-W"><GithubSolid class="mx-auto"/></NavLi>
     </NavUl>
