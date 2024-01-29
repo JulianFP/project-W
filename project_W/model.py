@@ -2,15 +2,17 @@ import base64
 from dataclasses import dataclass
 import hashlib
 import re
-import secrets
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from argon2 import PasswordHasher
-import argon2
 from flask_sqlalchemy import SQLAlchemy
+from smtplib import SMTP, SMTP_SSL
+from email.message import EmailMessage
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
 from project_W.logger import get_logger
+from project_W.utils import encode_activation_token, decode_activation_token, encode_password_reset_token, decode_password_reset_token
+import secrets, ssl, argon2, flask, re
 
 db = SQLAlchemy()
 hasher = PasswordHasher()
@@ -29,6 +31,7 @@ class User(db.Model):
     user_key = db.Column(db.Text, nullable=False,
                          default=lambda: secrets.token_urlsafe(16))
     is_admin = db.Column(db.Boolean, nullable=False)
+    activated = db.Column(db.Boolean, nullable=False)
 
     jobs = relationship("Job", order_by="Job.id", backref="user", cascade="all,delete-orphan")
 
@@ -36,16 +39,14 @@ class User(db.Model):
         self.invalidate_session_tokens()
         self.password_hash = hasher.hash(new_password)
         db.session.commit()
-
-    def set_password(self, current_password: str, new_password: str) -> bool:
-        if self.check_password(current_password):
-            self.set_password_unchecked(new_password)
-            return True
-        return False
+        logger.info(f" -> Updated password of user {self.email}")
 
     def set_email(self, new_email: str):
-        self.email = new_email
         self.invalidate_session_tokens()
+        old_email = self.email
+        self.email = new_email
+        db.session.commit()
+        logger.info(f" -> Updated email from {old_email} to {self.email}")
 
     def check_password(self, password: str) -> bool:
         try:
@@ -63,19 +64,67 @@ class User(db.Model):
 
 
 def add_new_user(
-    email: str, password: str, is_admin: bool
+        email: str, password: str, is_admin: bool
 ) -> Tuple[str, int]:
     email_already_in_use = db.session.query(
         User.query.where(User.email == email).exists()).scalar()
     if email_already_in_use:
         return "E-Mail is already used by another account", 400
+    if not send_activation_email(email, email):
+        return f"Failed to send activation email to {email}. Email address may not exist", 400
 
     logger.info(f" -> Created user with email {email}")
     db.session.add(
-        User(email=email, password_hash=hasher.hash(password), is_admin=is_admin))
+        User(email=email, password_hash=hasher.hash(password), is_admin=is_admin, activated=False))
     db.session.commit()
 
-    return "Successfully created user. Use /api/login to authenticate yourself", 200
+    return f"Successful signup for {email}. Please activate your account be clicking on the link provided in the email we just sent you", 200
+
+
+def activate_user(token: str) -> Tuple[str, int]:
+    secret_key = flask.current_app.config["JWT_SECRET_KEY"]
+    emails = decode_activation_token(token, secret_key)
+
+    if emails is None:
+        logger.info("  -> Invalid user activation token")
+        return "Invalid or expired activation link", 400
+
+    old_email = emails["old_email"]
+    new_email = emails["new_email"]
+
+    logger.info(f"  -> activation request for email '{new_email}'")
+    user: Optional[User] = User.query.where(
+        User.email == old_email).one_or_none()
+    if user is None:
+        logger.info(f"  -> Unknown email address '{old_email}' for user activation token")
+        return f"Unknown email address {old_email}", 400
+    if user.activated is True and old_email == new_email:
+        logger.info(f"  -> User with email {old_email} already activated")
+        return f"Account for {old_email} is already activated", 400
+    user.activated = True
+    user.set_email(new_email) #update email address (in case activation got issued for changed email address)
+    db.session.commit()
+    return f"Account {new_email} activated", 200
+
+
+def reset_user_password(token: str, newPassword: str) -> Tuple[str, int]:
+    secret_key = flask.current_app.config["JWT_SECRET_KEY"]
+    email = decode_password_reset_token(token, secret_key)
+
+    if email is None:
+        logger.info("  -> Invalid password reset token")
+        return "Invalid or expired password reset link", 400
+    
+    logger.info(f"  -> initiated password reset for email '{email}'")
+    user: Optional[User] = User.query.where(
+        User.email == email).one_or_none()
+    if user is None:
+        logger.info(f"  -> Unknown email address '{email}' for password reset token")
+        return f"Unknown email address {email}", 400
+    user.set_password_unchecked(newPassword)
+    db.session.commit()
+    logger.info(f"  -> password changed via password reset for user {email}")
+    return f"password changed successfully", 200
 
 
 def delete_user(
@@ -88,22 +137,85 @@ def delete_user(
     return (f"Successfully deleted user with email {user.email}"), 200
 
 
-def update_user_password(
-    user: User, new_password: str
-) -> Tuple[str, int]:
-    user.set_password_unchecked(new_password)
-    db.session.commit()
-    logger.info(f" -> Updated password of user {user.email}")
-    return "Successfully updated user password", 200
+def is_valid_email(email: str) -> bool:
+    allowedDomains = flask.current_app.config["loginSecurity"]["allowedEmailDomains"]
+    pattern = r"^\S+@"
+    if not allowedDomains: pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
+    else: pattern += r"(" + "|".join(allowedDomains) + r")"
+    pattern += r"$"
+    return re.match(pattern, email) is not None
+
+def is_valid_password(password: str) -> bool:
+    return re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{12,}$", password) is not None
 
 
-def update_user_email(
-    user: User, new_email: str
-) -> Tuple[str, int]:
-    user.set_email(new_email)
-    db.session.commit()
-    logger.info(f" -> Updated email of user {user.email}")
-    return "Successfully updated user email", 200
+def send_activation_email(old_email: str, new_email: str) -> bool:
+    config = flask.current_app.config
+    secret_key = config["JWT_SECRET_KEY"]
+    token = encode_activation_token(old_email, new_email, secret_key)
+    url = f"{config['clientURL']}/activate?token={token}"
+    logger.info(f" -> Activation url for email {new_email}: {url}")
+    msg_body = (
+        f"To activate your Project-W account, "
+        f"please confirm your email address by clicking on the following link:\n\n"
+        f"{url}\n\n"
+        f"This link will expire within the next 24 hours. "
+        f"After this period you will have to request a new activation email over the website\n\n"
+        f"If you did not sign up for an account please disregard this email."
+    )
+    msg_subject = "Project-W account activation"
+    return _send_email(new_email, msg_body, msg_subject)
+
+def send_password_reset_email(email: str) -> bool:
+    config = flask.current_app.config
+    secret_key = config["JWT_SECRET_KEY"]
+    token = encode_password_reset_token(email, secret_key)
+    url = f"{config['clientURL']}/resetPassword?token={token}"
+    logger.info(f" -> Password Reset url for email {email}: {url}")
+    msg_body = (
+        f"To reset the password of your Project-W account, "
+        f"please open the following link and enter a new password:\n\n"
+        f"{url}\n\n"
+        f"This link will expire within the next hour. "
+        f"After this period you will have to request a new password reset email over the website\n\n"
+        f"If you did not request a password reset then you can disregard this email"
+    )
+    msg_subject = "Project-W password reset request"
+    return _send_email(email, msg_body, msg_subject)
+
+def _send_email(
+        receiver: str, msg_body: str, msg_subject: str
+    ) -> bool:
+    smtpConfig = flask.current_app.config["smtpServer"]
+
+    msg = EmailMessage()
+    msg.set_content(msg_body)
+    msg["Subject"] = msg_subject
+    msg["From"] = smtpConfig["senderEmail"]
+    msg["To"] = receiver
+    context = ssl.create_default_context()
+
+    try:
+        #default instance for unencrypted and starttls 
+        #ssl encrypts from beginning and requires a different instance
+        smtpInstance = (SMTP_SSL(smtpConfig["domain"], smtpConfig["port"], context=context) 
+            if smtpConfig["secure"] == "ssl" 
+            else SMTP(smtpConfig["domain"], smtpConfig["port"]))
+
+        with smtpInstance as server:
+            if smtpConfig["secure"] == "starttls": 
+                server.ehlo()
+                server.starttls(context=context)
+                server.ehlo()
+            server.login(smtpConfig["username"], smtpConfig["password"])
+            server.send_message(msg)
+            logger.info(f" -> successfully sent email to {receiver}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f" -> Error sending email to {receiver}: {e}")
+        return False
 
 
 # We rarely need to load the entire audio file, so we keep
