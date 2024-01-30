@@ -7,6 +7,7 @@
 
   import Router from "svelte-spa-router";
   import Login from "./routes/Login.svelte";
+  import Signup from "./routes/Signup.svelte";
   import About from "./routes/About.svelte";
   import UserInfo from "./routes/UserInfo.svelte";
   import JobList from "./routes/JobList.svelte";
@@ -17,6 +18,7 @@
   export const routes: {[key: string]: ComponentType} = {
     "/": JobList,
     "/login": Login,
+    "/signup": Signup,
     "/about": About,
     "/userinfo": UserInfo,
     "*": NotFound

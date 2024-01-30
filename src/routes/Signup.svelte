@@ -1,5 +1,78 @@
 <script lang="ts">
+  import { Button,  Helper } from "flowbite-svelte";
 
+  import GreetingPage from "../components/greetingPage.svelte";
+  import PasswordField from "../components/passwordField.svelte";
+  import EmailField from "../components/emailField.svelte";
+  import WaitingButton from "../components/waitingSubmitButton.svelte";
+
+  import { post } from "../utils/httpRequests";
+  import { authHeader } from "../utils/stores";
+  import { destForward, preserveQuerystringForward } from "../utils/navigation";
+
+  let email: string, password: string, repeatedPassword: string;
+
+  let emailError: boolean = false;
+  let passwordError: boolean = false;
+  let generalError: boolean = false;
+  let errorMessage: string;
+  $: anyError = emailError || passwordError || generalError;
+  $: if(password != repeatedPassword){
+    passwordError = true;
+    errorMessage = generalError ? errorMessage : "'Password' and 'Repeat Password' contents don't match. Please check for typos"
+  }
+
+  let Signupresponse: {[key: string]: any}
+  let waitingForPromise: boolean = false;
+
+  async function postSignup(event: Event): Promise<void> {
+    waitingForPromise = true; //show loading button
+    event.preventDefault(); //disable page reload after form submission
+
+    //send post request and wait for response
+    Signupresponse = await post("signup", {"email": email, "password": password});
+
+    if (Signupresponse.status === 200) {
+      //login user 
+      let loginResponse = await post("login", {"email": email, "password": password})
+    
+      if (loginResponse.status === 200) {
+        authHeader.setToken(loginResponse.access_token)
+        //if it was successfull, forward to different page
+        destForward();
+      }
+      else {
+        generalError = true; //display error message
+        errorMessage = "Account created, however automatic login failed: " + loginResponse.msg;
+        waitingForPromise = false;
+      }
+    }
+    else {
+      waitingForPromise = false;
+      errorMessage = Signupresponse.msg;
+      if(Signupresponse.errorType === "email"){
+        emailError = true;
+        errorMessage += ". Allowed email domains: " + Signupresponse.allowedEmailDomains.toString();
+      }
+      else if(Signupresponse.errorType === "password") passwordError = true;
+      else generalError = true;
+    }
+  }
 </script>
 
+<GreetingPage>
+  <form class="mx-auto max-w-lg" on:submit={postSignup}>
+    <EmailField bind:value={email} bind:error={emailError}/>
+    <PasswordField bind:value={password} bind:error={passwordError}>Password</PasswordField>
+    <PasswordField bind:value={repeatedPassword} bind:error={passwordError}>Repeat Password</PasswordField>
 
+    <div class="flex max-w-lg justify-between items-center">
+      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={anyError}>Signup</WaitingButton>
+      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/login")}}>Login instead</Button>
+    </div>
+
+    {#if anyError}
+      <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMessage}</Helper>
+    {/if}
+  </form>
+</GreetingPage>

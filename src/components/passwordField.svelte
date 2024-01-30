@@ -13,7 +13,7 @@
 </script>
 
 <div class="mb-6">
-  <Label for="password" color={error ? "red" : "gray"} class="mb-2">Password</Label>
+  <Label for="password" color={error ? "red" : "gray"} class="mb-2"><slot/></Label>
   <Input type={passwordShow ? "text" : "password"} id="password" color={error ? "red" : "base"} placeholder={passwordShow ? "alice's password" : "••••••••••••••••"} required bind:value={value} on:input={disableError}>
     <button type="button" slot="right" on:click={() => (passwordShow = !passwordShow)} class="bg-transparent">
       {#if passwordShow}
