@@ -98,7 +98,7 @@ class HeartbeatResponse:
         if self.error is not None:
             return jsonify(error=self.error), 400
         if self.job_assigned:
-            return jsonify(job_assigned=True), 200
+            return jsonify(jobAssigned=True), 200
         return jsonify(ack=True), 200
 
 
@@ -247,7 +247,7 @@ class RunnerManager:
     @synchronized("mtx")
     def find_available_runner(self, job: Job) -> Optional[OnlineRunner]:
         """
-        Finds an appropriatre available runner for the given job.
+        Finds an appropriate available runner for the given job.
         If no runner is available, returns None.
         """
         # TODO: We might want a runner tag system so that some runners

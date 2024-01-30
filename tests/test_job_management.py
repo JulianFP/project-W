@@ -18,7 +18,7 @@ def test_submitJob_invalid(client: Client, user):
 def test_submitJob_valid(client: Client, user, audio):
     res = client.post("/api/jobs/submit", headers=user, data={"file": audio})
     assert res.status_code == 200
-    assert "job_id" in res.json
+    assert "jobId" in res.json
 
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
@@ -45,11 +45,11 @@ def test_listJobs_invalid(client: Client, user, admin):
 def test_listJobs_valid(client: Client, user, admin):
     res = client.get("/api/jobs/list", headers=user)
     assert res.status_code == 200
-    assert len(res.json["job_ids"]) == 1
+    assert len(res.json["jobIds"]) == 1
 
     res = client.get("/api/jobs/list", headers=admin, query_string={"email": "user@test.com"})
     assert res.status_code == 200
-    assert len(res.json["job_ids"]) == 1
+    assert len(res.json["jobIds"]) == 1
 
     res = client.get("/api/jobs/list", headers=admin, query_string={"all": True})
     assert res.status_code == 200
@@ -66,12 +66,12 @@ def test_jobStatus_invalid(client: Client, user, admin):
     # 1 is a job by a different user, 3 doesn't exist
     for job_id in [1, 3]:
         res = client.get("/api/jobs/status", headers=user,
-                         query_string={"job_id": job_id})
+                         query_string={"jobId": job_id})
         assert res.status_code == 403
         assert res.json["message"] == "You don't have permission to access this job"
 
     # invalid job id but as admin
-    res = client.get("/api/jobs/status", headers=admin, query_string={"job_id": 3})
+    res = client.get("/api/jobs/status", headers=admin, query_string={"jobId": 3})
     assert res.status_code == 404
     assert res.json["message"] == "There exists no job with that id"
 
@@ -79,11 +79,11 @@ def test_jobStatus_invalid(client: Client, user, admin):
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_jobStatus_valid(client: Client, user, admin):
     # users can lookup their own jobs
-    res = client.get("/api/jobs/status", headers=user, query_string={"job_id": 2})
+    res = client.get("/api/jobs/status", headers=user, query_string={"jobId": 2})
     assert res.status_code == 200
     assert "status" in res.json
 
     # admins can lookup other users' jobs
-    res = client.get("/api/jobs/status", headers=admin, query_string={"job_id": 2})
+    res = client.get("/api/jobs/status", headers=admin, query_string={"jobId": 2})
     assert res.status_code == 200
     assert "status" in res.json

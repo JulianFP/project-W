@@ -112,7 +112,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(msg="Incorrect credentials provided"), 400
 
         logger.info(" -> login successful, returning JWT token")
-        return jsonify(access_token=create_access_token(user))
+        return jsonify(accessToken=create_access_token(user))
 
     @app.post("/api/requestPasswordReset")
     def requestPasswordReset():
@@ -159,7 +159,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 return jsonify(msg="No user exists with that email"), 400
         else:
             logger.info(f"Requested user info for {user.email}")
-        return jsonify(email=user.email, is_admin=user.is_admin, activated=user.activated)
+        return jsonify(email=user.email, isAdmin=user.is_admin, activated=user.activated)
 
     @app.post("/api/deleteUser")
     @jwt_required()
@@ -273,7 +273,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         language = request.form.get("model")
         job = submit_job(user, file_name, audio, model, language)
         runner_manager.enqueue_job(job)
-        return jsonify(job_id=job.id)
+        return jsonify(jobId=job.id)
 
     @app.get("/api/jobs/list")
     @jwt_required()
@@ -287,7 +287,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
             if request.args.get("all", type=bool):
                 ids_by_user = list_job_ids_for_all_users()
-                return jsonify([{"user_id": user_id, "job_ids": job_ids}
+                return jsonify([{"userId": user_id, "jobIds": job_ids}
                                 for (user_id, job_ids) in ids_by_user.items()]), 200
 
             email = request.args["email"]
@@ -296,13 +296,13 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 logger.info(f"Admin tried to list jobs of nonexistent user {email}")
                 return jsonify(message="No user exists with that email"), 400
 
-        return jsonify(job_ids=list_job_ids_for_user(requested_user)), 200
+        return jsonify(jobIds=list_job_ids_for_user(requested_user)), 200
 
     @app.get("/api/jobs/status")
     @jwt_required()
     def jobStatus():
         user: User = current_user
-        job_id = request.args['job_id']
+        job_id = request.args['jobId']
         job: Job = Job.query.where(Job.id == job_id).one_or_none()
         # Technically, job IDs aren't secret, so leaking whether they exist
         # isn't a big deal, but it still seems cleaner this way
@@ -323,7 +323,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(message="Only admins may create runner tokens.")
         token, _ = create_runner()
         logger.info(f"Admin {user.email} created runner with token {token}")
-        return jsonify(runner_token=token)
+        return jsonify(runnerToken=token)
 
     @app.post("/api/runners/register")
     def registerRunner():
@@ -351,7 +351,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(message="Runner successfully unregistered!")
         return jsonify(error="Runner is not registered!"), 400
 
-    @app.post("/api/runners/retrieve_job")
+    @app.post("/api/runners/retrieveJob")
     def retrieveJob():
         online_runner, error = runner_manager.get_online_runner_for_req(request)
         if error:
@@ -361,7 +361,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(error="No job available!"), 400
         return jsonify(audio=base64.b64encode(job.file.audio_data).decode("ascii"), model=job.model, language=job.language)
 
-    @app.post("/api/runners/submit_job_result")
+    @app.post("/api/runners/submitJobResult")
     def submitJobResult():
         online_runner, error = runner_manager.get_online_runner_for_req(request)
         if error:
