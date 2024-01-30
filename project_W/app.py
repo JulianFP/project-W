@@ -283,7 +283,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         if "email" in request.args or "all" in request.args:
             if not user.is_admin:
                 logger.info("Non-admin tried to list other users' jobs, denied")
-                return jsonify(message="You don't have permission to list other users' jobs"), 403
+                return jsonify(msg="You don't have permission to list other users' jobs"), 403
 
             if request.args.get("all", type=bool):
                 ids_by_user = list_job_ids_for_all_users()
@@ -294,7 +294,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             requested_user = User.query.where(User.email == email).one_or_none()
             if not requested_user:
                 logger.info(f"Admin tried to list jobs of nonexistent user {email}")
-                return jsonify(message="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email"), 400
 
         return jsonify(jobIds=list_job_ids_for_user(requested_user)), 200
 
@@ -308,10 +308,10 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         # isn't a big deal, but it still seems cleaner this way
         if not job:
             if user.is_admin:
-                return jsonify(message="There exists no job with that id"), 404
-            return jsonify(message="You don't have permission to access this job"), 403
+                return jsonify(msg="There exists no job with that id"), 404
+            return jsonify(msg="You don't have permission to access this job"), 403
         if job.user_id != user.id and not user.is_admin:
-            return jsonify(message="You don't have permission to access this job"), 403
+            return jsonify(msg="You don't have permission to access this job"), 403
         return jsonify(status=runner_manager.job_status(job))
 
     @app.get("/api/runners/create")
@@ -320,7 +320,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         user: User = current_user
         if not user.is_admin:
             logger.info(f"non-admin ({user.email}) tried to create runner.")
-            return jsonify(message="Only admins may create runner tokens.")
+            return jsonify(msg="Only admins may create runner tokens.")
         token, _ = create_runner()
         logger.info(f"Admin {user.email} created runner with token {token}")
         return jsonify(runnerToken=token)
@@ -335,7 +335,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(error="No runner with that token exists!"), 400
         if runner_manager.register_runner(runner):
             logger.info(f"Runner {runner.id} successfully registered!")
-            return jsonify(message="Runner successfully registered!")
+            return jsonify(msg="Runner successfully registered!")
         return jsonify(error="Runner is already registered!"), 400
 
     @app.post("/api/runners/unregister")
@@ -348,7 +348,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(error="No runner with that token exists!"), 400
         if runner_manager.unregister_runner(runner):
             logger.info(f"Runner {runner.id} successfully unregistered!")
-            return jsonify(message="Runner successfully unregistered!")
+            return jsonify(msg="Runner successfully unregistered!")
         return jsonify(error="Runner is not registered!"), 400
 
     @app.post("/api/runners/retrieveJob")
@@ -369,10 +369,10 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         if (error_msg := request.form.get("error_msg")):
             runner_manager.submit_job_result(online_runner, error_msg, True)
-            return jsonify(message="Successfully submitted failed job!")
+            return jsonify(msg="Successfully submitted failed job!")
 
         runner_manager.submit_job_result(online_runner, request.form["transcript"], False)
-        return jsonify(message="Transcript successfully submitted!")
+        return jsonify(msg="Transcript successfully submitted!")
 
     @app.post("/api/runners/heartbeat")
     def heartbeat():
