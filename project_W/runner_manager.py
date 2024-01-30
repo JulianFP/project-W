@@ -54,6 +54,8 @@ class InProcessJob:
     """
     runner: Runner
     job_id: int
+    # A float between 0 and 1 representing the progress of the job.
+    progress: float = 0.0
 
     def job(self) -> Job:
         return Job.query.where(self.job_id == Job.id).one_or_none()
@@ -144,7 +146,6 @@ class RunnerManager:
         had some sort of outage. This method is called periodically (but infrequently)
         by the background thread.
         """
-        logger.info("Cleanup pass")
         now = time.monotonic()
         runners_to_unregister = []
         for online_runner in self.online_runners.values():
@@ -163,8 +164,9 @@ class RunnerManager:
         self.job_queue = AddressablePriorityQueue()
         threading.Thread(target=self.background_thread, name="runner_manager_bg", daemon=True).start()
 
-        # TODO: Start a background thread to periodically unregister
-        # runners that haven't been responding.
+        for job in Job.query.all():
+            if self.job_status(job) == JobStatus.NOT_QUEUED:
+                self.enqueue_job(job)
 
     @synchronized("mtx")
     def is_runner_online(self, runner: Runner) -> bool:
@@ -191,8 +193,13 @@ class RunnerManager:
             in_process_job=None,
         )
         logger.info(f"Runner {runner.id} just came online!")
-        # TODO: We should probably try to enqueue any available jobs
-        # to this runner?
+
+        # TODO: If we have runner tags, only assign job if it has the right tag.
+        if len(self.job_queue) > 0:
+            job_id, _ = self.job_queue.pop_max()
+            job = Job.query.where(job_id == Job.id).one_or_none()
+            self.assign_job_to_runner(job, self.online_runners[runner.id])
+
         return True
 
     @synchronized("mtx")
@@ -329,4 +336,8 @@ class RunnerManager:
         online_runner.last_heartbeat_timestamp = time.monotonic()
         if online_runner.assigned_job_id:
             return HeartbeatResponse(job_assigned=True)
+        if online_runner.in_process_job is not None \
+                and (progress := req.args.get("progress", type=float)) is not None:
+            job = online_runner.in_process_job
+            job.progress = progress
         return HeartbeatResponse()
