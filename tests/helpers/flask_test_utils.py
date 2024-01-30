@@ -1,5 +1,6 @@
 import argon2
-from project_W.model import Job, StatusEnum, User, db
+from project_W.model import InputFile, Job, User, db
+
 
 def add_test_users(app):
     ph = argon2.PasswordHasher()
@@ -19,9 +20,10 @@ def add_test_users(app):
             db.session.add(
                 Job(
                     user_id=id,
-                    file_name="sample.mp3",
-                    audio_data=b"",
-                    status=StatusEnum.PENDING_RUNNER,
+                    file=InputFile(
+                        file_name="sample.mp3",
+                        audio_data=b"",
+                    )
                 )
             )
         db.session.commit()

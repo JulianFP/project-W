@@ -1,7 +1,9 @@
 
+import pytest
 from werkzeug import Client
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_submitJob_invalid(client: Client, user):
     # missing auth header
     res = client.post("/api/jobs/submit")
@@ -12,12 +14,14 @@ def test_submitJob_invalid(client: Client, user):
     assert 400 <= res.status_code < 500
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_submitJob_valid(client: Client, user, audio):
     res = client.post("/api/jobs/submit", headers=user, data={"file": audio})
     assert res.status_code == 200
     assert "job_id" in res.json
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_listJobs_invalid(client: Client, user, admin):
     # missing auth header
     res = client.get("/api/jobs/list")
@@ -37,6 +41,7 @@ def test_listJobs_invalid(client: Client, user, admin):
     assert res.status_code == 400
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_listJobs_valid(client: Client, user, admin):
     res = client.get("/api/jobs/list", headers=user)
     assert res.status_code == 200
@@ -51,6 +56,7 @@ def test_listJobs_valid(client: Client, user, admin):
     assert len(res.json) == 2
 
 
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_jobStatus_invalid(client: Client, user, admin):
     # missing credentials
     res = client.get("/api/jobs/status")
@@ -63,12 +69,14 @@ def test_jobStatus_invalid(client: Client, user, admin):
                          query_string={"job_id": job_id})
         assert res.status_code == 403
         assert res.json["message"] == "You don't have permission to access this job"
-    
+
     # invalid job id but as admin
     res = client.get("/api/jobs/status", headers=admin, query_string={"job_id": 3})
     assert res.status_code == 404
     assert res.json["message"] == "There exists no job with that id"
 
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_jobStatus_valid(client: Client, user, admin):
     # users can lookup their own jobs
     res = client.get("/api/jobs/status", headers=user, query_string={"job_id": 2})

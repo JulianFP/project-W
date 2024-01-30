@@ -247,7 +247,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 return jsonify(msg="You don't have permission to modify other users"), 403
             elif not specifiedUser:
                 logger.info(" -> Invalid user email")
-                return jsonify(message="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email"), 400
             else:
                 toModify = specifiedUser
 
