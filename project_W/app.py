@@ -298,6 +298,20 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         return jsonify(jobIds=list_job_ids_for_user(requested_user)), 200
 
+    @app.get("/api/jobs/info")
+    @jwt_required()
+    def jobInfo():
+        user: User = current_user
+        job_id = request.args['jobId']
+        job: Job = Job.query.where(Job.id == job_id).one_or_none()
+        if not job:
+            if user.is_admin:
+                return jsonify(msg="There exists no job with that id"), 404
+            return jsonify(msg="You don't have permission to access this job"), 403
+        if job.user_id != user.id and not user.is_admin:
+            return jsonify(msg="You don't have permission to access this job"), 403
+        return jsonify(jobId=job.id, fileName=job.file_name, model=job.model, language=job.language, status=runner_manager.job_status(job))
+
     @app.get("/api/jobs/status")
     @jwt_required()
     def jobStatus():
