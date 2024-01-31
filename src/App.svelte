@@ -26,6 +26,10 @@
     "*": NotFound
   };
 
+  //on application start: check localStorage for authHeader and login if it is there
+  const returnVal: string|null = localStorage.getItem("authHeader");
+  if(returnVal) authHeader.setToken(returnVal);
+
   let dropDownOpen = false;
 </script>
 

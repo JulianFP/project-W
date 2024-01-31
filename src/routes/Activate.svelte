@@ -20,6 +20,7 @@
     replace("/");
   }
 </script>
+
 {#await activate()}
   <div class="flex flex-col w-full h-full justify-evenly items-center">
     <Spinner class="me-3" size="10" />

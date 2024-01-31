@@ -10,10 +10,12 @@ function createAuthHeaderStore() {
     setToken: function(token: string): void { 
       set({"Authorization": "Bearer " + token});
       loggedInWrit.set(true);
+      localStorage.setItem("authHeader", token);
     },
     forgetToken: function(): void { 
       set({});
       loggedInWrit.set(false);
+      localStorage.removeItem("authHeader");
     }
   }
 }

@@ -7,8 +7,10 @@
   import WaitingButton from "../components/waitingSubmitButton.svelte";
 
   import { post } from "../utils/httpRequests";
-  import { authHeader } from "../utils/stores";
+  import { authHeader, loggedIn } from "../utils/stores";
   import { destForward, preserveQuerystringForward } from "../utils/navigation";
+
+  $: if($loggedIn) destForward();
 
   let email: string, password: string, repeatedPassword: string;
 
