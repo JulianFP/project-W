@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ComponentType } from "svelte";
-  import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, Avatar, Dropdown, DropdownItem, DarkMode } from "flowbite-svelte";
-  import { GithubSolid } from "flowbite-svelte-icons";
+  import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, Avatar, Dropdown, DropdownItem, DarkMode, Alert } from "flowbite-svelte";
+  import { GithubSolid, InfoCircleSolid } from "flowbite-svelte-icons";
 
   import { location } from "svelte-spa-router";
 
@@ -13,7 +13,7 @@
   import JobList from "./routes/JobList.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
-  import { loggedIn, authHeader } from "./utils/stores";
+  import { loggedIn, authHeader, alerts } from "./utils/stores";
 
   export const routes: {[key: string]: ComponentType} = {
     "/": JobList,
@@ -62,7 +62,15 @@
       <NavLi href="https://github.com/JulianFP/project-W"><GithubSolid class="mx-auto"/></NavLi>
     </NavUl>
   </Navbar>
+
+  {#each $alerts as alert}
+    <Alert color={alert.color} dismissable class="m-2">
+      <InfoCircleSolid slot="icon" class="w-4 h-4" />
+      {alert.msg}
+    </Alert>
+  {/each}
 </header>
+
 
 <!--flex: required for h-full of chield to work, w-screen: width to screen width min-h-dvh: dynamic viewport height -->
 <main class="flex w-screen min-h-dvh bg-slate-200 dark:bg-slate-950">

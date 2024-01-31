@@ -1,5 +1,5 @@
 import { apiURL } from "./backendConfig";
-import { loggedIn, authHeader } from "./stores";
+import { loggedIn, authHeader, alerts } from "./stores";
 
 export async function get(route: string, headers: {[key: string]: string} = {}) {
   let returnObj: {[key: string]: any};
@@ -20,7 +20,10 @@ export async function get(route: string, headers: {[key: string]: string} = {}) 
     };
   }
 
-  if (returnObj.status === 401) loggedIn.set(false);
+  if (returnObj.status === 401){
+    authHeader.forgetToken();
+    alerts.add("You have been logged out: " + returnObj.msg, "orange");
+  } 
   return returnObj;
 }
 
@@ -72,7 +75,10 @@ export async function post(route: string, params: {[key: string]: string}, heade
     };
   }
 
-  if (returnObj.status === 401) loggedIn.set(false);
+  if (returnObj.status === 401){
+    authHeader.forgetToken();
+    alerts.add("You have been logged out: " + returnObj.msg, "orange");
+  } 
   return returnObj;
 }
 

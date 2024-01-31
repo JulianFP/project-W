@@ -1,21 +1,35 @@
 import { writable } from "svelte/store";
+import type { Writable } from "svelte/store";
 
+const loggedInWrit: Writable<boolean> = writable(false);
 function createAuthHeaderStore() {
-  const { subscribe, set, update} = writable({});
+  const { subscribe, set }: Writable<{[key: string]: string}> = writable({});
 
   return {
     subscribe,
     setToken: function(token: string): void { 
       set({"Authorization": "Bearer " + token});
-      loggedIn.set(true);
+      loggedInWrit.set(true);
     },
     forgetToken: function(): void { 
       set({});
-      loggedIn.set(false);
+      loggedInWrit.set(false);
     }
   }
 }
 
-export const authHeader = createAuthHeaderStore();
+function createAlertsStore() {
+  const { subscribe, update }: Writable<{msg: string, color: "dark" | "gray" | "red" | "yellow" | "green" | "orange"}[]> = writable([])
 
-export const loggedIn = writable(false);
+  return {
+    subscribe,
+    add: function(msg: string, color: "dark" | "gray" | "red" | "yellow" | "green" | "orange" = "dark"): void {
+      update((alerts) => alerts.concat({msg: msg, color: color}))
+    }
+  };
+}
+
+export const authHeader = createAuthHeaderStore();
+export const loggedIn = { subscribe: loggedInWrit.subscribe };
+
+export const alerts = createAlertsStore();
