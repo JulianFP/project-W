@@ -22,7 +22,7 @@ export async function get(route: string, headers: {[key: string]: string} = {}) 
 
   if (returnObj.status === 401){
     authHeader.forgetToken();
-    alerts.add("You have been logged out: " + returnObj.msg, "orange");
+    alerts.add("You have been logged out: " + returnObj.msg, "red");
   } 
   return returnObj;
 }
@@ -77,7 +77,7 @@ export async function post(route: string, params: {[key: string]: string}, heade
 
   if (returnObj.status === 401){
     authHeader.forgetToken();
-    alerts.add("You have been logged out: " + returnObj.msg, "orange");
+    alerts.add("You have been logged out: " + returnObj.msg, "red");
   } 
   return returnObj;
 }
