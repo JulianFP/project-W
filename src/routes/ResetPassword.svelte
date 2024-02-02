@@ -42,7 +42,7 @@
 
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={resetPassword}>
-    <PasswordWithRepeatField bind:password={newPassword} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage}/>
+    <PasswordWithRepeatField bind:value={newPassword} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage}/>
 
     {#if anyError}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMessage}</Helper>

@@ -62,7 +62,7 @@
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={postSignup}>
     <EmailField bind:value={email} bind:error={emailError}/>
-    <PasswordWithRepeatField bind:password={password} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage}/>
+    <PasswordWithRepeatField bind:value={password} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage}/>
 
     {#if anyError}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMessage}</Helper>
