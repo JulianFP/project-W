@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, Helper } from "flowbite-svelte";
+  import { Button, Helper, A } from "flowbite-svelte";
 
   import GreetingPage from "../components/greetingPage.svelte";
   import PasswordField from "../components/passwordField.svelte";
@@ -41,13 +41,16 @@
     <EmailField bind:value={email} bind:error={error}/>
     <PasswordField bind:value={password} bind:error={error}>Password</PasswordField>
 
-    <div class="flex max-w-lg justify-between items-center">
-      <WaitingButton bind:waiting={waitingForPromise}>Login</WaitingButton>
-      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/signup")}}>Signup instead</Button>
-    </div>
-
     {#if error}
       <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response.msg}</Helper>
     {/if}
+
+    <div class="flex max-w-lg justify-between items-center my-2">
+      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error}>Login</WaitingButton>
+      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/signup")}}>Signup instead</Button>
+    </div>
+
+    <A href="#/requestPasswordReset">Forgot password?</A>
+
   </form>
 </GreetingPage>
