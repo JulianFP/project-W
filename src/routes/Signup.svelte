@@ -2,7 +2,7 @@
   import { Button,  Helper } from "flowbite-svelte";
 
   import GreetingPage from "../components/greetingPage.svelte";
-  import PasswordField from "../components/passwordField.svelte";
+  import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
   import EmailField from "../components/emailField.svelte";
   import WaitingButton from "../components/waitingSubmitButton.svelte";
 
@@ -12,17 +12,13 @@
 
   $: if($loggedIn) destForward();
 
-  let email: string, password: string, repeatedPassword: string;
+  let email: string, password: string;
 
   let emailError: boolean = false;
   let passwordError: boolean = false;
   let generalError: boolean = false;
   let errorMessage: string;
   $: anyError = emailError || passwordError || generalError;
-  $: if(password != repeatedPassword){
-    passwordError = true;
-    errorMessage = generalError ? errorMessage : "'Password' and 'Repeat Password' contents don't match. Please check for typos"
-  }
 
   let Signupresponse: {[key: string]: any}
   let waitingForPromise: boolean = false;
@@ -51,7 +47,6 @@
       }
     }
     else {
-      waitingForPromise = false;
       errorMessage = Signupresponse.msg;
       if(Signupresponse.errorType === "email"){
         emailError = true;
@@ -59,6 +54,7 @@
       }
       else if(Signupresponse.errorType === "password") passwordError = true;
       else generalError = true;
+      waitingForPromise = false;
     }
   }
 </script>
@@ -66,8 +62,7 @@
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={postSignup}>
     <EmailField bind:value={email} bind:error={emailError}/>
-    <PasswordField bind:value={password} bind:error={passwordError}>Password</PasswordField>
-    <PasswordField bind:value={repeatedPassword} bind:error={passwordError}>Repeat Password</PasswordField>
+    <PasswordWithRepeatField bind:password={password} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage}/>
 
     {#if anyError}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMessage}</Helper>

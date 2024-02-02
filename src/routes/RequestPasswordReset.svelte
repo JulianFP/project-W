@@ -42,7 +42,9 @@
       <Helper class="mt-2" color="red"><span class="font-medium">Sending request for password reset failed!</span> {response.msg}</Helper>
     {/if}
 
-    <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error}>Request Password Reset Email</WaitingButton>
+    <div class="my-2">
+      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error}>Request Password Reset Email</WaitingButton>
+    </div>
 
   </form>
 </GreetingPage>

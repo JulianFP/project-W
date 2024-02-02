@@ -10,6 +10,7 @@
   import Signup from "./routes/Signup.svelte";
   import Activate from "./routes/Activate.svelte";
   import RequestPasswordReset from "./routes/RequestPasswordReset.svelte";
+  import ResetPassword from "./routes/ResetPassword.svelte";
   import About from "./routes/About.svelte";
   import UserInfo from "./routes/UserInfo.svelte";
   import JobList from "./routes/JobList.svelte";
@@ -23,6 +24,7 @@
     "/signup": Signup,
     "/activate": Activate,
     "/requestPasswordReset": RequestPasswordReset,
+    "/resetPassword": ResetPassword,
     "/about": About,
     "/userinfo": UserInfo,
     "*": NotFound
