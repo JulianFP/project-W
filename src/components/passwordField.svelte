@@ -15,7 +15,7 @@
 <div class="mb-6">
   <Label for={$$props.id ? $$props.id: "password"} color={error ? "red" : "gray"} class="mb-2"><slot/></Label>
   <Input type={passwordVisible ? "text" : "password"} id={$$props.id ? $$props.id: "password"} name="password" autocomplete={$$props.autocomplete ? $$props.autocomplete: "current-password"} color={error ? "red" : "base"} placeholder={passwordVisible ? "alice's password" : "••••••••••••••••"} required on:input={disableError} {...$$restProps} bind:value={value}>
-    <button type="button" slot="right" on:click={() => (passwordVisible = !passwordVisible)} class="bg-transparent" tabindex="-1">
+    <button type="button" slot="right" on:click={() => (passwordVisible = !passwordVisible)} tabindex="-1">
       {#if passwordVisible}
         <EyeOutline class="w-6 h-6" />
       {:else}

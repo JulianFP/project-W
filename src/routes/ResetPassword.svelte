@@ -42,14 +42,14 @@
 
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={resetPassword}>
-    <PasswordWithRepeatField bind:value={newPassword} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage} tabindex="1"/>
+    <PasswordWithRepeatField bind:value={newPassword} bind:error={passwordError} otherError={generalError} bind:errorMessage={errorMessage} tabindex="1"/>
 
     {#if anyError}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMessage}</Helper>
     {/if}
 
     <div class="my-2">
-      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={anyError} tabindex="3">Reset Password</WaitingButton>
+      <WaitingButton waiting={waitingForPromise} disabled={anyError} tabindex="3">Reset Password</WaitingButton>
     </div>
 
   </form>

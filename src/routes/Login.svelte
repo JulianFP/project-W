@@ -46,7 +46,7 @@
     {/if}
 
     <div class="flex max-w-lg justify-between items-center my-2">
-      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error} tabindex="3">Login</WaitingButton>
+      <WaitingButton waiting={waitingForPromise} disabled={error} tabindex="3">Login</WaitingButton>
       <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/signup")}} tabindex="4">Signup instead</Button>
     </div>
 

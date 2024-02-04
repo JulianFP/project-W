@@ -63,14 +63,14 @@
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={postSignup}>
     <EmailField bind:value={email} bind:error={emailError} tabindex="1"/>
-    <PasswordWithRepeatField bind:value={password} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage} tabindex="2"/>
+    <PasswordWithRepeatField bind:value={password} bind:error={passwordError} otherError={generalError} bind:errorMessage={errorMessage} tabindex="2"/>
 
     {#if anyError}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMessage}</Helper>
     {/if}
 
     <div class="flex max-w-lg justify-between items-center my-2">
-      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={anyError} tabindex="3">Signup</WaitingButton>
+      <WaitingButton waiting={waitingForPromise} disabled={anyError} tabindex="3">Signup</WaitingButton>
       <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/login")}} tabindex="4">Login instead</Button>
     </div>
   </form>

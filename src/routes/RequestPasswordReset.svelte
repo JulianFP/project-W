@@ -43,7 +43,7 @@
     {/if}
 
     <div class="my-2">
-      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error} tabindex="2">Request Password Reset Email</WaitingButton>
+      <WaitingButton waiting={waitingForPromise} disabled={error} tabindex="2">Request Password Reset Email</WaitingButton>
     </div>
 
   </form>
