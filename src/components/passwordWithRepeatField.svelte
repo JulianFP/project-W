@@ -14,7 +14,8 @@
   export let error: boolean = false;
   export let otherError: boolean;
   export let errorMessage: string;
+  export let tabindex: string = "1";
 </script>
 
-<PasswordField bind:value={value} bind:error={error} bind:passwordVisible={passwordVisible} id="password" autocomplete="new-password">Password</PasswordField>
-<PasswordField bind:value={repeatedValue} bind:error={error} bind:passwordVisible={passwordVisible} id="password-repeat" autocomplete="new-password">Repeat Password</PasswordField>
+<PasswordField bind:value={value} bind:error={error} bind:passwordVisible={passwordVisible} id="password" autocomplete="new-password" tabindex={tabindex}>Password</PasswordField>
+<PasswordField bind:value={repeatedValue} bind:error={error} bind:passwordVisible={passwordVisible} id="password-repeat" autocomplete="new-password" tabindex={(+tabindex + 1).toString()}>Repeat Password</PasswordField>

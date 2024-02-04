@@ -36,14 +36,14 @@
 
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={postRequestPasswordReset}>
-    <EmailField bind:value={email} bind:error={error}/>
+    <EmailField bind:value={email} bind:error={error} tabindex="1"/>
 
     {#if error}
       <Helper class="mt-2" color="red"><span class="font-medium">Sending request for password reset failed!</span> {response.msg}</Helper>
     {/if}
 
     <div class="my-2">
-      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error}>Request Password Reset Email</WaitingButton>
+      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error} tabindex="2">Request Password Reset Email</WaitingButton>
     </div>
 
   </form>

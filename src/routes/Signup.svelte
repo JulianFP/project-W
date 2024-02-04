@@ -43,34 +43,35 @@
       else {
         generalError = true; //display error message
         errorMessage = "Account created, however automatic login failed: " + loginResponse.msg;
-        waitingForPromise = false;
       }
     }
     else {
       errorMessage = Signupresponse.msg;
       if(Signupresponse.errorType === "email"){
         emailError = true;
-        errorMessage += ". Allowed email domains: " + Signupresponse.allowedEmailDomains.toString();
+        const allowedDomains: String[] = Signupresponse.allowedEmailDomains;
+        if(allowedDomains) errorMessage += ". Allowed email domains: " + allowedDomains.join(", ");
       }
       else if(Signupresponse.errorType === "password") passwordError = true;
       else generalError = true;
-      waitingForPromise = false;
     }
+
+    waitingForPromise = false;
   }
 </script>
 
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={postSignup}>
-    <EmailField bind:value={email} bind:error={emailError}/>
-    <PasswordWithRepeatField bind:value={password} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage}/>
+    <EmailField bind:value={email} bind:error={emailError} tabindex="1"/>
+    <PasswordWithRepeatField bind:value={password} bind:error={passwordError} bind:otherError={generalError} bind:errorMessage={errorMessage} tabindex="2"/>
 
     {#if anyError}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMessage}</Helper>
     {/if}
 
     <div class="flex max-w-lg justify-between items-center my-2">
-      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={anyError}>Signup</WaitingButton>
-      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/login")}}>Login instead</Button>
+      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={anyError} tabindex="3">Signup</WaitingButton>
+      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/login")}} tabindex="4">Login instead</Button>
     </div>
   </form>
 </GreetingPage>

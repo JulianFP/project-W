@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Spinner } from "flowbite-svelte";
   import { replace, querystring } from "svelte-spa-router";
 
+  import Waiting from "../components/waiting.svelte";
   import { alerts } from "../utils/stores";
   import { get } from "../utils/httpRequests";
 
@@ -22,7 +22,5 @@
 </script>
 
 {#await activate()}
-  <div class="flex flex-col w-full h-full justify-evenly items-center">
-    <Spinner class="me-3" size="10" />
-  </div>
+  <Waiting/>
 {/await}

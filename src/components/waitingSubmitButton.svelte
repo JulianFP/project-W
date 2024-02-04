@@ -10,5 +10,5 @@ export let disabled: boolean = false;
     <Spinner class="me-3" size="4" color="white" />Loading ...
   </Button>
 {:else}
-  <Button type="submit" bind:disabled={disabled}><slot/></Button>
+  <Button type="submit" bind:disabled={disabled} {...$$restProps}><slot/></Button>
 {/if}

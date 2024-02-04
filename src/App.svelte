@@ -12,7 +12,7 @@
   import RequestPasswordReset from "./routes/RequestPasswordReset.svelte";
   import ResetPassword from "./routes/ResetPassword.svelte";
   import About from "./routes/About.svelte";
-  import UserInfo from "./routes/UserInfo.svelte";
+  import AccountSettings from "./routes/AccountSettings.svelte";
   import JobList from "./routes/JobList.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
@@ -26,7 +26,7 @@
     "/requestPasswordReset": RequestPasswordReset,
     "/resetPassword": ResetPassword,
     "/about": About,
-    "/userinfo": UserInfo,
+    "/accountSettings": AccountSettings,
     "*": NotFound
   };
 
@@ -61,7 +61,7 @@
           <span class="block truncate text-sm font-medium">name@flowbite.com</span>
         </DropdownHeader>
         </!-->
-        <DropdownItem href="#/userinfo" on:click={() => {dropDownOpen = false}}>Settings</DropdownItem>
+        <DropdownItem href="#/accountsettings" on:click={() => {dropDownOpen = false}}>Settings</DropdownItem>
         <DropdownItem slot="footer" on:click={() => {dropDownOpen = false; authHeader.forgetToken()}}>Log out</DropdownItem>
       </Dropdown>
     {/if}

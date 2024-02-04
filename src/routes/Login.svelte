@@ -38,19 +38,19 @@
 
 <GreetingPage>
   <form class="mx-auto max-w-lg" on:submit={postLogin}>
-    <EmailField bind:value={email} bind:error={error}/>
-    <PasswordField bind:value={password} bind:error={error}>Password</PasswordField>
+    <EmailField bind:value={email} bind:error={error} tabindex="1"/>
+    <PasswordField bind:value={password} bind:error={error} tabindex="2">Password</PasswordField>
 
     {#if error}
       <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {response.msg}</Helper>
     {/if}
 
     <div class="flex max-w-lg justify-between items-center my-2">
-      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error}>Login</WaitingButton>
-      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/signup")}}>Signup instead</Button>
+      <WaitingButton bind:waiting={waitingForPromise} bind:disabled={error} tabindex="3">Login</WaitingButton>
+      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/signup")}} tabindex="4">Signup instead</Button>
     </div>
 
-    <A href="#/requestPasswordReset">Forgot password?</A>
+    <A href="#/requestPasswordReset" tabindex=5>Forgot password?</A>
 
   </form>
 </GreetingPage>
