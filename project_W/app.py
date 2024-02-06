@@ -398,5 +398,6 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        runner_manager.load_jobs_from_db()
 
     return app

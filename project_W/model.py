@@ -248,11 +248,8 @@ class Job(db.Model):
         db.session.commit()
 
     def set_transcript(self, transcript: str):
-        print(self.transcript, self.id)
         self.transcript = transcript
-        print(self.transcript, self.id)
         db.session.commit()
-        print(self.transcript, self.id)
     # TODO Add some form of runner token/tag system
 
 

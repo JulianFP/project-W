@@ -58,7 +58,7 @@ class InProcessJob:
     progress: float = 0.0
 
     def job(self) -> Job:
-        return Job.query.where(self.job_id == Job.id).one_or_none()
+        return db.session.query(Job).where(self.job_id == Job.id).one_or_none()
 
 
 @dataclass
@@ -88,7 +88,7 @@ class OnlineRunner:
     def assigned_job(self) -> Optional[Job]:
         if self.assigned_job_id is None:
             return None
-        return Job.query.where(self.assigned_job_id == Job.id).one_or_none()
+        return db.session.query(Job).where(self.assigned_job_id == Job.id).one_or_none()
 
 
 @dataclass
@@ -164,7 +164,13 @@ class RunnerManager:
         self.job_queue = AddressablePriorityQueue()
         threading.Thread(target=self.background_thread, name="runner_manager_bg", daemon=True).start()
 
-        for job in Job.query.all():
+
+    def load_jobs_from_db(self):
+        """
+        Enqueues all jobs from the database that are not currently queued.
+        Currently, this is only called once just after the server startup
+        """
+        for job in db.session.query(Job):
             if self.job_status(job) == JobStatus.NOT_QUEUED:
                 self.enqueue_job(job)
 
@@ -197,7 +203,7 @@ class RunnerManager:
         # TODO: If we have runner tags, only assign job if it has the right tag.
         if len(self.job_queue) > 0:
             job_id, _ = self.job_queue.pop_max()
-            job = Job.query.where(job_id == Job.id).one_or_none()
+            job = db.session.query(Job).where(job_id == Job.id).one_or_none()
             self.assign_job_to_runner(job, self.online_runners[runner.id])
 
         return True
