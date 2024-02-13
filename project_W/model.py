@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from typing import Tuple, Optional
 from argon2 import PasswordHasher
-from flask import Response, jsonify
+from flask import Response, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
+from flask_jwt_extended import current_user
 from smtplib import SMTP, SMTP_SSL
 from email.message import EmailMessage
+from functools import wraps
 from project_W.logger import get_logger
 from project_W.utils import encode_activation_token, decode_activation_token, encode_password_reset_token, decode_password_reset_token
 import secrets, ssl, argon2, flask, re
@@ -121,12 +123,12 @@ def reset_user_password(token: str, newPassword: str) -> Tuple[Response, int]:
 
 def delete_user(
     user: User
-) -> Tuple[str, int]:
+) -> Tuple[Response, int]:
     db.session.delete(user)
     db.session.commit()
     logger.info(f" -> Deleted user with email {user.email}")
 
-    return (f"Successfully deleted user with email {user.email}"), 200
+    return jsonify(msg=f"Successfully deleted user with email {user.email}"), 200
 
 
 def is_valid_email(email: str) -> bool:
@@ -208,3 +210,53 @@ def _send_email(
     except Exception as e:
         logger.error(f" -> Error sending email to {receiver}: {e}")
         return False
+
+
+#some additional wraps for api routes
+#if user should be activated to use this route
+def activatedRequired(f):
+    @wraps(f)
+    def decoratedFunction(*args, **kwargs):
+        user: User = current_user
+        if not user.activated:
+            return jsonify(msg="Your account is not activated. Please activate your user account to use this feature.", errorType="permission"), 403
+        else: return f(*args, **kwargs)
+    return decoratedFunction
+
+#if user should need to confirm their identity by entering their password
+def confirmIdentity(f):
+    @wraps(f)
+    def decoratedFunction(*args, **kwargs):
+        user: User = current_user
+        password = request.form['password']
+        if not user.check_password(password):
+            logger.info(" -> incorrect password")
+            return jsonify(msg="Incorrect password provided", errorType="auth"), 403
+        else: return f(*args, **kwargs)
+    return decoratedFunction
+
+#if admins can change other users with 'emailModify' over same route as users can change themselves 
+#will return user to be modified. This is either 'emailModify' or current_user 
+def emailModifyForAdmins(f):
+    @wraps(f)
+    def decoratedFunction(*args, **kwargs):
+        user: User = current_user
+        toModify: User = current_user
+
+        if 'emailModify' in request.form:
+            specifiedEmail = request.form['emailModify']
+            specifiedUser = User.query.where(
+                User.email == specifiedEmail).one_or_none()
+            if not user.is_admin:
+                logger.info(
+                    f"Non-admin tried to modify users {specifiedEmail} email, denied")
+                return jsonify(msg="You don't have permission to modify other users", errorType="permission"), 403
+            elif not specifiedUser:
+                logger.info(" -> Invalid user email")
+                return jsonify(msg="No user exists with that email", errorType="notInDatabase"), 400
+            else:
+                toModify = specifiedUser
+
+        kwargs["toModify"] = toModify
+        return f(*args, **kwargs)
+    return decoratedFunction

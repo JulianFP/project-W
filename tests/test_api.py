@@ -396,16 +396,16 @@ def test_deleteUser_invalid_wrongPassword(client: Client, user):
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_deleteUser_invalid_noPermissions(client: Client, user):
     res = client.post("/api/deleteUser", headers=user,
-                      data={"password": "userPassword1!", "emailDelete": "admin@test.com"})
+                      data={"password": "userPassword1!", "emailModify": "admin@test.com"})
     assert res.status_code == 403
-    assert res.json["msg"] == "You don't have permission to delete other users"
+    assert res.json["msg"] == "You don't have permission to modify other users"
     assert res.json["errorType"] == "permission"
 
 # admin user who tries to delete other user, but email is invalid
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_deleteUser_invalid_wrongEmail(client: Client, admin):
     res = client.post("/api/deleteUser", headers=admin,
-                      data={"password": "adminPassword1!", "emailDelete": "abc@xyz.com"})
+                      data={"password": "adminPassword1!", "emailModify": "abc@xyz.com"})
     assert res.status_code == 400
     assert res.json["msg"] == "No user exists with that email"
     assert res.json["errorType"] == "notInDatabase"
@@ -423,7 +423,7 @@ def test_deleteUser_valid_nonAdmins(client: Client, user):
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_deleteUser_valid_Admins(client: Client, admin):
     res = client.post("/api/deleteUser", headers=admin,
-                      data={"password": "adminPassword1!", "emailDelete": "user@test.com"})
+                      data={"password": "adminPassword1!", "emailModify": "user@test.com"})
     assert res.status_code == 200
     assert res.json["msg"] == "Successfully deleted user with email user@test.com"
 
@@ -479,7 +479,7 @@ def test_changeUserPassword_valid_normal(client: Client, user):
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_changeUserPassword_valid_admin(client: Client, admin):
     res = client.post("/api/changeUserPassword", headers=admin, data={
-                      "password": "adminPassword1!", "newPassword": "admin2Password!", "emailDelete": "user@test.com"})
+                      "password": "adminPassword1!", "newPassword": "admin2Password!", "emailModify": "user@test.com"})
     assert res.status_code == 200
     assert res.json["msg"] == "Successfully updated user password"
 
