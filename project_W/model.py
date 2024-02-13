@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Tuple, Optional
 from argon2 import PasswordHasher
+from flask import Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from smtplib import SMTP, SMTP_SSL
 from email.message import EmailMessage
@@ -56,29 +57,29 @@ class User(db.Model):
 
 def add_new_user(
         email: str, password: str, is_admin: bool
-) -> Tuple[str, int]:
+) -> Tuple[Response, int]:
     email_already_in_use = db.session.query(
         User.query.where(User.email == email).exists()).scalar()
     if email_already_in_use:
-        return "E-Mail is already used by another account", 400
+        return jsonify(msg="E-Mail is already used by another account", errorType="email"), 400
     if not send_activation_email(email, email):
-        return f"Failed to send activation email to {email}. Email address may not exist", 400
+        return jsonify(msg=f"Failed to send activation email to {email}. Email address may not exist", errorType="email"), 400
 
     logger.info(f" -> Created user with email {email}")
     db.session.add(
         User(email=email, password_hash=hasher.hash(password), is_admin=is_admin, activated=False))
     db.session.commit()
 
-    return f"Successful signup for {email}. Please activate your account be clicking on the link provided in the email we just sent you", 200
+    return jsonify(msg=f"Successful signup for {email}. Please activate your account be clicking on the link provided in the email we just sent you"), 200
 
 
-def activate_user(token: str) -> Tuple[str, int]:
+def activate_user(token: str) -> Tuple[Response, int]:
     secret_key = flask.current_app.config["JWT_SECRET_KEY"]
     emails = decode_activation_token(token, secret_key)
 
     if emails is None:
         logger.info("  -> Invalid user activation token")
-        return "Invalid or expired activation link", 400
+        return jsonify(msg="Invalid or expired activation link", errorType="auth"), 400
 
     old_email = emails["old_email"]
     new_email = emails["new_email"]
@@ -87,35 +88,35 @@ def activate_user(token: str) -> Tuple[str, int]:
     user: Optional[User] = User.query.where(
         User.email == old_email).one_or_none()
     if user is None:
-        logger.info(f"  -> Unknown email address '{old_email}' for user activation token")
-        return f"Unknown email address {old_email}", 400
+        logger.info(f"  -> Invalid user email '{old_email}' for user activation token")
+        return jsonify(msg=f"No user with email {old_email} exists", errorType="notInDatabase"), 400
     if user.activated is True and old_email == new_email:
         logger.info(f"  -> User with email {old_email} already activated")
-        return f"Account for {old_email} is already activated", 400
+        return jsonify(msg=f"Account for {old_email} is already activated", errorType="operation"), 400
     user.activated = True
     user.set_email(new_email) #update email address (in case activation got issued for changed email address)
     db.session.commit()
-    return f"Account {new_email} activated", 200
+    return jsonify(msg=f"Account {new_email} activated"), 200
 
 
-def reset_user_password(token: str, newPassword: str) -> Tuple[str, int]:
+def reset_user_password(token: str, newPassword: str) -> Tuple[Response, int]:
     secret_key = flask.current_app.config["JWT_SECRET_KEY"]
     email = decode_password_reset_token(token, secret_key)
 
     if email is None:
         logger.info("  -> Invalid password reset token")
-        return "Invalid or expired password reset link", 400
+        return jsonify(msg="Invalid or expired password reset link", errorType="auth"), 400
     
     logger.info(f"  -> initiated password reset for email '{email}'")
     user: Optional[User] = User.query.where(
         User.email == email).one_or_none()
     if user is None:
         logger.info(f"  -> Unknown email address '{email}' for password reset token")
-        return f"Unknown email address {email}", 400
+        return jsonify(msg=f"Unknown email address {email}", errorType="notInDatabase"), 400
     user.set_password_unchecked(newPassword)
     db.session.commit()
     logger.info(f"  -> password changed via password reset for user {email}")
-    return f"password changed successfully", 200
+    return jsonify(msg=f"password changed successfully"), 200
 
 
 def delete_user(
