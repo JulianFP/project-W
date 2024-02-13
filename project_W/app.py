@@ -4,6 +4,7 @@ from typing import Optional
 from pathlib import Path
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
+from flask_cors import CORS
 from .logger import get_logger
 from .model import User, add_new_user, delete_user, db, activate_user, send_activation_email, send_password_reset_email, reset_user_password, is_valid_email, is_valid_password, confirmIdentity, emailModifyForAdmins
 from .config import loadConfig
@@ -11,6 +12,7 @@ from .config import loadConfig
 def create_app(customConfigPath: Optional[str] = None) -> Flask:
     logger = get_logger("project-W")
     app = Flask("project-W")
+    CORS(app)
 
     #load config from additionalPaths (if not None) + defaultSearchDirs
     if customConfigPath is None:

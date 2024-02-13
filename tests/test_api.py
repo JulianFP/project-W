@@ -638,3 +638,11 @@ def test_changeUserEmail_revokes_session(client: Client, mockedSMTP, user):
     # the request should fail because the jwt token has been revoked.
     # by changing the user password
     assert 400 <= res.status_code < 500
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_corsSupport(client: Client, user):
+    res = client.get("/api/userinfo", headers=user)
+    assert res.status_code == 200
+
+    assert res.headers.get("Access-Control-Allow-Origin") == "*"
+
