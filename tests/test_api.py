@@ -178,6 +178,27 @@ def test_activate_valid_emailChange(client: Client, mockedSMTP, user):
     assert res.status_code == 200
     assert res.json["msg"] == "Account user2@test.com activated"
 
+#JWT Token still valid after account activation
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_activate_valid_tokenStaysValid(client: Client, mockedSMTP):
+    email: str = "user2@test.com"
+    password: str = "user2Password1!"
+    signupRes = client.post(
+        "/api/signup", data={"email": email, "password": password})
+    assert signupRes.status_code == 200
+
+    user2 = get_auth_headers(client, email, password)
+
+    msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
+    tokenLine = msgBody.split('\n')[2]
+    token = tokenLine.partition("token=")[2]
+    activateRes = client.get("/api/activate", query_string={"token": token})
+    assert activateRes.status_code == 200
+
+    userinfoRes = client.get("/api/userinfo", headers=user2)
+    assert userinfoRes.status_code == 200
+
+
 
 
 # missing form data

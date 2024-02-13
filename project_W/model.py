@@ -30,17 +30,20 @@ class User(db.Model):
     activated = db.Column(db.Boolean, nullable=False)
 
     def set_password_unchecked(self, new_password: str):
-        self.invalidate_session_tokens()
-        self.password_hash = hasher.hash(new_password)
-        db.session.commit()
-        logger.info(f" -> Updated password of user {self.email}")
+        new_password_hash = hasher.hash(new_password)
+        if new_password_hash != self.password_hash:
+            self.invalidate_session_tokens()
+            self.password_hash = new_password_hash
+            db.session.commit()
+            logger.info(f" -> Updated password of user {self.email}")
 
     def set_email(self, new_email: str):
-        self.invalidate_session_tokens()
-        old_email = self.email
-        self.email = new_email
-        db.session.commit()
-        logger.info(f" -> Updated email from {old_email} to {self.email}")
+        if new_email != self.email:
+            self.invalidate_session_tokens()
+            old_email = self.email
+            self.email = new_email
+            db.session.commit()
+            logger.info(f" -> Updated email from {old_email} to {self.email}")
 
     def check_password(self, password: str) -> bool:
         try:
