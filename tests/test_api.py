@@ -554,6 +554,18 @@ def test_changeUserEmail_invalid_invalidEmail2(client: Client, email: str, user)
     assert res.json["allowedEmailDomains"] == [ 'test.com' ]
     assert res.json["errorType"] == "email"
 
+# provided 'email's domain is not in 'allowedEmailDomains'
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_changeUserEmail_invalid_emailAlreadyInUse(client: Client, mockedSMTP, user):
+    res = client.post("/api/changeUserEmail", headers=user,
+                      data={"password": "userPassword1!", "newEmail": "admin@test.com"})
+    assert res.status_code == 400 
+    assert res.json["msg"] == "E-Mail is already used by another account"
+    assert res.json["errorType"] == "email"
+
+    #smtp stuff: it didn't send an email
+    assert mockedSMTP.call_count == 0
+
 # email couldn't be sent
 @pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
 def test_changeUserEmail_invalid_brokenSMTP(client: Client, mockedSMTP, user):

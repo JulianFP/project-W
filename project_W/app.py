@@ -184,12 +184,15 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         
         if not is_valid_email(newEmail): 
             return jsonify(msg=f"'{newEmail}' is not a valid email address", errorType="email", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+        emailInUse: bool = db.session.query(
+            User.query.where(User.email == newEmail).exists()).scalar()
+        if emailInUse:
+            return jsonify(msg="E-Mail is already used by another account", errorType="email"), 400
 
         logger.info(f"user {thisUser.email} made request to modify user email of user {toModify.email} to {newEmail}")
 
         if send_activation_email(toModify.email, newEmail): 
             return jsonify(msg="Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"), 200
-
         else:
             return jsonify(msg=f"Failed to send activation email to {newEmail}. Email address may not exist", errorType="email"), 400
 
