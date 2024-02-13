@@ -10,7 +10,7 @@
 
     response = await action();
 
-    if(!response.ok && response.errorType === "incorrectPassword"){
+    if(!response.ok && response.errorType === "auth"){
       error = true;
     }
     else open = false;
