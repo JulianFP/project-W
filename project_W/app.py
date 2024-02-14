@@ -196,6 +196,26 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         else:
             return jsonify(msg=f"Failed to send activation email to {newEmail}. Email address may not exist", errorType="email"), 400
 
+    @app.get("/api/resendActivationEmail")
+    @jwt_required()
+    def resendActivationEmail():
+        user: User = current_user
+        if user.activated:
+            return jsonify(msg="This user is already activated", errorType="operation"), 400
+
+        if not send_activation_email(user.email, user.email):
+            return jsonify(msg=f"Failed to send password reset email to {user.email}.", errorType="email"), 400
+
+        return jsonify(msg=f"We have sent a new password reset email to {user.email}. Please check your emails"), 200
+
+    @app.get("/api/invalidateAllTokens")
+    @jwt_required()
+    def invalidateAllTokens():
+        user: User = current_user
+        user.invalidate_session_tokens()
+
+        return jsonify(msg="You have successfully been logged out accross all your devices"), 200
+
     with app.app_context():
         db.create_all()
 

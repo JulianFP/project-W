@@ -554,11 +554,23 @@ def test_changeUserEmail_invalid_invalidEmail2(client: Client, email: str, user)
     assert res.json["allowedEmailDomains"] == [ 'test.com' ]
     assert res.json["errorType"] == "email"
 
-# provided 'email's domain is not in 'allowedEmailDomains'
+# provided 'email' is already in use by another account
 @pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
 def test_changeUserEmail_invalid_emailAlreadyInUse(client: Client, mockedSMTP, user):
     res = client.post("/api/changeUserEmail", headers=user,
                       data={"password": "userPassword1!", "newEmail": "admin@test.com"})
+    assert res.status_code == 400 
+    assert res.json["msg"] == "E-Mail is already used by another account"
+    assert res.json["errorType"] == "email"
+
+    #smtp stuff: it didn't send an email
+    assert mockedSMTP.call_count == 0
+
+# provided 'email' is the same as the current email
+@pytest.mark.parametrize("client", [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")], indirect=True)
+def test_changeUserEmail_invalid_emailNotChanged(client: Client, mockedSMTP, user):
+    res = client.post("/api/changeUserEmail", headers=user,
+                      data={"password": "userPassword1!", "newEmail": "user@test.com"})
     assert res.status_code == 400 
     assert res.json["msg"] == "E-Mail is already used by another account"
     assert res.json["errorType"] == "email"
@@ -616,6 +628,75 @@ def test_changeUserEmail_valid_admin(client: Client, mockedSMTP, admin):
     body = msg.get_content()
     assert body.startswith("To activate your Project-W account")
     assert body.count("https://example.com/activate?token=")
+
+
+
+
+# user is alredy activated
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_resendActivationEmail_invalid_alreadyActivated(client: Client, mockedSMTP, user):
+    res = client.get("/api/resendActivationEmail", headers=user)
+    assert res.status_code == 400
+    assert res.json["msg"] == "This user is already activated"
+    assert res.json["errorType"] == "operation"
+
+    #smtp stuff
+    assert mockedSMTP.call_count == 0
+
+# email couldn't be sent
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_resendActivationEmail_invalid_brokenSMTP(client: Client, mockedSMTP, user):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
+    assert res.status_code == 200
+    user2 = get_auth_headers(client, "user2@test.com", "user2Password1!")
+
+    mockedSMTP.side_effect = smtplib.SMTPException
+    res = client.get("/api/resendActivationEmail", headers=user2)
+    assert res.status_code == 400
+    assert res.json["msg"] == "Failed to send password reset email to user2@test.com."
+
+    #smtp stuff 
+    assert mockedSMTP.call_count == 2
+
+
+# valid
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_resendActivationEmail_valid(client: Client, mockedSMTP, user):
+    res = client.post(
+        "/api/signup", data={"email": "user2@test.com", "password": "user2Password1!"})
+    assert res.status_code == 200
+    user2 = get_auth_headers(client, "user2@test.com", "user2Password1!")
+
+    res = client.get("/api/resendActivationEmail", headers=user2)
+    assert res.status_code == 200
+    assert res.json["msg"] == "We have sent a new password reset email to user2@test.com. Please check your emails"
+
+    #smtp stuff
+    assert mockedSMTP.call_count == 2
+    msg = mockedSMTP.mock_calls[3][1][0]
+    assert msg["Subject"] == "Project-W account activation"
+    assert msg["From"] == "alice@example.com"
+    assert msg["To"] == "user2@test.com"
+    body = msg.get_content()
+    assert body.startswith("To activate your Project-W account")
+    assert body.count("https://example.com/activate?token=")
+
+
+
+
+# successful call and login tokesn invalidated
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_invalidateAllTokens_valid(client: Client, user):
+    res = client.get("/api/invalidateAllTokens", headers=user)
+    assert res.status_code == 200
+    assert res.json["msg"] == "You have successfully been logged out accross all your devices"
+
+    #check if header is still valid
+    res = client.get("/api/userinfo", headers=user)
+    # the request should fail because the jwt token has been revoked
+    # by changing the user password
+    assert 400 <= res.status_code < 500
 
 
 
