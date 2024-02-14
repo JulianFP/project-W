@@ -10,5 +10,5 @@
     <Spinner class="me-3" size="4" color="white" />Loading ...
   </Button>
 {:else}
-  <Button type="submit" disabled={disabled} {...$$restProps}><slot/></Button>
+  <Button type="submit" disabled={disabled} on:click {...$$restProps}><slot/></Button>
 {/if}

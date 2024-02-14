@@ -20,10 +20,15 @@ export async function get(route: string, headers: {[key: string]: string} = {}) 
     };
   }
 
+  //401: Token expired, 422: Token was invalidated 
   if (returnObj.status === 401){
     authHeader.forgetToken();
     alerts.add("You have been logged out: " + returnObj.msg, "red");
   } 
+  else if (returnObj.status === 422 && returnObj.msg === "Signature verification failed"){
+    authHeader.forgetToken();
+    alerts.add("You have been logged out: Token was invalidated", "red");
+  }
   return returnObj;
 }
 
@@ -75,10 +80,15 @@ export async function post(route: string, params: {[key: string]: string}, heade
     };
   }
 
+  //401: Token expired, 422: Token was invalidated 
   if (returnObj.status === 401){
     authHeader.forgetToken();
     alerts.add("You have been logged out: " + returnObj.msg, "red");
   } 
+  else if (returnObj.status === 422 && returnObj.msg === "Signature verification failed"){
+    authHeader.forgetToken();
+    alerts.add("You have been logged out: Token was invalidated", "red");
+  }
   return returnObj;
 }
 

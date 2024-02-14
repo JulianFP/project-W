@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ComponentType } from "svelte";
   import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, Avatar, Dropdown, DropdownItem, DarkMode, Alert } from "flowbite-svelte";
-  import { GithubSolid, InfoCircleSolid } from "flowbite-svelte-icons";
+  import { GithubSolid, InfoCircleSolid, UserEditSolid, LockSolid } from "flowbite-svelte-icons";
 
   import { location } from "svelte-spa-router";
 
@@ -12,7 +12,8 @@
   import RequestPasswordReset from "./routes/RequestPasswordReset.svelte";
   import ResetPassword from "./routes/ResetPassword.svelte";
   import About from "./routes/About.svelte";
-  import AccountSettings from "./routes/AccountSettings.svelte";
+  import Account from "./routes/Account.svelte";
+  import Security from "./routes/Security.svelte";
   import JobList from "./routes/JobList.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
@@ -26,7 +27,8 @@
     "/requestPasswordReset": RequestPasswordReset,
     "/resetPassword": ResetPassword,
     "/about": About,
-    "/accountSettings": AccountSettings,
+    "/account": Account,
+    "/security": Security,
     "*": NotFound
   };
 
@@ -61,7 +63,8 @@
           <span class="block truncate text-sm font-medium">name@flowbite.com</span>
         </DropdownHeader>
         </!-->
-        <DropdownItem href="#/accountsettings" on:click={() => {dropDownOpen = false}}>Settings</DropdownItem>
+        <DropdownItem href="#/account" on:click={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
+        <DropdownItem href="#/security" on:click={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
         <DropdownItem slot="footer" on:click={() => {dropDownOpen = false; authHeader.forgetToken()}}>Log out</DropdownItem>
       </Dropdown>
     {/if}
