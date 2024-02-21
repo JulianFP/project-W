@@ -56,7 +56,7 @@ export async function getLoggedIn(route: string, args: {[key: string]: string} =
   return returnObj;
 }
 
-export async function post(route: string, form: {[key: string]: string}, headers: {[key: string]: string} = {}) {
+export async function post(route: string, form: {[key: string]: string} = {}, headers: {[key: string]: string} = {}) {
   const formObj: FormData = new FormData();
   for (let key in form) {
     formObj.set(key, form[key]);
@@ -93,7 +93,7 @@ export async function post(route: string, form: {[key: string]: string}, headers
   return returnObj;
 }
 
-export async function postLoggedIn(route: string, form: {[key: string]: string}) {
+export async function postLoggedIn(route: string, form: {[key: string]: string} = {}) {
   let loggedInVal: boolean = false;
   const loggedInUnsubscribe = loggedIn.subscribe((value) => {
     loggedInVal = value;

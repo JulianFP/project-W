@@ -21,8 +21,8 @@
     return postLoggedIn("user/changePassword", {"password": password, "newPassword": newPassword});
   }
 
-  async function getInvalidateAllTokens(): Promise<{[key: string]: any}> {
-    return getLoggedIn("user/invalidateAllTokens");
+  async function postInvalidateAllTokens(): Promise<{[key: string]: any}> {
+    return postLoggedIn("user/invalidateAllTokens");
   }
 
   //post password modal code
@@ -93,6 +93,6 @@
   You are about to change this accounts password. You have to remember your new password in order to login in the future.
 </ConfirmPasswordModal>
 
-<ConfirmModal bind:open={invalidModalOpen} bind:response={invalidResponse} action={getInvalidateAllTokens}>
+<ConfirmModal bind:open={invalidModalOpen} bind:response={invalidResponse} action={postInvalidateAllTokens}>
   We will invalidate all your session tokens thus logging you out from all devices (including this). You will have to login again.  
 </ConfirmModal>
