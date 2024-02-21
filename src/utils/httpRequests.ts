@@ -1,11 +1,10 @@
-import { apiURL } from "./backendConfig";
 import { loggedIn, authHeader, alerts } from "./stores";
 
 export async function get(route: string, headers: {[key: string]: string} = {}) {
   let returnObj: {[key: string]: any};
 
   try {
-    const response: {[key: string]: any} = await fetch(apiURL + route, {
+    const response: {[key: string]: any} = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route, {
       method: "GET",
       headers: headers
     });
@@ -64,7 +63,7 @@ export async function post(route: string, params: {[key: string]: string}, heade
   let returnObj: {[key: string]: any};
 
   try {
-    const response: {[key: string]: any} = await fetch(apiURL + route, {
+    const response: {[key: string]: any} = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route, {
       method: "POST",
       body: form,
       headers: headers
