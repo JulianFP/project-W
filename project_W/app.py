@@ -65,7 +65,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         # If the user doesn't exist then the token will fail anyways
         return JWT_SECRET_KEY
 
-    @app.post("/api/signup")
+    @app.post("/api/user/signup")
     def signup():
         if app.config["loginSecurity"]["disableSignup"]:
             return jsonify(msg="Signup of new accounts is disabled on this server", errorType="serverConfig"), 400
@@ -81,13 +81,13 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         return add_new_user(email, password, False)
 
-    @app.get("/api/activate")
+    @app.post("/api/user/activate")
     def activate():
-        if(token := request.args.get("token", type=str)):
+        if(token := request.form.get("token", type=str)):
             return activate_user(token)
         else: return jsonify(msg="You need a token to activate a users email", errorType="auth"), 400
 
-    @app.post("/api/login")
+    @app.post("/api/user/login")
     def login():
         email = request.form['email']
         password = request.form['password']
@@ -103,9 +103,9 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         logger.info(" -> login successful, returning JWT token")
         return jsonify(msg="Login successful", access_token=create_access_token(user))
 
-    @app.post("/api/requestPasswordReset")
+    @app.get("/api/user/requestPasswordReset")
     def requestPasswordReset():
-        email = request.form['email']
+        email = request.args.get("email", type=str)
         logger.info(f"Password reset request for email {email}")
 
         user: Optional[User] = User.query.where(
@@ -118,18 +118,18 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         return jsonify(msg=f"If an account with the address {email} exists, then we sent a password reset email to this address. Please check your emails"), 200
 
-    @app.post("/api/resetPassword")
+    @app.post("/api/user/resetPassword")
     def resetPassword():
         newPassword = request.form['newPassword']
 
         if not is_valid_password(newPassword): 
             return jsonify(msg = "Password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total", errorType="password"), 400
-        elif(token := request.args.get("token", type=str)):
+        elif(token := request.form.get("token", type=str)):
             return reset_user_password(token, newPassword)
         else: return jsonify(msg="You need a token to reset a users password", errorType="auth"), 400
 
 
-    @app.get("/api/userinfo")
+    @app.get("/api/user/info")
     @jwt_required()
     def userinfo():
         user: User = current_user
@@ -147,7 +147,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             logger.info(f"Requested user info for {user.email}")
         return jsonify(email=user.email, is_admin=user.is_admin, activated=user.activated)
 
-    @app.post("/api/deleteUser")
+    @app.post("/api/user/delete")
     @jwt_required()
     @confirmIdentity
     @emailModifyForAdmins
@@ -158,7 +158,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         return delete_user(toModify)
 
-    @app.post("/api/changeUserPassword")
+    @app.post("/api/user/changePassword")
     @jwt_required()
     @confirmIdentity
     @emailModifyForAdmins
@@ -174,7 +174,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         toModify.set_password_unchecked(newPassword)
         return jsonify(msg="Successfully updated user password"), 200
 
-    @app.post("/api/changeUserEmail")
+    @app.post("/api/user/changeEmail")
     @jwt_required()
     @confirmIdentity
     @emailModifyForAdmins
@@ -196,7 +196,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         else:
             return jsonify(msg=f"Failed to send activation email to {newEmail}. Email address may not exist", errorType="email"), 400
 
-    @app.get("/api/resendActivationEmail")
+    @app.get("/api/user/resendActivationEmail")
     @jwt_required()
     def resendActivationEmail():
         user: User = current_user
@@ -208,7 +208,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         return jsonify(msg=f"We have sent a new password reset email to {user.email}. Please check your emails"), 200
 
-    @app.get("/api/invalidateAllTokens")
+    @app.get("/api/user/invalidateAllTokens")
     @jwt_required()
     def invalidateAllTokens():
         user: User = current_user
