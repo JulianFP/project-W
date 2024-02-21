@@ -688,7 +688,7 @@ def test_resendActivationEmail_valid(client: Client, mockedSMTP, user):
 # successful call and login tokesn invalidated
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_invalidateAllTokens_valid(client: Client, user):
-    res = client.get("/api/user/invalidateAllTokens", headers=user)
+    res = client.post("/api/user/invalidateAllTokens", headers=user)
     assert res.status_code == 200
     assert res.json["msg"] == "You have successfully been logged out accross all your devices"
 

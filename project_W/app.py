@@ -208,7 +208,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         return jsonify(msg=f"We have sent a new password reset email to {user.email}. Please check your emails"), 200
 
-    @app.get("/api/user/invalidateAllTokens")
+    @app.post("/api/user/invalidateAllTokens")
     @jwt_required()
     def invalidateAllTokens():
         user: User = current_user
