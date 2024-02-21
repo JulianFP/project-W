@@ -1,10 +1,12 @@
 import { loggedIn, authHeader, alerts } from "./stores";
 
-export async function get(route: string, headers: {[key: string]: string} = {}) {
+export async function get(route: string, args: {[key: string]: string} = {}, headers: {[key: string]: string} = {}) {
+  const argsObj: URLSearchParams = new URLSearchParams(args);
+
   let returnObj: {[key: string]: any};
 
   try {
-    const response: {[key: string]: any} = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route, {
+    const response: {[key: string]: any} = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route + "?" + argsObj.toString(), {
       method: "GET",
       headers: headers
     });
@@ -31,7 +33,7 @@ export async function get(route: string, headers: {[key: string]: string} = {}) 
   return returnObj;
 }
 
-export async function getLoggedIn(route: string) {
+export async function getLoggedIn(route: string, args: {[key: string]: string} = {}) {
   let loggedInVal: boolean = false;
   const loggedInUnsubscribe = loggedIn.subscribe((value) => {
     loggedInVal = value;
@@ -42,30 +44,30 @@ export async function getLoggedIn(route: string) {
   });
 
   let returnObj: {[key: string]: any};
-  if(loggedInVal) returnObj = get(route, authHeaderVal);
+  if(loggedInVal) returnObj = get(route, args, authHeaderVal);
   else returnObj = {
     ok: false,
     status: 401,
     msg: "not logged in"
-  };
+  }
 
   loggedInUnsubscribe();
   authHeaderUnsubscribe();
   return returnObj;
 }
 
-export async function post(route: string, params: {[key: string]: string}, headers: {[key: string]: string} = {}) {
-  const form: FormData = new FormData();
-  for (let key in params) {
-    form.set(key, params[key]);
-  };
+export async function post(route: string, form: {[key: string]: string}, headers: {[key: string]: string} = {}) {
+  const formObj: FormData = new FormData();
+  for (let key in form) {
+    formObj.set(key, form[key]);
+  }
 
   let returnObj: {[key: string]: any};
 
   try {
     const response: {[key: string]: any} = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route, {
       method: "POST",
-      body: form,
+      body: formObj,
       headers: headers
     });
     const responseContent: {[key: string]: any} = await response.json();
@@ -91,7 +93,7 @@ export async function post(route: string, params: {[key: string]: string}, heade
   return returnObj;
 }
 
-export async function postLoggedIn(route: string, params: {[key: string]: string}) {
+export async function postLoggedIn(route: string, form: {[key: string]: string}) {
   let loggedInVal: boolean = false;
   const loggedInUnsubscribe = loggedIn.subscribe((value) => {
     loggedInVal = value;
@@ -102,12 +104,12 @@ export async function postLoggedIn(route: string, params: {[key: string]: string
   });
 
   let returnObj: {[key: string]: any};
-  if(loggedInVal) returnObj = post(route, params, authHeaderVal);
+  if(loggedInVal) returnObj = post(route, form, authHeaderVal);
   else returnObj = {
     ok: false,
     status: 401,
     msg: "not logged in"
-  };
+  }
 
   loggedInUnsubscribe();
   authHeaderUnsubscribe();

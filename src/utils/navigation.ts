@@ -1,16 +1,5 @@
-import type { Readable } from "svelte/store";
 import { location, querystring, push, replace } from "svelte-spa-router";
-
-//handles subscribe/unsubscribe to a store to reduce code reuse/boilerplate
-function getStoreStringValue(store: Readable<string|undefined>): string {
-  let storeVal: string = "";
-  const unsubscribe = store.subscribe((value) => {
-    if(typeof value === "string") storeVal = value;
-  });
-
-  unsubscribe();
-  return storeVal;
-}
+import { getStoreStringValue } from "./helperFunctions";
 
 export function loginForward(): void {
   const params = new URLSearchParams(getStoreStringValue(querystring));

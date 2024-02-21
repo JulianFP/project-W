@@ -14,14 +14,14 @@
   $: if(!$loggedIn) loginForward();
 
   async function postDeleteUser(): Promise<{[key: string]: any}> {
-    return postLoggedIn("deleteUser", {"password": password});
+    return postLoggedIn("user/delete", {"password": password});
   }
 
   async function getResendEmail(): Promise<void> {
     waitingForResend = true;
     resendError = false;
 
-    resendResponse = await getLoggedIn("resendActivationEmail");
+    resendResponse = await getLoggedIn("user/resendActivationEmail");
 
     if(!resendResponse.ok) resendError = true;
     else alerts.add(resendResponse.msg, "green");
@@ -56,7 +56,7 @@
 </script>
 
 <CenterPage title="Account settings">
-{#await getLoggedIn("userinfo")}
+{#await getLoggedIn("user/info")}
   <Waiting/>
 {:then deleteResponseUserinfo} 
   {#if deleteResponseUserinfo.status !== 200}

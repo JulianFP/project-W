@@ -6,7 +6,7 @@
   import EmailField from "../components/emailField.svelte";
   import WaitingButton from "../components/waitingSubmitButton.svelte";
 
-  import { post } from "../utils/httpRequests";
+  import { get } from "../utils/httpRequests";
   import { loggedIn, alerts } from "../utils/stores";
 
   $: if($loggedIn) push("/");
@@ -20,7 +20,7 @@
     waitingForPromise = true; //show loading button
     event.preventDefault(); //disable page reload after form submission
 
-    response = await post("requestPasswordReset", {"email": email})
+    response = await get("user/requestPasswordReset", {"email": email})
 
     if (response.status === 200) {
       alerts.add(response.msg, "green");

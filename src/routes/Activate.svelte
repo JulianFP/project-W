@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { replace, querystring } from "svelte-spa-router";
+  import { replace } from "svelte-spa-router";
 
   import Waiting from "../components/waiting.svelte";
   import { alerts } from "../utils/stores";
-  import { get } from "../utils/httpRequests";
+  import { post } from "../utils/httpRequests";
+  import { getParams } from "../utils/helperFunctions";
 
   let response: {[key: string]: any}
 
   async function activate(): Promise<void> {
     //send get request and wait for response
-    response = await get("activate?" + $querystring);
+    response = await post("user/activate", getParams());
 
     if (response.status === 200) {
       alerts.add("Account activation successful", "green");

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Helper } from "flowbite-svelte";
-  import { push, querystring } from "svelte-spa-router";
+  import { push } from "svelte-spa-router";
 
   import GreetingPage from "../components/greetingPage.svelte";
   import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
@@ -8,6 +8,7 @@
 
   import { post } from "../utils/httpRequests";
   import { loggedIn, alerts } from "../utils/stores";
+  import { getParams } from "../utils/helperFunctions";
 
   $: if($loggedIn) push("/");
 
@@ -25,7 +26,7 @@
     waitingForPromise = true; //show loading button
     event.preventDefault(); //disable page reload after form submission
 
-    response = await post("resetPassword?" + $querystring, {"newPassword": newPassword})
+    response = await post("user/resetPassword", Object.assign({"newPassword": newPassword}, getParams()));
 
     if (response.status === 200){
       alerts.add(response.msg, "green");
