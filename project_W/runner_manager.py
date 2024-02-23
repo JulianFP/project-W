@@ -168,8 +168,6 @@ class RunnerManager:
         self.assigned_jobs = {}
         self.job_queue = AddressablePriorityQueue()
         threading.Thread(target=self.background_thread, name="runner_manager_bg", daemon=True).start()
-        with app.app_context():
-            self.load_jobs_from_db()
 
 
     def load_jobs_from_db(self):
