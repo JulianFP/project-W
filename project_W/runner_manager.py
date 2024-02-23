@@ -3,7 +3,7 @@ import threading
 import time
 from typing import Dict, Optional, Tuple
 from attr import dataclass
-from flask import Request, jsonify
+from flask import Request, jsonify, Flask
 from project_W.utils import AddressablePriorityQueue, auth_token_from_req, synchronized
 from project_W.logger import get_logger
 
@@ -112,6 +112,9 @@ class RunnerManager:
     the job results.
     """
 
+    # We need this because the cleanup thread needs to be able to access
+    # the app context.
+    app: Flask
     # Keeps track of all runners currently registered as online, with their
     # runner IDs as keys.
     online_runners: Dict[int, OnlineRunner]
@@ -146,23 +149,27 @@ class RunnerManager:
         had some sort of outage. This method is called periodically (but infrequently)
         by the background thread.
         """
-        now = time.monotonic()
-        runners_to_unregister = []
-        for online_runner in self.online_runners.values():
-            time_since_last_heartbeat = now - online_runner.last_heartbeat_timestamp
-            if time_since_last_heartbeat > DEFAULT_HEARTBEAT_TIMEOUT:
-                logger.info(f"Runner {online_runner.runner.id} hasn't sent a heartbeat in {time_since_last_heartbeat:.2f} seconds, unregistering...")
-                runners_to_unregister.append(online_runner)
+        with self.app.app_context():
+            now = time.monotonic()
+            runners_to_unregister = []
+            for online_runner in self.online_runners.values():
+                time_since_last_heartbeat = now - online_runner.last_heartbeat_timestamp
+                if time_since_last_heartbeat > DEFAULT_HEARTBEAT_TIMEOUT:
+                    logger.info(f"Runner {online_runner.runner.id} hasn't sent a heartbeat in {time_since_last_heartbeat:.2f} seconds, unregistering...")
+                    runners_to_unregister.append(online_runner)
 
-        for online_runner in runners_to_unregister:
-            self.unregister_runner(online_runner)
+            for online_runner in runners_to_unregister:
+                self.unregister_runner(online_runner)
 
-    def __init__(self):
+    def __init__(self, app: Flask):
+        self.app = app
         self.mtx = threading.RLock()
         self.online_runners = {}
         self.assigned_jobs = {}
         self.job_queue = AddressablePriorityQueue()
         threading.Thread(target=self.background_thread, name="runner_manager_bg", daemon=True).start()
+        with app.app_context():
+            self.load_jobs_from_db()
 
 
     def load_jobs_from_db(self):

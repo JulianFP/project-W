@@ -48,7 +48,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     jwt = JWTManager(app)
     db.init_app(app)
 
-    runner_manager = RunnerManager()
+    runner_manager = RunnerManager(app)
 
     @jwt.user_identity_loader
     def user_identity_loader(user: User):
@@ -398,6 +398,5 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     with app.app_context():
         db.create_all()
-        runner_manager.load_jobs_from_db()
 
     return app
