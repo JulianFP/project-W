@@ -18,7 +18,7 @@
   }
 
   async function postChangeUserEmail(): Promise<{[key: string]: any}> {
-    return postLoggedIn("user/changeEmail", {"password": password, "newEmail": email});
+    return postLoggedIn("users/changeEmail", {"password": password, "newEmail": email});
   }
 
   //post modal code

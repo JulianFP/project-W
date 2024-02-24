@@ -28,11 +28,11 @@
     event.preventDefault(); //disable page reload after form submission
 
     //send post request and wait for response
-    Signupresponse = await post("user/signup", {"email": email, "password": password});
+    Signupresponse = await post("users/signup", {"email": email, "password": password});
 
     if (Signupresponse.status === 200) {
       //login user 
-      let loginResponse = await post("user/login", {"email": email, "password": password})
+      let loginResponse = await post("users/login", {"email": email, "password": password})
     
       if (loginResponse.status === 200) {
         authHeader.setToken(loginResponse.access_token)

@@ -10,7 +10,7 @@
 
   async function activate(): Promise<void> {
     //send get request and wait for response
-    response = await post("user/activate", getParams());
+    response = await post("users/activate", getParams());
 
     if (response.status === 200) {
       alerts.add("Account activation successful", "green");

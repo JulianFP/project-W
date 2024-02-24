@@ -26,7 +26,7 @@
     waitingForPromise = true; //show loading button
     event.preventDefault(); //disable page reload after form submission
 
-    response = await post("user/resetPassword", Object.assign({"newPassword": newPassword}, getParams()));
+    response = await post("users/resetPassword", Object.assign({"newPassword": newPassword}, getParams()));
 
     if (response.status === 200){
       alerts.add(response.msg, "green");

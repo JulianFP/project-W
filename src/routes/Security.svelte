@@ -18,11 +18,11 @@
 
   
   async function postChangeUserPassword(): Promise<{[key: string]: any}> {
-    return postLoggedIn("user/changePassword", {"password": password, "newPassword": newPassword});
+    return postLoggedIn("users/changePassword", {"password": password, "newPassword": newPassword});
   }
 
   async function postInvalidateAllTokens(): Promise<{[key: string]: any}> {
-    return postLoggedIn("user/invalidateAllTokens");
+    return postLoggedIn("users/invalidateAllTokens");
   }
 
   //post password modal code

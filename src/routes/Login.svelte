@@ -22,7 +22,7 @@
     event.preventDefault(); //disable page reload after form submission
 
     //send post request and wait for response
-    response = await post("user/login", {"email": email, "password": password});
+    response = await post("users/login", {"email": email, "password": password});
 
     if (response.status === 200) {
       authHeader.setToken(response.access_token)
