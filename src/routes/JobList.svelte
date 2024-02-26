@@ -3,6 +3,7 @@
   import { CaretSortSolid, CaretUpSolid, CaretDownSolid, ChevronLeftOutline, ChevronRightOutline, PlusSolid } from "flowbite-svelte-icons";
   import { querystring, location } from "svelte-spa-router";
 
+  import SubmitJobsModal from "../components/submitJobsModal.svelte";
   import CenterPage from "../components/centerPage.svelte";
   import { loggedIn } from "../utils/stores";
   import { loginForward } from "../utils/navigation";
@@ -38,7 +39,10 @@
     { id: 21, fileName: 'birthdayParty.m4a', model: 'large', language: 'German', status: 'downloaded' }
   ];
 
+  let submitModalOpen: boolean = false;
+
   let searchTerm: string = "";
+  let searchTermEdited: boolean = false;
   let sortKey: itemKey = 'id'; // default sort key
   let sortDirection: number = 1; // default sort direction (ascending)
   let hideOld: boolean = true;
@@ -96,7 +100,10 @@
     else setParams({"hideold": 0});
   }
 
-  $: setParams({"search": searchTerm});
+  $: if(searchTerm || searchTermEdited){
+    setParams({"search": searchTerm});
+    searchTermEdited = true;
+  }
 
   //keep hrefs up to date with querystring
   $: {
@@ -139,41 +146,43 @@
 </script>
 
 <CenterPage title="Your transcription jobs">
-  <div class="flex justify-between">
-    <Checkbox bind:checked={hideOld} on:change={() => setHideOld(hideOld)}>Hide old jobs</Checkbox>
-    <Button pill><PlusSolid class="mr-2"/>New Job</Button>
-  </div>
-  <TableSearch shadow placeholder="Search by file name" hoverable={true} bind:inputValue={searchTerm}>
-    <TableHead> 
-      {#each keys as key}
-        <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" on:click={() => sortTable(key)}>
-          <div class="flex">
-            {#if sortKey === key}
-              {#if +sortDirection === 1}
-                <CaretUpSolid class="inline mr-2"/>
+  <div>
+    <div class="flex justify-between">
+      <Checkbox id="hide_old_elements" bind:checked={hideOld} on:change={() => setHideOld(hideOld)}>Hide old jobs</Checkbox>
+      <Button pill on:click={() => submitModalOpen = true}><PlusSolid class="mr-2"/>New Job</Button>
+    </div>
+    <TableSearch shadow placeholder="Search by file name" hoverable={true} bind:inputValue={searchTerm}>
+      <TableHead> 
+        {#each keys as key}
+          <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" on:click={() => sortTable(key)}>
+            <div class="flex">
+              {#if sortKey === key}
+                {#if +sortDirection === 1}
+                  <CaretUpSolid class="inline mr-2"/>
+                {:else}
+                  <CaretDownSolid class="inline mr-2"/>
+                {/if}
               {:else}
-                <CaretDownSolid class="inline mr-2"/>
+                <CaretSortSolid class="inline mr-2"/>
               {/if}
-            {:else}
-              <CaretSortSolid class="inline mr-2"/>
-            {/if}
-            {key}
-          </div>
-        </TableHeadCell>
-      {/each}
-    </TableHead>
-    <TableBody>
-      {#each sortItems.slice((page-1)*10, page*10) as item}
-        <TableBodyRow>
-          <TableBodyCell>{item.id}</TableBodyCell>
-          <TableBodyCell>{item.fileName}</TableBodyCell>
-          <TableBodyCell>{item.model}</TableBodyCell>
-          <TableBodyCell>{item.language}</TableBodyCell>
-          <TableBodyCell>{item.status}</TableBodyCell>
-        </TableBodyRow>
-      {/each}
-    </TableBody>
-  </TableSearch>
+              {key}
+            </div>
+          </TableHeadCell>
+        {/each}
+      </TableHead>
+      <TableBody>
+        {#each sortItems.slice((page-1)*10, page*10) as item}
+          <TableBodyRow>
+            <TableBodyCell>{item.id}</TableBodyCell>
+            <TableBodyCell>{item.fileName}</TableBodyCell>
+            <TableBodyCell>{item.model}</TableBodyCell>
+            <TableBodyCell>{item.language}</TableBodyCell>
+            <TableBodyCell>{item.status}</TableBodyCell>
+          </TableBodyRow>
+        {/each}
+      </TableBody>
+    </TableSearch>
+  </div>
 
   <div class="flex flex-col items-center justify-center gap-2">
     <div class="text-sm text-gray-700 dark:text-gray-400">
@@ -187,13 +196,14 @@
     <Pagination {pages} on:previous={() => setPage(+page-1)} on:next={() => setPage(+page+1)} icon>
       <svelte:fragment slot="prev">
         <span class="sr-only">Previous</span>
-        <ChevronLeftOutline class="w-2.5 h-2.5" />
+        <ChevronLeftOutline/>
       </svelte:fragment>
       <svelte:fragment slot="next">
         <span class="sr-only">Next</span>
-        <ChevronRightOutline class="w-2.5 h-2.5" />
+        <ChevronRightOutline/>
       </svelte:fragment>
     </Pagination>
-
   </div>
 </CenterPage>
+
+<SubmitJobsModal bind:open={submitModalOpen}/>
