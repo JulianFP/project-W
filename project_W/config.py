@@ -39,7 +39,7 @@ schema = {
     "properties": {
         "clientURL": {
             "type": "string",
-            "pattern": r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?$",
+            "pattern": r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?(\/#)?$",
         },
         "databasePath": {
             "type": "string",
