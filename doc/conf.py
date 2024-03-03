@@ -7,9 +7,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'project-W'
-copyright = '2023, Julian Partanen'
-author = 'Julian Partanen'
+project = 'Project-W'
+copyright = '2023, Julian Partanen & Markus Everling'
+author = 'Julian Partanen, Markus Everling'
 
 # -- General configuration ---------------------------------------------------
 
@@ -17,8 +17,8 @@ author = 'Julian Partanen'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "nbsphinx",
-    "nbsphinx_link",
+    "sphinxcontrib.httpdomain",
+    "sphinxcontrib.autohttp.flask",
     "sphinx_mdinclude",
     "sphinx.ext.autodoc",
     "sphinx_rtd_theme",

@@ -17,6 +17,7 @@ description = "Add short description here"
 readme = "README.md"
 maintainers = [
     { name = "Julian Partanen", email = "your@email.com" },
+    { name = "Markus Everling", email = "your@email.com"}
 ]
 dynamic = ["version"]
 requires-python = ">=3.8"
@@ -55,11 +56,13 @@ tests = [
     "nbval",
 ]
 docs = [
-    "ipykernel",
-    "nbsphinx",
-    "nbsphinx-link",
+    #sphinx documentation engine
     "sphinx",
+    #for automatically documenting http apis
+    "sphinxcontrib-httpdomain",
+    #for including markdown files in sphinx documentation (like the README)
     "sphinx_mdinclude",
+    #read the docs theme for sphinx
     "sphinx_rtd_theme",
 ]
 
@@ -86,6 +89,5 @@ write_to = "project_W/_version.py"
 # The following is the configuration for the pytest test suite
 [tool.pytest.ini_options]
 testpaths = [
-    "tests",
-    "notebooks",
+    "tests"
 ]

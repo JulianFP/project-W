@@ -6,7 +6,7 @@ project W
    :caption: Contents:
 
    intro
-   demo
+   installation
    api
 
 Indices and tables
