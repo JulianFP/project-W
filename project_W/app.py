@@ -354,14 +354,11 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     @app.post("/api/runners/unregister")
     def unregisterRunner():
-        token, error = auth_token_from_req(request)
+        runner, error = runner_manager.get_online_runner_for_req(request)
         if error:
             return jsonify(error=error), 400
-        runner = get_runner_by_token(token)
-        if runner is None:
-            return jsonify(error="No runner with that token exists!"), 400
         if runner_manager.unregister_runner(runner):
-            logger.info(f"Runner {runner.id} successfully unregistered!")
+            logger.info(f"Runner {runner.runner.id} successfully unregistered!")
             return jsonify(msg="Runner successfully unregistered!")
         return jsonify(error="Runner is not registered!"), 400
 
