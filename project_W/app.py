@@ -16,19 +16,21 @@ from .model import Job, User, add_new_user, create_runner, delete_user, \
 from .config import loadConfig
 from .runner_manager import RunnerManager
 
+
 def create_app(customConfigPath: Optional[str] = None) -> Flask:
     logger = get_logger("project-W")
     app = Flask("project-W")
 
-    #load config from additionalPaths (if not None) + defaultSearchDirs
+    # load config from additionalPaths (if not None) + defaultSearchDirs
     if customConfigPath is None:
         app.config.update(loadConfig())
     else:
         path = Path(customConfigPath)
-        if not path.is_dir(): path = path.parent
-        app.config.update(loadConfig(additionalPaths=[ path ]))
+        if not path.is_dir():
+            path = path.parent
+        app.config.update(loadConfig(additionalPaths=[path]))
 
-    #check syntax of JWT_SECRET_KEY and update if necessary
+    # check syntax of JWT_SECRET_KEY and update if necessary
     JWT_SECRET_KEY = app.config["loginSecurity"]["sessionSecretKey"]
     if JWT_SECRET_KEY is not None and len(JWT_SECRET_KEY) > 16:
         logger.info("Setting JWT_SECRET_KEY from supplied config or env var")
@@ -41,7 +43,8 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 
     # tokens are by default valid for 1 hour
-    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(minutes=app.config["loginSecurity"]["sessionExpirationTimeMinutes"])
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(
+        minutes=app.config["loginSecurity"]["sessionExpirationTimeMinutes"])
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{app.config['databasePath']}/database.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -82,9 +85,9 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         password = request.form['password']
         logger.info(f"Signup request from {email}")
 
-        if not is_valid_email(email): 
+        if not is_valid_email(email):
             return jsonify(msg=f"'{email}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
-        if not is_valid_password(password): 
+        if not is_valid_password(password):
             return jsonify(msg="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
 
         message, code = add_new_user(email, password, False)
@@ -93,9 +96,10 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     @app.get("/api/activate")
     def activate():
         msg, code = "", 0
-        if(token := request.args.get("token", type=str)):
+        if (token := request.args.get("token", type=str)):
             msg, code = activate_user(token)
-        else: msg, code = "You need a token to activate a users email", 400
+        else:
+            msg, code = "You need a token to activate a users email", 400
         return jsonify(msg=msg), code
 
     @app.post("/api/login")
@@ -123,8 +127,9 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         user: Optional[User] = User.query.where(
             User.email == email).one_or_none()
         if user is None:
-            #do not change the output in this case since that would allow anybody to probe for emails which have an account here
-            logger.info(f"  -> password reset request for unknown email address '{email}'")
+            # do not change the output in this case since that would allow anybody to probe for emails which have an account here
+            logger.info(
+                f"  -> password reset request for unknown email address '{email}'")
         elif not send_password_reset_email(email):
             msg, code = f"Failed to send password reset email to {email}.", 400
 
@@ -135,13 +140,13 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         newPassword = request.form['newPassword']
 
         msg, code = "", 0
-        if not is_valid_password(newPassword): 
+        if not is_valid_password(newPassword):
             msg, code = "password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total", 400
-        elif(token := request.args.get("token", type=str)):
+        elif (token := request.args.get("token", type=str)):
             msg, code = reset_user_password(token, newPassword)
-        else: msg, code = "You need a token to reset a users password", 400
+        else:
+            msg, code = "You need a token to reset a users password", 400
         return jsonify(msg=msg), code
-
 
     @app.get("/api/userinfo")
     @jwt_required()
@@ -187,7 +192,8 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             else:
                 toDelete = specifiedUser
 
-        logger.info(f"user deletion request from {thisUser.email} for user {toDelete.email}")
+        logger.info(
+            f"user deletion request from {thisUser.email} for user {toDelete.email}")
         message, code = delete_user(toDelete)
         return jsonify(msg=message), code
 
@@ -218,10 +224,11 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 toModify = specifiedUser
 
         newPassword = request.form['newPassword']
-        if not is_valid_password(password): 
+        if not is_valid_password(password):
             return jsonify(msg="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
 
-        logger.info(f"request to modify user password from {thisUser.email} for user {toModify.email}")
+        logger.info(
+            f"request to modify user password from {thisUser.email} for user {toModify.email}")
         toModify.set_password_unchecked(newPassword)
         return jsonify(msg="Successfully updated user password"), 200
 
@@ -252,11 +259,12 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 toModify = specifiedUser
 
         newEmail = request.form['newEmail']
-        if not is_valid_email(newEmail): 
+        if not is_valid_email(newEmail):
             return jsonify(msg=f"'{newEmail}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
 
-        logger.info(f"request to modify user email from {thisUser.email} to {toModify.email}")
-        if send_activation_email(toModify.email, newEmail): 
+        logger.info(
+            f"request to modify user email from {thisUser.email} to {toModify.email}")
+        if send_activation_email(toModify.email, newEmail):
             return jsonify(msg="Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"), 200
         else:
             return jsonify(msg=f"Failed to send activation email to {newEmail}. Email address may not exist"), 400
@@ -282,7 +290,8 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         requested_user = user
         if "email" in request.args or "all" in request.args:
             if not user.is_admin:
-                logger.info("Non-admin tried to list other users' jobs, denied")
+                logger.info(
+                    "Non-admin tried to list other users' jobs, denied")
                 return jsonify(msg="You don't have permission to list other users' jobs"), 403
 
             if request.args.get("all", type=bool):
@@ -291,9 +300,11 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                                 for (user_id, job_ids) in ids_by_user.items()]), 200
 
             email = request.args["email"]
-            requested_user = User.query.where(User.email == email).one_or_none()
+            requested_user = User.query.where(
+                User.email == email).one_or_none()
             if not requested_user:
-                logger.info(f"Admin tried to list jobs of nonexistent user {email}")
+                logger.info(
+                    f"Admin tried to list jobs of nonexistent user {email}")
                 return jsonify(msg="No user exists with that email"), 400
 
         return jsonify(jobIds=list_job_ids_for_user(requested_user)), 200
@@ -303,7 +314,8 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     def jobInfo():
         user: User = current_user
         try:
-            job_ids = [int(job_id) for job_id in request.form["jobIds"].split(",")]
+            job_ids = [int(job_id)
+                       for job_id in request.form["jobIds"].split(",")]
         except ValueError:
             return jsonify(msg="`jobIds` must be comma-separated list of integers"), 400
         result = []
@@ -356,13 +368,15 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         if error:
             return jsonify(error=error), 400
         if runner_manager.unregister_runner(runner):
-            logger.info(f"Runner {runner.runner.id} successfully unregistered!")
+            logger.info(
+                f"Runner {runner.runner.id} successfully unregistered!")
             return jsonify(msg="Runner successfully unregistered!")
         return jsonify(error="Runner is not registered!"), 400
 
     @app.post("/api/runners/retrieveJob")
     def retrieveJob():
-        online_runner, error = runner_manager.get_online_runner_for_req(request)
+        online_runner, error = runner_manager.get_online_runner_for_req(
+            request)
         if error:
             return jsonify(error=error), 400
         job = runner_manager.retrieve_job(online_runner)
@@ -372,7 +386,8 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     @app.post("/api/runners/submitJobResult")
     def submitJobResult():
-        online_runner, error = runner_manager.get_online_runner_for_req(request)
+        online_runner, error = runner_manager.get_online_runner_for_req(
+            request)
         if error:
             return jsonify(error=error), 400
 
@@ -380,7 +395,8 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             runner_manager.submit_job_result(online_runner, error_msg, True)
             return jsonify(msg="Successfully submitted failed job!")
 
-        runner_manager.submit_job_result(online_runner, request.form["transcript"], False)
+        runner_manager.submit_job_result(
+            online_runner, request.form["transcript"], False)
         return jsonify(msg="Transcript successfully submitted!")
 
     @app.post("/api/runners/heartbeat")
