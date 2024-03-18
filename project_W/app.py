@@ -270,7 +270,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         file_name = file.filename
         audio = file.stream.read()
         model = request.form.get("model")
-        language = request.form.get("model")
+        language = request.form.get("language")
         job = submit_job(user, file_name, audio, model, language)
         runner_manager.enqueue_job(job)
         return jsonify(jobId=job.id)
