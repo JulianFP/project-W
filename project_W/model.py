@@ -238,6 +238,7 @@ class Job(db.Model):
     model = db.Column(db.Text)
     language = db.Column(db.Text)
     transcript = db.Column(db.Text)
+    downloaded = db.Column(db.Boolean, default=False, nullable=False)
     error_msg = db.Column(db.Text)
     file_id = db.Column(db.Integer, ForeignKey("files.id"))
     file = relationship("InputFile", back_populates="job", uselist=False,

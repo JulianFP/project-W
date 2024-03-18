@@ -338,6 +338,26 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             })
         return jsonify(result)
 
+    @app.get("/api/jobs/downloadTranscript")
+    @jwt_required()
+    def downloadTranscript():
+        user: User = current_user
+        job_id = request.args["jobId"]
+        job: Job = Job.query.where(Job.id == job_id).one_or_none()
+        if not job:
+            return jsonify(msg=f"There exists no job with id {job_id}"), 404
+        if job.user_id != user.id and not user.is_admin:
+            return jsonify(msg="You don't have permission to access this job"), 403
+
+        if job.transcript is not None:
+            job.downloaded = True
+            db.session.commit()
+            return jsonify(transcript=job.transcript)
+        elif job.error_msg is not None:
+            return jsonify(error=job.error_msg)
+        return jsonify(msg="Job isn't done yet"), 404
+
+
     @app.get("/api/runners/create")
     @jwt_required()
     def createRunner():

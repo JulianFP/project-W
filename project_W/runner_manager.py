@@ -42,6 +42,9 @@ class JobStatus(enum.Enum):
     SUCCESS = "success"
     # There was an error during the processing of the request
     FAILED = "failed"
+    # The job was successfully completed, and the transcript
+    # has been downloaded by the user.
+    DOWNLOADED = "downloaded"
 
 
 @dataclass
@@ -250,6 +253,8 @@ class RunnerManager:
 
     @synchronized("mtx")
     def job_status(self, job: Job) -> JobStatus:
+        if job.downloaded:
+            return JobStatus.DOWNLOADED
         if job.transcript is not None:
             return JobStatus.SUCCESS
         if job.error_msg is not None:
