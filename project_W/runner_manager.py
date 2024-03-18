@@ -19,7 +19,7 @@ DEFAULT_HEARTBEAT_INTERVAL = 15
 DEFAULT_HEARTBEAT_TIMEOUT = 60
 
 
-class JobStatus(enum.StrEnum):
+class JobStatus(enum.Enum):
     """
     Represents all the possible statuses that a
     job request might have.
@@ -27,16 +27,16 @@ class JobStatus(enum.StrEnum):
     # The job request has been received by the server,
     # but is not currently queued for processing.
     # TODO: Do we even need to support this?
-    NOT_QUEUED = "not_queued"
+    NOT_QUEUED = "notQueued"
     # The backend has received the job request but no
     # runner has been assigned yet
-    PENDING_RUNNER = "pending_runner"
+    PENDING_RUNNER = "pendingRunner"
     # A runner has been assigned, but has not started processing
     # the request
-    RUNNER_ASSIGNED = "runner_assigned"
+    RUNNER_ASSIGNED = "runnerAssigned"
     # A runner has been assigned, and is currently processing
     # the request
-    RUNNER_IN_PROGRESS = "runner_in_progress"
+    RUNNER_IN_PROGRESS = "runnerInProgress"
     # The runner successfully completed the job and
     # the transcript is ready for retrieval
     SUCCESS = "success"
@@ -155,7 +155,8 @@ class RunnerManager:
             for online_runner in self.online_runners.values():
                 time_since_last_heartbeat = now - online_runner.last_heartbeat_timestamp
                 if time_since_last_heartbeat > DEFAULT_HEARTBEAT_TIMEOUT:
-                    logger.info(f"Runner {online_runner.runner.id} hasn't sent a heartbeat in {time_since_last_heartbeat:.2f} seconds, unregistering...")
+                    logger.info(
+                        f"Runner {online_runner.runner.id} hasn't sent a heartbeat in {time_since_last_heartbeat:.2f} seconds, unregistering...")
                     runners_to_unregister.append(online_runner)
 
             for online_runner in runners_to_unregister:
@@ -167,8 +168,8 @@ class RunnerManager:
         self.online_runners = {}
         self.assigned_jobs = {}
         self.job_queue = AddressablePriorityQueue()
-        threading.Thread(target=self.background_thread, name="runner_manager_bg", daemon=True).start()
-
+        threading.Thread(target=self.background_thread,
+                         name="runner_manager_bg", daemon=True).start()
 
     def load_jobs_from_db(self):
         """
@@ -225,7 +226,8 @@ class RunnerManager:
         logger.info(f"Runner {online_runner.runner.id} just went offline!")
 
         if online_runner.assigned_job_id is not None:
-            logger.info(f"  -> Runner was unregistered while still processing a job! Enqueuing job again.")
+            logger.info(
+                f"  -> Runner was unregistered while still processing a job! Enqueuing job again.")
             self.enqueue_job(online_runner.assigned_job())
         return True
 
@@ -254,13 +256,20 @@ class RunnerManager:
             return JobStatus.FAILED
         if job.id in self.job_queue:
             return JobStatus.PENDING_RUNNER
-        if job.id in self.assigned_jobs:
-            runner = self.assigned_jobs[job.id]
+        if (runner := self.assigned_jobs.get(job.id)) is not None:
             if runner.in_process_job is not None:
                 return JobStatus.RUNNER_IN_PROGRESS
             return JobStatus.RUNNER_ASSIGNED
         # TODO: Do we need additional logic here?
         return JobStatus.NOT_QUEUED
+
+    def status_dict(self, job: Job) -> dict:
+        data = {"step": self.job_status(job).value}
+        if (runner := self.assigned_jobs.get(job.id)) is not None:
+            data["runner"] = runner.runner.id
+            if runner.in_process_job is not None:
+                data["progress"] = runner.in_process_job.progress
+        return data
 
     @synchronized("mtx")
     def find_available_runner(self, job: Job) -> Optional[OnlineRunner]:
