@@ -43,7 +43,7 @@ schema = {
         },
         "databasePath": {
             "type": "string",
-            "default": user_data_dir(appname=programName, ensure_exists=True)
+            "default": user_data_dir(appname=programName)
         },
         "loginSecurity": {
             "type": "object",

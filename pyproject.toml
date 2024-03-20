@@ -52,8 +52,7 @@ dependencies = [
 tests = [
     "pytest",
     "pytest-mock",
-    "pytest-cov",
-    "nbval",
+    "pytest-cov"
 ]
 docs = [
     #sphinx documentation engine
