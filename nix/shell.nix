@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> { } }:
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    nodejs_21
-    corepack_21
+    nodejs_20
+    corepack_20
   ];
 }

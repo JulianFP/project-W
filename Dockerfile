@@ -8,13 +8,11 @@ LABEL org.opencontainers.image.licenses=MIT
 
 WORKDIR /app
 
+COPY . .
+
 RUN npm install -g pnpm
 
-COPY package*.json ./
-
 RUN pnpm install
-
-COPY . .
 
 RUN VITE_BACKEND_BASE_URL=$BACKEND_BASE_URL pnpm build
 
