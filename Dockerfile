@@ -1,4 +1,6 @@
-FROM python:3.11
+FROM python:3.11-slim
+
+ARG PSEUDO_VERSION="0.0.1"
 
 LABEL org.opencontainers.image.source=https://github.com/JulianFP/project-W
 LABEL org.opencontainers.image.description="Project-W backend production image"
@@ -8,7 +10,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install .
+RUN SETUPTOOLS_SCM_PRETEND_VERSION=$PSEUDO_VERSION pip install .
 
 RUN pip install gunicorn
 
