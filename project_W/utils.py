@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List, Tuple, TypeVar, Generic
+from typing import Optional, Dict, List, Tuple, TypeVar, Generic, Union
 from itsdangerous.url_safe import URLSafeTimedSerializer
 from project_W.logger import get_logger
 from flask import json, Request
@@ -146,7 +146,7 @@ def synchronized(lock_name: str):
 AUTH_HEADER_PATTERN = re.compile(r"Bearer ([a-zA-Z0-9_-]+)")
 
 
-def auth_token_from_req(request: Request) -> Tuple[str, None] | Tuple[None, str]:
+def auth_token_from_req(request: Request) -> Union[Tuple[str, None], Tuple[None, str]]:
     """
     Extracts the token from the Authorization header of a request. If the header
     is missing or malformed, returns `(None, error_message)`.
