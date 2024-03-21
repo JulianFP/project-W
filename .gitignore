@@ -143,3 +143,6 @@ cython_debug/
 #ignore config files 
 JWT_SECRET_KEY
 config.yml
+
+#docker data dir 
+project-W-data

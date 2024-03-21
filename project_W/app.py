@@ -5,14 +5,12 @@ from typing import Optional
 from pathlib import Path
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, current_user, jwt_required
-
 from project_W.utils import auth_token_from_req
-
-
+from flask_cors import CORS
 from .logger import get_logger
 from .model import Job, User, add_new_user, create_runner, delete_user, \
     get_runner_by_token, list_job_ids_for_all_users, list_job_ids_for_user, \
-    submit_job, db, activate_user, send_activation_email, send_password_reset_email, reset_user_password, is_valid_email, is_valid_password
+    submit_job, db, activate_user, send_activation_email, send_password_reset_email, reset_user_password, is_valid_email, is_valid_password, confirmIdentity, emailModifyForAdmins
 from .config import loadConfig
 from .runner_manager import RunnerManager
 
@@ -20,6 +18,7 @@ from .runner_manager import RunnerManager
 def create_app(customConfigPath: Optional[str] = None) -> Flask:
     logger = get_logger("project-W")
     app = Flask("project-W")
+    CORS(app)
 
     # load config from additionalPaths (if not None) + defaultSearchDirs
     if customConfigPath is None:
@@ -76,33 +75,30 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         # If the user doesn't exist then the token will fail anyways
         return JWT_SECRET_KEY
 
-    @app.post("/api/signup")
+    @app.post("/api/users/signup")
     def signup():
         if app.config["loginSecurity"]["disableSignup"]:
-            return jsonify(msg="signup of new accounts is disabled on this server"), 400
+            return jsonify(msg="Signup of new accounts is disabled on this server", errorType="serverConfig"), 400
 
         email = request.form['email']
         password = request.form['password']
         logger.info(f"Signup request from {email}")
 
         if not is_valid_email(email):
-            return jsonify(msg=f"'{email}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+            return jsonify(msg=f"'{email}' is not a valid email address", errorType="email", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
         if not is_valid_password(password):
-            return jsonify(msg="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
+            return jsonify(msg="Password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total", errorType="password"), 400
 
-        message, code = add_new_user(email, password, False)
-        return jsonify(msg=message), code
+        return add_new_user(email, password, False)
 
-    @app.get("/api/activate")
+    @app.post("/api/users/activate")
     def activate():
-        msg, code = "", 0
-        if (token := request.args.get("token", type=str)):
-            msg, code = activate_user(token)
+        if (token := request.form.get("token", type=str)):
+            return activate_user(token)
         else:
-            msg, code = "You need a token to activate a users email", 400
-        return jsonify(msg=msg), code
+            return jsonify(msg="You need a token to activate a users email", errorType="auth"), 400
 
-    @app.post("/api/login")
+    @app.post("/api/users/login")
     def login():
         email = request.form['email']
         password = request.form['password']
@@ -113,16 +109,15 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         if not (user and user.check_password(password)):
             logger.info(" -> incorrect credentials")
-            return jsonify(msg="Incorrect credentials provided"), 400
+            return jsonify(msg="Incorrect credentials provided", errorType="auth"), 400
 
         logger.info(" -> login successful, returning JWT token")
-        return jsonify(accessToken=create_access_token(user))
+        return jsonify(msg="Login successful", accessToken=create_access_token(user))
 
-    @app.post("/api/requestPasswordReset")
+    @app.get("/api/users/requestPasswordReset")
     def requestPasswordReset():
-        email = request.form['email']
+        email = request.args['email']
         logger.info(f"Password reset request for email {email}")
-        msg, code = f"If an account with the address {email} exists, then we sent a password reset email to this address. Please check your emails", 200
 
         user: Optional[User] = User.query.where(
             User.email == email).one_or_none()
@@ -131,24 +126,22 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             logger.info(
                 f"  -> password reset request for unknown email address '{email}'")
         elif not send_password_reset_email(email):
-            msg, code = f"Failed to send password reset email to {email}.", 400
+            return jsonify(msg=f"Failed to send password reset email to {email}.", errorType="email"), 400
 
-        return jsonify(msg=msg), code
+        return jsonify(msg=f"If an account with the address {email} exists, then we sent a password reset email to this address. Please check your emails"), 200
 
-    @app.post("/api/resetPassword")
+    @app.post("/api/users/resetPassword")
     def resetPassword():
         newPassword = request.form['newPassword']
 
-        msg, code = "", 0
         if not is_valid_password(newPassword):
-            msg, code = "password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total", 400
-        elif (token := request.args.get("token", type=str)):
-            msg, code = reset_user_password(token, newPassword)
+            return jsonify(msg="Password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total", errorType="password"), 400
+        elif (token := request.form.get("token", type=str)):
+            return reset_user_password(token, newPassword)
         else:
-            msg, code = "You need a token to reset a users password", 400
-        return jsonify(msg=msg), code
+            return jsonify(msg="You need a token to reset a users password", errorType="auth"), 400
 
-    @app.get("/api/userinfo")
+    @app.get("/api/users/info")
     @jwt_required()
     def userinfo():
         user: User = current_user
@@ -156,118 +149,87 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not user.is_admin:
                 logger.info(
                     f"Non-admin tried to access user info of {email}, denied")
-                return jsonify(msg="You don't have permission to view other accounts' user info"), 403
+                return jsonify(msg="You don't have permission to view other accounts' user info", errorType="permission"), 403
             logger.info(f"Admin requested user info for {user.email}")
             user = User.query.where(User.email == email).one_or_none()
             if not user:
                 logger.info(" -> Invalid user email")
-                return jsonify(msg="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email", errorType="notInDatabase"), 400
         else:
             logger.info(f"Requested user info for {user.email}")
         return jsonify(email=user.email, isAdmin=user.is_admin, activated=user.activated)
 
-    @app.post("/api/deleteUser")
+    @app.post("/api/users/delete")
     @jwt_required()
-    def deleteUser():
+    @confirmIdentity
+    @emailModifyForAdmins
+    def deleteUser(toModify: User):
         thisUser: User = current_user
-        toDelete: User = current_user
-
-        # ask for password as confirmation
-        password = request.form['password']
-        if not thisUser.check_password(password):
-            logger.info(" -> incorrect password")
-            return jsonify(msg="Incorrect password provided"), 403
-
-        if 'emailDelete' in request.form:
-            specifiedEmail = request.form['emailDelete']
-            specifiedUser = User.query.where(
-                User.email == specifiedEmail).one_or_none()
-            if not thisUser.is_admin:
-                logger.info(
-                    f"Non-admin tried to delete user {specifiedEmail}, denied")
-                return jsonify(msg="You don't have permission to delete other users"), 403
-            elif not specifiedUser:
-                logger.info(" -> Invalid user email")
-                return jsonify(msg="No user exists with that email"), 400
-            else:
-                toDelete = specifiedUser
 
         logger.info(
-            f"user deletion request from {thisUser.email} for user {toDelete.email}")
-        message, code = delete_user(toDelete)
-        return jsonify(msg=message), code
+            f"user {thisUser.email} made request to delete user {toModify.email}")
 
-    @app.post("/api/changeUserPassword")
+        return delete_user(toModify)
+
+    @app.post("/api/users/changePassword")
     @jwt_required()
-    def changeUserPassword():
+    @confirmIdentity
+    @emailModifyForAdmins
+    def changeUserPassword(toModify: User):
         thisUser: User = current_user
-        toModify: User = current_user
-
-        # ask for password as confirmation
-        password = request.form['password']
-        if not thisUser.check_password(password):
-            logger.info(" -> incorrect password")
-            return jsonify(msg="Incorrect password provided"), 403
-
-        if 'emailModify' in request.form:
-            specifiedEmail = request.form['emailModify']
-            specifiedUser = User.query.where(
-                User.email == specifiedEmail).one_or_none()
-            if not thisUser.is_admin:
-                logger.info(
-                    f"Non-admin tried to modify password of user {specifiedEmail}, denied")
-                return jsonify(msg="You don't have permission to modify other users"), 403
-            elif not specifiedUser:
-                logger.info(" -> Invalid user email")
-                return jsonify(msg="No user exists with that email"), 400
-            else:
-                toModify = specifiedUser
-
         newPassword = request.form['newPassword']
-        if not is_valid_password(password):
-            return jsonify(msg="password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total"), 400
+
+        if not is_valid_password(newPassword):
+            return jsonify(msg="Password invalid. The password needs to have at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total", errorType="password"), 400
 
         logger.info(
-            f"request to modify user password from {thisUser.email} for user {toModify.email}")
+            f"user {thisUser.email} made request to modify user password of user {toModify.email}")
+
         toModify.set_password_unchecked(newPassword)
         return jsonify(msg="Successfully updated user password"), 200
 
-    @app.post("/api/changeUserEmail")
+    @app.post("/api/users/changeEmail")
     @jwt_required()
-    def changeUserEmail():
+    @confirmIdentity
+    @emailModifyForAdmins
+    def changeUserEmail(toModify: User):
         thisUser: User = current_user
-        toModify: User = current_user
-
-        # ask for password as confirmation
-        password = request.form['password']
-        if not thisUser.check_password(password):
-            logger.info(" -> incorrect password")
-            return jsonify(msg="Incorrect password provided"), 403
-
-        if 'emailModify' in request.form:
-            specifiedEmail = request.form['emailModify']
-            specifiedUser = User.query.where(
-                User.email == specifiedEmail).one_or_none()
-            if not thisUser.is_admin:
-                logger.info(
-                    f"Non-admin tried to modify users {specifiedEmail} email, denied")
-                return jsonify(msg="You don't have permission to modify other users"), 403
-            elif not specifiedUser:
-                logger.info(" -> Invalid user email")
-                return jsonify(msg="No user exists with that email"), 400
-            else:
-                toModify = specifiedUser
-
         newEmail = request.form['newEmail']
+
         if not is_valid_email(newEmail):
-            return jsonify(msg=f"'{newEmail}' is not a valid email address", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+            return jsonify(msg=f"'{newEmail}' is not a valid email address", errorType="email", allowedEmailDomains=app.config["loginSecurity"]["allowedEmailDomains"]), 400
+        emailInUse: bool = db.session.query(
+            User.query.where(User.email == newEmail).exists()).scalar()
+        if emailInUse:
+            return jsonify(msg="E-Mail is already used by another account", errorType="email"), 400
 
         logger.info(
-            f"request to modify user email from {thisUser.email} to {toModify.email}")
+            f"user {thisUser.email} made request to modify user email of user {toModify.email} to {newEmail}")
+
         if send_activation_email(toModify.email, newEmail):
             return jsonify(msg="Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"), 200
         else:
-            return jsonify(msg=f"Failed to send activation email to {newEmail}. Email address may not exist"), 400
+            return jsonify(msg=f"Failed to send activation email to {newEmail}. Email address may not exist", errorType="email"), 400
+
+    @app.get("/api/users/resendActivationEmail")
+    @jwt_required()
+    def resendActivationEmail():
+        user: User = current_user
+        if user.activated:
+            return jsonify(msg="This user is already activated", errorType="operation"), 400
+
+        if not send_activation_email(user.email, user.email):
+            return jsonify(msg=f"Failed to send password reset email to {user.email}.", errorType="email"), 400
+
+        return jsonify(msg=f"We have sent a new password reset email to {user.email}. Please check your emails"), 200
+
+    @app.post("/api/users/invalidateAllTokens")
+    @jwt_required()
+    def invalidateAllTokens():
+        user: User = current_user
+        user.invalidate_session_tokens()
+
+        return jsonify(msg="You have successfully been logged out accross all your devices"), 200
 
     @app.post("/api/jobs/submit")
     @jwt_required()
@@ -356,7 +318,6 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         elif job.error_msg is not None:
             return jsonify(error=job.error_msg)
         return jsonify(msg="Job isn't done yet"), 404
-
 
     @app.get("/api/runners/create")
     @jwt_required()
