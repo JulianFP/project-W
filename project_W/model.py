@@ -274,7 +274,7 @@ class Job(db.Model):
     # TODO Add some form of runner token/tag system
 
 
-def submit_job(user: User, file_name: str | None, audio: bytes, model: str | None, language: str | None) -> Job:
+def submit_job(user: User, file_name: Optional[str], audio: bytes, model: Optional[str], language: Optional[str]) -> Job:
     job = Job(
         user_id=user.id,
         file=InputFile(
@@ -294,7 +294,7 @@ def submit_job(user: User, file_name: str | None, audio: bytes, model: str | Non
     return job
 
 
-def get_job_by_id(id: int) -> Job | None:
+def get_job_by_id(id: int) -> Optional[Job]:
     return db.session.query(Job).where(Job.id == id).one_or_none()
 
 
@@ -326,7 +326,7 @@ class Runner(db.Model):
     # TODO: Add some form of runner tag system
 
 
-def get_runner_by_token(token: str) -> Runner | None:
+def get_runner_by_token(token: str) -> Optional[Runner]:
     token_hash = runner_token_hash(token)
     return db.session.query(Runner).where(Runner.token_hash == token_hash).one_or_none()
 

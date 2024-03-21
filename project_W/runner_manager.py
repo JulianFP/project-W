@@ -1,7 +1,7 @@
 import enum
 import threading
 import time
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 from attr import dataclass
 from flask import Request, jsonify, Flask
 from project_W.utils import AddressablePriorityQueue, auth_token_from_req, synchronized
@@ -235,7 +235,7 @@ class RunnerManager:
         return True
 
     @synchronized("mtx")
-    def get_online_runner_for_req(self, request: Request) -> Tuple[OnlineRunner, None] | Tuple[None, str]:
+    def get_online_runner_for_req(self, request: Request) -> Union[Tuple[OnlineRunner, None], Tuple[None, str]]:
         """
         Returns the online runner whose token is specified in the Authorization header of
         the request. If the token doesn't correspond to any online runner, returns
@@ -351,7 +351,7 @@ class RunnerManager:
         logger.info(f"No runner available for job {job.id}, enqueuing...")
 
     @synchronized("mtx")
-    def heartbeat(self, runner: Runner | None, req: Request) -> HeartbeatResponse:
+    def heartbeat(self, runner: Optional[Runner], req: Request) -> HeartbeatResponse:
         # TODO: actually handle the request data for job updates and such.
         if runner is None:
             return HeartbeatResponse(error="No runner with that token exists!")
