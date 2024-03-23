@@ -268,6 +268,7 @@ class RunnerManager:
         # TODO: Do we need additional logic here?
         return JobStatus.NOT_QUEUED
 
+    @synchronized("mtx")
     def status_dict(self, job: Job) -> dict:
         data = {"step": self.job_status(job).value}
         if (runner := self.assigned_jobs.get(job.id)) is not None:

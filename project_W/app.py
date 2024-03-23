@@ -233,6 +233,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     @app.post("/api/jobs/submit")
     @jwt_required()
+    @activatedRequired
     def submitJob():
         user: User = current_user
         file = request.files["file"]
