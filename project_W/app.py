@@ -8,9 +8,10 @@ from flask_jwt_extended import JWTManager, create_access_token, current_user, jw
 from project_W.utils import auth_token_from_req
 from flask_cors import CORS
 from .logger import get_logger
-from .model import Job, User, add_new_user, create_runner, delete_user, \
+from .model import Job, User, activatedRequired, add_new_user, create_runner, delete_user, \
     get_runner_by_token, list_job_ids_for_all_users, list_job_ids_for_user, \
-    submit_job, db, activate_user, send_activation_email, send_password_reset_email, reset_user_password, is_valid_email, is_valid_password, confirmIdentity, emailModifyForAdmins
+    submit_job, db, activate_user, send_activation_email, send_password_reset_email, \
+    reset_user_password, is_valid_email, is_valid_password, confirmIdentity, emailModifyForAdmins
 from .config import loadConfig
 from .runner_manager import RunnerManager
 
