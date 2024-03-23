@@ -358,10 +358,9 @@ def activatedRequired(f):
             return f(*args, **kwargs)
     return decoratedFunction
 
-# if user should need to confirm their identity by entering their password
-
 
 def confirmIdentity(f):
+    """if user should need to confirm their identity by entering their password"""
     @wraps(f)
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
@@ -373,11 +372,10 @@ def confirmIdentity(f):
             return f(*args, **kwargs)
     return decoratedFunction
 
-# if admins can change other users with 'emailModify' over same route as users can change themselves
-# will return user to be modified. This is either 'emailModify' or current_user
-
 
 def emailModifyForAdmins(f):
+    """if admins can change other users with 'emailModify' over same route as users can change themselves
+    will return user to be modified. This is either 'emailModify' or current_user"""
     @wraps(f)
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
