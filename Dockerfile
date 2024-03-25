@@ -18,8 +18,10 @@ RUN VITE_BACKEND_BASE_URL=$BACKEND_BASE_URL pnpm build
 
 FROM nginx
 
-ARG NGINX_CONFIG="ssl"
+ENV NGINX_CONFIG "ssl"
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-COPY Docker/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf
+COPY Docker/ /NginxConfigs
+
+CMD cp /NginxConfigs/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
