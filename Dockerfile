@@ -24,4 +24,4 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 COPY Docker/ /NginxConfigs
 
-CMD cp /NginxConfigs/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
+CMD ln -s /etc/letsencrypt/live/${SERVER_NAME} /ssl && cp /NginxConfigs/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
