@@ -122,7 +122,9 @@ def findConfigFile(additionalPaths: List[Path] = []) -> Path:
 
     for dir in searchDirs:
         configDir = dir / "config.yml"
-        if configDir.is_file(): return configDir
+        if configDir.is_file(): 
+            logger.info("Trying to load config from: " + str(configDir))
+            return configDir
     raise findConfigFileException("couldn't find a config.yml file in any search directory. Please add one")
 
 def loadConfig(additionalPaths: List[Path] = []) -> Dict:
