@@ -233,7 +233,7 @@ def test_login_valid(client: Client):
         "/api/users/login", data={"email": email, "password": password})
     assert response.status_code == 200
     assert response.json["msg"] == "Login successful"
-    assert "access_token" in response.json
+    assert "accessToken" in response.json
 
 
 
@@ -384,7 +384,7 @@ def test_info_valid_nonAdmins(client: Client, user):
     res = client.get("/api/users/info", headers=user)
     assert res.status_code == 200
     assert res.json["email"] == "user@test.com"
-    assert res.json["is_admin"] == False
+    assert res.json["isAdmin"] == False
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_info_valid_admins(client: Client, admin):
@@ -392,14 +392,14 @@ def test_info_valid_admins(client: Client, admin):
     res = client.get("/api/users/info", headers=admin)
     assert res.status_code == 200
     assert res.json["email"] == "admin@test.com"
-    assert res.json["is_admin"] == True
+    assert res.json["isAdmin"] == True
 
     # admins can access other users' info
     res = client.get("/api/users/info", headers=admin,
                      query_string={"email": "user@test.com"})
     assert res.status_code == 200
     assert res.json["email"] == "user@test.com"
-    assert res.json["is_admin"] == False
+    assert res.json["isAdmin"] == False
 
 
 

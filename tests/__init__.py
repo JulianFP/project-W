@@ -6,5 +6,5 @@ def get_auth_headers(
 ) -> Dict[str, str]:
     response = client.post(
         "/api/users/login", data={"email": email, "password": password})
-    token = response.json["access_token"]
+    token = response.json["accessToken"]
     return {"Authorization": f"Bearer {token}"}
