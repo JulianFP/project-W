@@ -1,0 +1,6 @@
+# This is a dummy config intended for development purposes only!
+disableOptionValidation: true
+clientURL: http://localhost:5178/#
+databasePath: .
+loginSecurity:
+  sessionSecretKey: abcdefghijklmnopqrstuvwxyz0123456789
