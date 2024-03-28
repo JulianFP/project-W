@@ -18,6 +18,7 @@ author = 'Julian Partanen, Markus Everling'
 # ones.
 extensions = [
     "sphinxcontrib.httpdomain",
+    "sphinx-jsonschema",
     "sphinxcontrib.autohttp.flask",
     "sphinx_mdinclude",
     "sphinx.ext.autodoc",
@@ -42,4 +43,12 @@ html_theme = 'sphinx_rtd_theme'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = []
+html_static_path = ['_static']
+
+# These paths are either relative to html_static_path
+# or fully qualified paths (eg. https://...)
+html_css_files = [
+    #this fixes the style of tables when using the readthedocs theme
+    #refer to https://stackoverflow.com/questions/69359978/grid-table-does-not-word-wrap
+    'css/custom.css',
+]

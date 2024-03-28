@@ -40,22 +40,32 @@ schema = {
         "clientURL": {
             "type": "string",
             "pattern": r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?(\/#)?$",
+            "description": "URL under which the frontend is served. It is used for providing the user with clickable links inside of account-activation or password-reset emails. The URL should fullfill the following requirements:\n\n- It has to start with either 'http://' or 'https://'\n\n- It should contain the port number if it is not just 80 (default of http) or 443 (default of https)\n\n- It should contain the root path under which the frontend is served if its not just /\n- It should end with /# if the frontend uses hash based routing (which our frontend does!)",
+            "examples": [
+                "https://example.com/#",
+                "https://sub.example.org/apps/project-W/frontend/#",
+                "http://localhost:5173/#",
+                "http://192.168.1.100:5173/#"
+            ]
         },
         "databasePath": {
             "type": "string",
-            "default": user_data_dir(appname=programName)
+            "default": user_data_dir(appname=programName),
+            "description": "Path under which the sqlite 'database.db' file will be stored. This database contains all backend data, so make sure to backup this directory. Changing this option for an existing installation without moving the file manually will result in the creation of a new empty database. The default value is the users data dir which under Linux is `$XDG_DATA_HOME/project-W` (most of the time this is `~/.local/share/project-W`)"
         },
         "loginSecurity": {
             "type": "object",
             "properties": {
                 "sessionSecretKey": {
                     "type": [ "string", "null" ],
-                    "default": None
+                    "default": None,
+                    "description": "The secret key used to generate JWT Tokens. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex())'`. If left to 'None', then the server will generate a secret key for you, however it will not put it into your config file! This means that the secret key will be different after every server restart which will invalidate all JWT Tokens. It is recommended to generate a secret key yourself using the command above."
                 },
                 "sessionExpirationTimeMinutes": {
                     "type": "integer",
                     "minimum": 5,
-                    "default": 60
+                    "default": 60,
+                    "description": "Time for which a users/clients JWT Tokens stay valid (in minutes). After this time the user will be logged out automatically and has to authenticate again using their username and password."
                 },
                 "allowedEmailDomains": {
                     "type": [ "array" ],
@@ -63,11 +73,17 @@ schema = {
                         "type": "string",
                         "pattern": r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+$"
                     },
-                    "default": []
+                    "default": [],
+                    "examples": [
+                        ["uni-heidelberg.de", "stud.uni-heidelberg.de"]
+                        
+                    ],
+                    "description": "Allowed domains in email addresses. Users will only be able to sign up/change their email if their email address uses one of these domains (the part after the '@'). If left empty, then all email domains are allowed."
                 },
                 "disableSignup": {
                     "type": "boolean",
-                    "default": False
+                    "default": False,
+                    "description": "Whether signup of new accounts should be possible. If set to 'true' then only users who already have an account will be able to use the service."
                 }
             },
             "additionalProperties": False,
@@ -79,24 +95,30 @@ schema = {
                 "domain": {
                     "type": "string",
                     "pattern": r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost$",
+                    "description": "FQDN of your smtp server."
                 },
                 "port": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 65535
+                    "maximum": 65535,
+                    "description": "Port that should be used for the smtp connection."
                 },
                 "secure": {
                     "type": "string",
-                    "pattern": r"^ssl|starttls|unencrypted$"
+                    "pattern": r"^ssl|starttls|unencrypted$",
+                    "description": "Whether to use ssl, starttls or no encryption with the smtp server."
                 },
                 "senderEmail": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Email address from which emails will be sent to the users."
                 },
                 "username": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Username that should be used to authenticate with the smtp server. Most of the time this is the same as 'senderEmail'."
                 },
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Password that should be used to authenticate with the smtp server."
                 }
             },
             "required": [ "domain", "port", "secure", "senderEmail", "username", "password" ],
@@ -104,7 +126,8 @@ schema = {
         },
         "disableOptionValidation": {
             "type": "boolean",
-            "default": False
+            "default": False,
+            "description": "This disables the jsonschema validation of the provided config file. This means that the server will start and run even though it loaded possibly invalid data which may cause it to crash or not work proberly. Only set this to 'true' for development or testing purposes, never in production!"
         }
     },
     "required": [ "clientURL", "smtpServer" ],

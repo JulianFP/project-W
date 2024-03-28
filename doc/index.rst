@@ -7,6 +7,7 @@ project W
 
    intro
    installation
+   config
    api
 
 Indices and tables

@@ -59,6 +59,8 @@ docs = [
     "sphinx",
     #for automatically documenting http apis
     "sphinxcontrib-httpdomain",
+    #for automatically documenting jsonschemas (like the one for our config)
+    "sphinx-jsonschema",
     #for including markdown files in sphinx documentation (like the README)
     "sphinx_mdinclude",
     #read the docs theme for sphinx

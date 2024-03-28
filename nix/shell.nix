@@ -12,6 +12,7 @@ pkgs.mkShell {
     #optional dependencies: docs
     sphinx
     sphinxcontrib-httpdomain
+    (pkgs.callPackage ./pkgs/sphinx-jsonschema.nix { })
     sphinx-mdinclude
     sphinx-rtd-theme
   ];
