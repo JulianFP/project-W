@@ -8,6 +8,7 @@ project W
    intro
    installation
    config
+   dev_getting_started
    api
 
 Indices and tables

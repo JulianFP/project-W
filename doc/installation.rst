@@ -403,6 +403,8 @@ Runner
 
 TODO
 
+.. _manual_installation-label:
+
 Manual installation
 -------------------
 
