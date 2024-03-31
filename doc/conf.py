@@ -20,6 +20,7 @@ extensions = [
     "sphinxcontrib.httpdomain",
     "sphinx-jsonschema",
     "sphinxcontrib.autohttp.flask",
+    "sphinxcontrib.autohttp.flaskqref",
     "sphinx_mdinclude",
     "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
