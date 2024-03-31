@@ -1,8 +1,6 @@
 API
 ===
 
-.. toctree::
-
 .. _general-label:
 
 General

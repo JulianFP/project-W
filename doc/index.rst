@@ -3,11 +3,21 @@ project W
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Introduction:
 
    intro
+
+.. toctree::
+   :maxdepth: 2
+   :caption: For Administrators:
+
    installation
    config
+
+.. toctree::
+   :maxdepth: 2
+   :caption: For Developers:
+
    dev_getting_started
    api
 
