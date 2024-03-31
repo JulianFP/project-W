@@ -1,5 +1,8 @@
+import base64
 from dataclasses import dataclass
-from typing import Tuple, Optional
+import hashlib
+import re
+from typing import Dict, List, Tuple, Optional
 from argon2 import PasswordHasher
 from flask import Response, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
@@ -7,9 +10,16 @@ from flask_jwt_extended import current_user
 from smtplib import SMTP, SMTP_SSL
 from email.message import EmailMessage
 from functools import wraps
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
+
 from project_W.logger import get_logger
 from project_W.utils import encode_activation_token, decode_activation_token, encode_password_reset_token, decode_password_reset_token
-import secrets, ssl, argon2, flask, re
+import secrets
+import ssl
+import argon2
+import flask
+import re
 
 db = SQLAlchemy()
 hasher = PasswordHasher()
@@ -18,8 +28,9 @@ logger = get_logger("project-W")
 
 @dataclass
 class User(db.Model):
+    __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.Text, nullable=False, unique=True)
+    email = db.Column(db.Text, nullable=False, unique=True, index=True)
     password_hash = db.Column(db.Text, nullable=False)
     # We use this key together with JWT_SECRET_KEY to generate session tokens.
     # That way, we can easily invalidate all existing session tokens by changing
@@ -28,6 +39,9 @@ class User(db.Model):
                          default=lambda: secrets.token_urlsafe(16))
     is_admin = db.Column(db.Boolean, nullable=False)
     activated = db.Column(db.Boolean, nullable=False)
+
+    jobs = relationship("Job", order_by="Job.id",
+                        backref="user", cascade="all,delete-orphan")
 
     def set_password_unchecked(self, new_password: str):
         new_password_hash = hasher.hash(new_password)
@@ -93,13 +107,15 @@ def activate_user(token: str) -> Tuple[Response, int]:
     user: Optional[User] = User.query.where(
         User.email == old_email).one_or_none()
     if user is None:
-        logger.info(f"  -> Invalid user email '{old_email}' for user activation token")
+        logger.info(
+            f"  -> Invalid user email '{old_email}' for user activation token")
         return jsonify(msg=f"No user with email {old_email} exists", errorType="notInDatabase"), 400
     if user.activated is True and old_email == new_email:
         logger.info(f"  -> User with email {old_email} already activated")
         return jsonify(msg=f"Account for {old_email} is already activated", errorType="operation"), 400
     user.activated = True
-    user.set_email(new_email) #update email address (in case activation got issued for changed email address)
+    # update email address (in case activation got issued for changed email address)
+    user.set_email(new_email)
     db.session.commit()
     return jsonify(msg=f"Account {new_email} activated"), 200
 
@@ -111,12 +127,13 @@ def reset_user_password(token: str, newPassword: str) -> Tuple[Response, int]:
     if email is None:
         logger.info("  -> Invalid password reset token")
         return jsonify(msg="Invalid or expired password reset link", errorType="auth"), 400
-    
+
     logger.info(f"  -> initiated password reset for email '{email}'")
     user: Optional[User] = User.query.where(
         User.email == email).one_or_none()
     if user is None:
-        logger.info(f"  -> Unknown email address '{email}' for password reset token")
+        logger.info(
+            f"  -> Unknown email address '{email}' for password reset token")
         return jsonify(msg=f"Unknown email address {email}", errorType="notInDatabase"), 400
     user.set_password_unchecked(newPassword)
     db.session.commit()
@@ -137,10 +154,13 @@ def delete_user(
 def is_valid_email(email: str) -> bool:
     allowedDomains = flask.current_app.config["loginSecurity"]["allowedEmailDomains"]
     pattern = r"^\S+@"
-    if not allowedDomains: pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
-    else: pattern += r"(" + "|".join(allowedDomains) + r")"
+    if not allowedDomains:
+        pattern += r"([a-z0-9\-]+\.)+[a-z0-9\-]+"
+    else:
+        pattern += r"(" + "|".join(allowedDomains) + r")"
     pattern += r"$"
     return re.match(pattern, email) is not None
+
 
 def is_valid_password(password: str) -> bool:
     return re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{12,}$", password) is not None
@@ -163,6 +183,7 @@ def send_activation_email(old_email: str, new_email: str) -> bool:
     msg_subject = "Project-W account activation"
     return _send_email(new_email, msg_body, msg_subject)
 
+
 def send_password_reset_email(email: str) -> bool:
     config = flask.current_app.config
     secret_key = config["JWT_SECRET_KEY"]
@@ -180,9 +201,10 @@ def send_password_reset_email(email: str) -> bool:
     msg_subject = "Project-W password reset request"
     return _send_email(email, msg_body, msg_subject)
 
+
 def _send_email(
-        receiver: str, msg_body: str, msg_subject: str
-    ) -> bool:
+    receiver: str, msg_body: str, msg_subject: str
+) -> bool:
     smtpConfig = flask.current_app.config["smtpServer"]
 
     msg = EmailMessage()
@@ -193,14 +215,14 @@ def _send_email(
     context = ssl.create_default_context()
 
     try:
-        #default instance for unencrypted and starttls 
-        #ssl encrypts from beginning and requires a different instance
-        smtpInstance = (SMTP_SSL(smtpConfig["domain"], smtpConfig["port"], context=context) 
-            if smtpConfig["secure"] == "ssl" 
-            else SMTP(smtpConfig["domain"], smtpConfig["port"]))
+        # default instance for unencrypted and starttls
+        # ssl encrypts from beginning and requires a different instance
+        smtpInstance = (SMTP_SSL(smtpConfig["domain"], smtpConfig["port"], context=context)
+                        if smtpConfig["secure"] == "ssl"
+                        else SMTP(smtpConfig["domain"], smtpConfig["port"]))
 
         with smtpInstance as server:
-            if smtpConfig["secure"] == "starttls": 
+            if smtpConfig["secure"] == "starttls":
                 server.ehlo()
                 server.starttls(context=context)
                 server.ehlo()
@@ -215,19 +237,130 @@ def _send_email(
         return False
 
 
-#some additional wraps for api routes
-#if user should be activated to use this route
+# We rarely need to load the entire audio file, so we keep
+# them in a separate table to speed up db operations on jobs.
+@dataclass
+class InputFile(db.Model):
+    __tablename__ = "files"
+    id = db.Column(db.Integer, primary_key=True)
+    # job_id = db.Column(db.Integer, ForeignKey("jobs.id"))
+    job = relationship("Job", back_populates="file")
+    file_name = db.Column(db.Text)
+    audio_data = db.Column(db.BLOB)
+
+
+@dataclass
+class Job(db.Model):
+    __tablename__ = "jobs"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, ForeignKey(
+        "users.id"), index=True, nullable=False)
+    model = db.Column(db.Text)
+    language = db.Column(db.Text)
+    transcript = db.Column(db.Text)
+    downloaded = db.Column(db.Boolean, default=False, nullable=False)
+    error_msg = db.Column(db.Text)
+    file_id = db.Column(db.Integer, ForeignKey("files.id"))
+    file = relationship("InputFile", back_populates="job", uselist=False,
+                        single_parent=True, cascade="all,delete-orphan", lazy="subquery")
+
+    def set_error(self, error_msg: str):
+        self.error_msg = error_msg
+        db.session.commit()
+
+    def set_transcript(self, transcript: str):
+        self.transcript = transcript
+        db.session.commit()
+    # TODO Add some form of runner token/tag system
+
+
+def submit_job(user: User, file_name: Optional[str], audio: bytes, model: Optional[str], language: Optional[str]) -> Job:
+    job = Job(
+        user_id=user.id,
+        file=InputFile(
+            file_name=file_name,
+            audio_data=audio
+        ),
+        model=model,
+        language=language,
+    )
+
+    db.session.add(job)
+    db.session.commit()
+
+    logger.info(f"User {user.email} submitted job with file {file_name}")
+    logger.info(f" -> Assigned job id {job.id}")
+
+    return job
+
+
+def get_job_by_id(id: int) -> Optional[Job]:
+    return db.session.query(Job).where(Job.id == id).one_or_none()
+
+
+def list_job_ids_for_user(user: User) -> List[int]:
+    """Returns a list of all the job IDs associated with this user"""
+    return [job.id for job in user.jobs]
+
+
+def list_job_ids_for_all_users() -> Dict[int, List[int]]:
+    """For each user, returns a list of all job IDs associated with that user"""
+    return {user.id: list_job_ids_for_user(user) for user in db.session.query(User)}
+
+
+def runner_token_hash(token: str) -> str:
+    return base64.urlsafe_b64encode(
+        hashlib.sha256(token.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
+
+
+@dataclass
+class Runner(db.Model):
+    __tablename__ = "runners"
+    id = db.Column(db.Integer, primary_key=True)
+    # We only store the hash of the token, otherwise a db leak would make
+    # it possible to impersonate any runner. We don't need to use a salted hash
+    # because the token is created by the server and already has sufficient entropy.
+    # The hash itself is stored using base64.
+    token_hash = db.Column(db.Text, nullable=False, unique=True, index=True)
+    # TODO: Add some form of runner tag system
+
+
+def get_runner_by_token(token: str) -> Optional[Runner]:
+    token_hash = runner_token_hash(token)
+    return db.session.query(Runner).where(Runner.token_hash == token_hash).one_or_none()
+
+
+def create_runner() -> Tuple[str, Runner]:
+    token = secrets.token_urlsafe()
+    token_hash = runner_token_hash(token)
+
+    # Sanity check to ensure that the token and its hash are unique.
+    while db.session.query(Runner).where(Runner.token_hash == token_hash).one_or_none():
+        token = secrets.token_urlsafe()
+        token_hash = runner_token_hash(token)
+
+    runner = Runner(token_hash=token_hash)
+    db.session.add(runner)
+    db.session.commit()
+    return token, runner
+
+
+# some additional wraps for api routes
+# if user should be activated to use this route
 def activatedRequired(f):
     @wraps(f)
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
         if not user.activated:
             return jsonify(msg="Your account is not activated. Please activate your user account to use this feature.", errorType="permission"), 403
-        else: return f(*args, **kwargs)
+        else:
+            return f(*args, **kwargs)
     return decoratedFunction
 
-#if user should need to confirm their identity by entering their password
+
 def confirmIdentity(f):
+    """if user should need to confirm their identity by entering their password"""
     @wraps(f)
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
@@ -235,12 +368,14 @@ def confirmIdentity(f):
         if not user.check_password(password):
             logger.info(" -> incorrect password")
             return jsonify(msg="Incorrect password provided", errorType="auth"), 403
-        else: return f(*args, **kwargs)
+        else:
+            return f(*args, **kwargs)
     return decoratedFunction
 
-#if admins can change other users with 'emailModify' over same route as users can change themselves 
-#will return user to be modified. This is either 'emailModify' or current_user 
+
 def emailModifyForAdmins(f):
+    """if admins can change other users with 'emailModify' over same route as users can change themselves
+    will return user to be modified. This is either 'emailModify' or current_user"""
     @wraps(f)
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
