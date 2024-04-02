@@ -80,7 +80,7 @@
       </Alert>
     {/if}
     <Alert class="border-t-4" color="dark">
-      {deleteResponseUserinfo.is_admin ? "This is an admin account." : "This is a non-admin account."}
+      {deleteResponseUserinfo.isAdmin ? "This is an admin account." : "This is a non-admin account."}
     </Alert>
 
     <ChangeEmailField defaultValue={deleteResponseUserinfo.email}/>

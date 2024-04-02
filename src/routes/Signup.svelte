@@ -35,7 +35,7 @@
       let loginResponse = await post("users/login", {"email": email, "password": password})
     
       if (loginResponse.status === 200) {
-        authHeader.setToken(loginResponse.access_token)
+        authHeader.setToken(loginResponse.accessToken)
         //if it was successfull, show alert and forward to different page
         alerts.add(Signupresponse.msg, "green");
         destForward();

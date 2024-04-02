@@ -25,7 +25,7 @@
     response = await post("users/login", {"email": email, "password": password});
 
     if (response.status === 200) {
-      authHeader.setToken(response.access_token)
+      authHeader.setToken(response.accessToken)
       //if it was successfull, forward to different page
       destForward();
     }
