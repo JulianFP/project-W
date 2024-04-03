@@ -441,7 +441,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         language = request.form.get("language")
         job = submit_job(user, file_name, audio, model, language)
         runner_manager.enqueue_job(job)
-        return jsonify(jobId=job.id)
+        return jsonify(msg="Job successfully submitted", jobId=job.id)
 
     @app.get("/api/jobs/list")
     @jwt_required()
@@ -452,11 +452,11 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not user.is_admin:
                 logger.info(
                     "Non-admin tried to list other users' jobs, denied")
-                return jsonify(msg="You don't have permission to list other users' jobs"), 403
+                return jsonify(msg="You don't have permission to read other users jobs", errorType="permission"), 403
 
             if request.args.get("all", type=bool):
                 ids_by_user = list_job_ids_for_all_users()
-                return jsonify([{"userId": user_id, "jobIds": job_ids}
+                return jsonify(msg="Returning all list of all jobs in database", jobs=[{"userId": user_id, "jobIds": job_ids}
                                 for (user_id, job_ids) in ids_by_user.items()]), 200
 
             email = request.args["email"]
@@ -465,19 +465,19 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not requested_user:
                 logger.info(
                     f"Admin tried to list jobs of nonexistent user {email}")
-                return jsonify(msg="No user exists with that email"), 400
+                return jsonify(msg="No user exists with that email", errorType="notInDatabase"), 400
 
-        return jsonify(jobIds=list_job_ids_for_user(requested_user)), 200
+        return jsonify(msg="Returning list of all jobs of your account", jobIds=list_job_ids_for_user(requested_user)), 200
 
-    @app.post("/api/jobs/info")
+    @app.get("/api/jobs/info")
     @jwt_required()
     def jobInfo():
         user: User = current_user
         try:
             job_ids = [int(job_id)
-                       for job_id in request.form["jobIds"].split(",")]
+                       for job_id in request.args["jobIds"].split(",")]
         except ValueError:
-            return jsonify(msg="`jobIds` must be comma-separated list of integers"), 400
+            return jsonify(msg="`jobIds` must be comma-separated list of integers", errorType="invalidRequest"), 400
         result = []
         for job_id in job_ids:
             job: Job = Job.query.where(Job.id == job_id).one_or_none()
@@ -486,9 +486,9 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not job:
                 if user.is_admin:
                     return jsonify(msg=f"There exists no job with id {job_id}"), 404
-                return jsonify(msg=f"You don't have permission to access the job with id {job_id}"), 403
+                return jsonify(msg=f"You don't have permission to access the job with id {job_id}", errorType="permission"), 403
             if job.user_id != user.id and not user.is_admin:
-                return jsonify(msg=f"You don't have permission to access the job with id {job_id}"), 403
+                return jsonify(msg=f"You don't have permission to access the job with id {job_id}", errorType="permission"), 403
             result.append({
                 "jobId": job.id,
                 "fileName": job.file.file_name,
@@ -496,7 +496,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 "language": job.language,
                 "status": runner_manager.status_dict(job)
             })
-        return jsonify(result)
+        return jsonify(msg="Returning requested jobs", jobs=result)
 
     @app.get("/api/jobs/downloadTranscript")
     @jwt_required()
@@ -505,17 +505,17 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         job_id = request.args["jobId"]
         job: Job = Job.query.where(Job.id == job_id).one_or_none()
         if not job:
-            return jsonify(msg=f"There exists no job with id {job_id}"), 404
+            return jsonify(msg=f"There exists no job with id {job_id}", errorType="notInDatabase"), 404
         if job.user_id != user.id and not user.is_admin:
-            return jsonify(msg="You don't have permission to access this job"), 403
+            return jsonify(msg="You don't have permission to access this job", errorType="permission"), 403
 
         if job.transcript is not None:
             job.downloaded = True
             db.session.commit()
-            return jsonify(transcript=job.transcript)
+            return jsonify(msg="Returning transcript of job {job_id}", transcript=job.transcript)
         elif job.error_msg is not None:
-            return jsonify(error=job.error_msg)
-        return jsonify(msg="Job isn't done yet"), 404
+            return jsonify(msg=job.error_msg, errorType="operation")
+        return jsonify(msg="Job isn't done yet", errorType="operation"), 404
 
     @app.get("/api/runners/create")
     @jwt_required()
