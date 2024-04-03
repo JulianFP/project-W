@@ -93,6 +93,7 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
                 self._swap(index, max_child)
                 index = max_child
                 left_child = 2 * index + 1
+            else: return
 
     def push(self, key: TKey, value: TPrio):
         self._heap.append((key, value))
