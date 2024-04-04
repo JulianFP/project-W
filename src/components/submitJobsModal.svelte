@@ -27,7 +27,7 @@
     }
   };
 
-  function showFileNames(files: Files[]): string {
+  function showFileNames(files: File[]): string {
     if (files.length === 1) return files[0].name;
     let concat: string = files.length + " files: ";
     for(let file of files){
@@ -46,16 +46,30 @@
     waitingForPromise = true;
     event.preventDefault();
 
-    response = await postLoggedIn("/api/jobs/submit");
-
-    if(!response.ok){
-      error = true;
+    //send all requests at ones and wait for promises in parallel with "allSettled" method
+    //show results to user ones all promises have settled
+    let promises: Promise<{[key: string]: any}>[] = [];
+    for(let file of files){
+      if(language != "Automatic language detection"){
+        promises.push(postLoggedIn("jobs/submit", {"file": file, "model": model, "language": language}));
+      }
+      else{ //null for automatic language detection
+        promises.push(postLoggedIn("jobs/submit", {"file": file, "model": model}));
+      }
     }
-    else{
-      alerts.add("You successfully submitted a new job", "green");
-      open = false;
+    let responses: {[key: string]: any} = await Promise.allSettled(promises);
+
+    for(let i: number = 0; i < files.length; i++){
+      const response: {[key: string]: any} = responses[i].value;
+      if(!response.ok){
+        alerts.add("Error occurred while submitting job with filename '" + files[i].name + "': " + response.msg, "red")
+      }
+      else{
+        alerts.add("You successfully submitted job with ID " + response.jobId.toString() + " and filename '" + files[i].name + "'", "green");
+      }
     }
 
+    open = false;
     waitingForPromise = false;
   }
 
@@ -77,8 +91,6 @@
   let language: string = "Automatic language detection";
 
   let waitingForPromise: boolean = false;
-  let error: boolean = false;
-  let response: {[key: string]: any};
 
   export let open: boolean = false;
 </script>

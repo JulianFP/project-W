@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Alert, Button, Helper, P } from "flowbite-svelte";
+  import { Alert, Button, Helper } from "flowbite-svelte";
 
   import Waiting from "../components/waiting.svelte";
   import ChangeEmailField from "../components/changeEmailField.svelte";
@@ -10,6 +10,7 @@
   import { authHeader, loggedIn } from "../utils/stores";
   import { loginForward } from "../utils/navigation";
   import { alerts } from "../utils/stores";
+    import ErrorMsg from "../components/errorMsg.svelte";
 
   $: if(!$loggedIn) loginForward();
 
@@ -58,11 +59,11 @@
 <CenterPage title="Account settings">
 {#await getLoggedIn("users/info")}
   <Waiting/>
-{:then deleteResponseUserinfo} 
-  {#if deleteResponseUserinfo.status !== 200}
-    <P>deleteError: {deleteResponseUserinfo.msg}</P>
+{:then userinfoResponse} 
+  {#if userinfoResponse.status !== 200}
+    <ErrorMsg>{userinfoResponse.msg}</ErrorMsg>
   {:else}
-    {#if !deleteResponseUserinfo.activated}
+    {#if !userinfoResponse.activated}
       <div>
         <Alert class="border-t-4" color="red" dismissable>
           <span class="font-medium">Account not activated!</span>
@@ -80,10 +81,10 @@
       </Alert>
     {/if}
     <Alert class="border-t-4" color="dark">
-      {deleteResponseUserinfo.isAdmin ? "This is an admin account." : "This is a non-admin account."}
+      {userinfoResponse.isAdmin ? "This is an admin account." : "This is a non-admin account."}
     </Alert>
 
-    <ChangeEmailField defaultValue={deleteResponseUserinfo.email}/>
+    <ChangeEmailField defaultValue={userinfoResponse.email}/>
 
     <Button outline color="red" on:click={() => {modalOpen = true;}}>Delete account</Button>
   {/if}
