@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { P, TableSearch, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Pagination, Checkbox, Button, Progressbar } from "flowbite-svelte";
+  import { P, Span, TableSearch, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Pagination, Checkbox, Button, Progressbar } from "flowbite-svelte";
   import type { LinkType} from "flowbite-svelte";
   import { CaretSortSolid, CaretUpSolid, CaretDownSolid, ChevronLeftOutline, ChevronRightOutline, PlusSolid } from "flowbite-svelte-icons";
   import { querystring, location } from "svelte-spa-router";
@@ -18,6 +18,7 @@
   async function getJobs(): Promise<{msg: string, ok: boolean}> {
     const jobListResponse = await getLoggedIn("jobs/list");
     if(!jobListResponse.ok) return {msg: jobListResponse.msg, ok: false};
+    if(jobListResponse.jobIds.length === 0) return {msg: "No jobs", ok: true};
 
     const jobInfoResponse = await getLoggedIn("jobs/info", {"jobIds": jobListResponse.jobIds.toString()});
     if(!jobInfoResponse.ok) return {msg: jobInfoResponse.msg, ok: false};
@@ -210,51 +211,57 @@
               {/each}
             </TableHead>
             <TableBody>
-              {#each sortItems.slice((page-1)*10, page*10) as item, i}
-                <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
-                  <TableBodyCell>{item.ID}</TableBodyCell>
-                  <TableBodyCell>{item.fileName}</TableBodyCell>
-                  <TableBodyCell class="w-full">
-                    {#if item.status.step === "runnerInProgress"}
-                      <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                    {:else if item.status.step === "success"}
-                      <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                    {:else if item.status.step === "failed"}
-                      <Progressbar color="red" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                    {:else if item.status.step === "downloaded"}
-                      <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                    {:else}
-                      <Progressbar color="gray" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                    {/if}
-                  </TableBodyCell>
+              {#if items.length === 0}
+                <TableBodyRow>
+                  <TableBodyCell colspan="3">You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
-                {#if openRow === i}
-                  <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
-                    <TableBodyCell colspan="3">
-                      <div class="grid grid-cols-2 gap-x-8 gap-y-2">
-                        <div>
-                          <P class="inline" weight="extrabold" size="sm">Language: </P>
-                          <P class="inline" size="sm">{item.language}</P>
-                        </div>
-                        <div>
-                          <P class="inline" weight="extrabold" size="sm">Model: </P>
-                          <P class="inline" size="sm">{item.model}</P>
-                        </div>
-                        <div>
-                          <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
-                          <P class="inline" size="sm">{item.status.step}</P>
-                        </div>
-                        {#if item.status.runner}
-                        <div>
-                          <P class="inline" weight="extrabold" size="sm">ID of assigned runner: </P>
-                          <P class="inline" size="sm">{item.status.runner}</P>
-                        </div>
-                        {/if}
-                      </div>
+              {:else}
+                {#each sortItems.slice((page-1)*10, page*10) as item, i}
+                  <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
+                    <TableBodyCell>{item.ID}</TableBodyCell>
+                    <TableBodyCell>{item.fileName}</TableBodyCell>
+                    <TableBodyCell class="w-full">
+                      {#if item.status.step === "runnerInProgress"}
+                        <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      {:else if item.status.step === "success"}
+                        <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      {:else if item.status.step === "failed"}
+                        <Progressbar color="red" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      {:else if item.status.step === "downloaded"}
+                        <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      {:else}
+                        <Progressbar color="gray" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      {/if}
                     </TableBodyCell>
                   </TableBodyRow>
-                {/if}
-              {/each}
+                  {#if openRow === i}
+                    <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
+                      <TableBodyCell colspan="3">
+                        <div class="grid grid-cols-2 gap-x-8 gap-y-2">
+                          <div>
+                            <P class="inline" weight="extrabold" size="sm">Language: </P>
+                            <P class="inline" size="sm">{item.language}</P>
+                          </div>
+                          <div>
+                            <P class="inline" weight="extrabold" size="sm">Model: </P>
+                            <P class="inline" size="sm">{item.model}</P>
+                          </div>
+                          <div>
+                            <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
+                            <P class="inline" size="sm">{item.status.step}</P>
+                          </div>
+                          {#if item.status.runner}
+                          <div>
+                            <P class="inline" weight="extrabold" size="sm">ID of assigned runner: </P>
+                            <P class="inline" size="sm">{item.status.runner}</P>
+                          </div>
+                          {/if}
+                        </div>
+                      </TableBodyCell>
+                    </TableBodyRow>
+                  {/if}
+                {/each}
+              {/if}
             </TableBody>
           </TableSearch>
         {:else}
