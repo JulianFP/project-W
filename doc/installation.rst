@@ -473,4 +473,21 @@ The frontend is written in Svelte and needs to be compiled into native Javascrip
 Runner
 ``````
 
-TODO
+1. Install Python (3.9 or newer), pip, and ffmpeg.
+2. Clone this repository and enter it:
+
+   .. code-block:: bash
+
+      git clone https://github.com/JulianFP/project-W-runner.git & cd project-W-runner
+
+3. Install the package with pip:
+
+   .. code-block:: bash
+
+      python -m pip install .
+
+5. Start up the runner:
+
+   .. code-block:: bash
+
+      python -m project_W_runner

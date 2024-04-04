@@ -52,7 +52,18 @@ The following table gives an overview over all options available to you. All opt
    :hide_key: /**/pattern,/**/additionalProperties
    :hide_key_if_empty: /**/default
 
+.. _description_runner_config-label:
+
 Description of runner config options
 -------------------------------------
 
-TODO
+The following table describes all config options for the runner config.
+
+=================    =========      ==========================================================================================================
+Name                 Optional?      Description
+-----------------    ---------      ----------------------------------------------------------------------------------------------------------
+``runnerToken``      No             The token that's used to authenticate the runner to the backend.
+``backendURL``       No             The URL where the backend is hosted.
+``modelCacheDir``    Yes            Path to directory used to cache the Whisper models. If this is not set, ``$HOME/.cache/whisper/`` is used.
+``torchDevice``      Yes            The PyTorch device used by Whisper. If this is not set, the default device is used.
+=================    =========      ==========================================================================================================

@@ -57,7 +57,33 @@ You are now ready to go!
 Runner
 ``````
 
-TODO
+1. You must have Python, pip and git installed. Additionally, you must have ffmpeg installed and in your ``$PATH``.
+2. Clone the repository and enter it
+
+   .. code-block:: bash
+
+      git clone https://github.com/JulianFP/project-W-runner.git && cd project-W-runner
+
+3. Set up a python virtual environment
+
+   .. code-block:: bash
+
+      python -m venv venv
+
+4. Activate virtual environment
+
+   .. code-block:: bash
+
+      source venv/bin/activate
+
+5. Install project dependencies including optional dependencies for testing and building the documentation:
+
+   .. code-block:: bash
+
+      python -m pip install .[tests,docs]
+
+You are now ready to go! Note that by default, Whisper caches downloaded models in ``$HOME/.cache/whisper/``. If you would like
+the runner to download the models into a different directory, set ``modelCacheDir`` in your ``config.yml`` to the desired directory.
 
 Alternatively: Nix
 ``````````````````
@@ -112,4 +138,10 @@ It will output those files into the `dist` directory. If you plan on serving the
 Runner
 ``````
 
-TODO
+You can use the ``run.sh`` script to start the runner:
+
+   .. code-block:: bash
+
+      ./run.sh
+
+Note that the runner will exit immediately if you don't provide a valid runner token as returned by ``/api/runners/create`` or if it can't access the backend at the provided URL. For more info on the runner configuration, refer to :ref:`description_runner_config-label`.
