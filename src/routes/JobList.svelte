@@ -1,7 +1,7 @@
 <script lang="ts">
   import { P, Span, TableSearch, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Pagination, Checkbox, Button, Spinner, Progressbar } from "flowbite-svelte";
   import type { LinkType} from "flowbite-svelte";
-  import { CaretSortSolid, CaretUpSolid, CaretDownSolid, ChevronLeftOutline, ChevronRightOutline, PlusSolid, DownloadSolid } from "flowbite-svelte-icons";
+  import { CaretSortSolid, CaretUpSolid, CaretDownSolid, ChevronLeftOutline, ChevronRightOutline, PlusOutline, DownloadSolid } from "flowbite-svelte-icons";
   import { querystring, location } from "svelte-spa-router";
 
   import SubmitJobsModal from "../components/submitJobsModal.svelte";
@@ -208,7 +208,7 @@
   <div>
     <div class="flex justify-between">
       <Checkbox id="hide_old_elements" bind:checked={hideOld} on:change={() => setHideOld(hideOld)}>Hide old jobs</Checkbox>
-      <Button pill on:click={() => submitModalOpen = true}><PlusSolid class="mr-2"/>New Job</Button>
+      <Button pill on:click={() => submitModalOpen = true}><PlusOutline class="mr-2"/>New Job</Button>
     </div>
       {#await getJobs()}
         <Waiting/>

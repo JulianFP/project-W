@@ -5,7 +5,7 @@
   import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
   import ConfirmPasswordModal from "../components/confirmPasswordModal.svelte";
   import ConfirmModal from "../components/confirmModal.svelte";
-  import { getLoggedIn, postLoggedIn } from "../utils/httpRequests";
+  import { postLoggedIn } from "../utils/httpRequests";
   import { loggedIn, alerts, authHeader } from "../utils/stores";
   import { loginForward } from "../utils/navigation";
 
