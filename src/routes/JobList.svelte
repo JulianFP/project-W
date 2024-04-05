@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { P, Span, TableSearch, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Pagination, Checkbox, Button, Progressbar } from "flowbite-svelte";
+  import { P, Span, TableSearch, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Pagination, Checkbox, Button, Spinner, Progressbar } from "flowbite-svelte";
   import type { LinkType} from "flowbite-svelte";
-  import { CaretSortSolid, CaretUpSolid, CaretDownSolid, ChevronLeftOutline, ChevronRightOutline, PlusSolid } from "flowbite-svelte-icons";
+  import { CaretSortSolid, CaretUpSolid, CaretDownSolid, ChevronLeftOutline, ChevronRightOutline, PlusSolid, DownloadSolid } from "flowbite-svelte-icons";
   import { querystring, location } from "svelte-spa-router";
 
   import SubmitJobsModal from "../components/submitJobsModal.svelte";
   import CenterPage from "../components/centerPage.svelte";
-  import { loggedIn } from "../utils/stores";
+  import Waiting from "../components/waiting.svelte";
+  import ErrorMsg from "../components/errorMsg.svelte";
+  import { alerts, loggedIn } from "../utils/stores";
   import { getLoggedIn } from "../utils/httpRequests";
   import { loginForward } from "../utils/navigation";
   import { setParams, paramsLoc } from "../utils/helperFunctions";
-    import Waiting from "../components/waiting.svelte";
-    import ErrorMsg from "../components/errorMsg.svelte";
 
   $: if(!$loggedIn) loginForward();
 
@@ -64,11 +64,34 @@
     return {msg: jobInfoResponse.msg, ok: true};
   }
 
+  async function downloadTranscript(item: itemObj): Promise<void> {
+    jobDownloading[item.ID] = true;
+
+    const downloadTranscriptResponse = await getLoggedIn("jobs/downloadTranscript", {jobId: item.ID.toString()});
+    if(!downloadTranscriptResponse.ok){
+      alerts.add("Could not download transcript of job with ID " + item.ID.toString() + ": " + downloadTranscriptResponse.msg, "red");
+      return;
+    }
+
+    //convert transcript to Blob and generate url for it
+    const blob = new Blob([downloadTranscriptResponse.transcript], { type: "text/plain"});
+    const url = URL.createObjectURL(blob);
+
+    //create document element with this url and 'click' it
+    const element = document.createElement('a');
+    element.href = url;
+    element.download = item.fileName.replace(/\.[^/.]+$/, "") + "_transcribed.txt";
+    element.click();
+
+    jobDownloading[item.ID] = false;
+  }
+
   type itemKey = 'ID'|'fileName'|'model'|'language'|'progress'|'status';
   let keys: itemKey[] = ['ID','fileName','progress'];
   type itemValue = string|number;
-  type itemObj = {ID: number, fileName: string, model: string, language: string, progress: number, status: {step: string, runner: number}};
+  type itemObj = {ID: number, fileName: string, model: string, language: string, progress: number, status: {step: string, runner: number}, downloadWaiting: boolean};
   let items: itemObj[] = [];
+  let jobDownloading: {[key: number]: boolean} = {};
 
   let submitModalOpen: boolean = false;
 
@@ -209,11 +232,16 @@
                   </div>
                 </TableHeadCell>
               {/each}
+              <TableHeadCell/>
             </TableHead>
             <TableBody>
               {#if items.length === 0}
                 <TableBodyRow>
-                  <TableBodyCell colspan="3">You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+                  <TableBodyCell colspan="4">You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+                </TableBodyRow>
+              {:else if sortItems.length === 0}
+                <TableBodyRow>
+                  <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {:else}
                 {#each sortItems.slice((page-1)*10, page*10) as item, i}
@@ -233,10 +261,21 @@
                         <Progressbar color="gray" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
                       {/if}
                     </TableBodyCell>
+                    <TableBodyCell tdClass="pr-6 py-4 whitespace-nowrap font-medium">
+                      <Button size="xs" color="alternative" 
+                      disabled={!(item.status.step === "success" || item.status.step === "downloaded") || jobDownloading[item.ID]} 
+                      on:click={() => downloadTranscript(item)}>
+                        {#if jobDownloading[item.ID]}
+                          <Spinner size="5"/>
+                        {:else} 
+                          <DownloadSolid/>
+                        {/if}
+                      </Button>
+                    </TableBodyCell>
                   </TableBodyRow>
                   {#if openRow === i}
                     <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
-                      <TableBodyCell colspan="3">
+                      <TableBodyCell colspan="4">
                         <div class="grid grid-cols-2 gap-x-8 gap-y-2">
                           <div>
                             <P class="inline" weight="extrabold" size="sm">Language: </P>
