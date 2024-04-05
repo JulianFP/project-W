@@ -15,12 +15,21 @@
 
   $: if(!$loggedIn) loginForward();
 
+  //gets list of all jobIds and call getJobInfo on them
   async function getJobs(): Promise<{msg: string, ok: boolean}> {
     const jobListResponse = await getLoggedIn("jobs/list");
+
     if(!jobListResponse.ok) return {msg: jobListResponse.msg, ok: false};
     if(jobListResponse.jobIds.length === 0) return {msg: "No jobs", ok: true};
 
-    const jobInfoResponse = await getLoggedIn("jobs/info", {"jobIds": jobListResponse.jobIds.toString()});
+    return getJobInfo(jobListResponse.jobIds);
+  }
+
+  //get info of all jobs in jobIds and update items object with them
+  async function getJobInfo(jobIds: number[]): Promise<{msg: string, ok: boolean}> {
+    updatingJobList = true;
+
+    const jobInfoResponse = await getLoggedIn("jobs/info", {"jobIds": jobIds.toString()});
     if(!jobInfoResponse.ok) return {msg: jobInfoResponse.msg, ok: false};
 
     for(let job of jobInfoResponse.jobs){
@@ -59,8 +68,9 @@
       job.ID = job.jobId;
       delete job.jobId;
     }
-    items = jobInfoResponse.jobs;
+    items = items.concat(jobInfoResponse.jobs);
 
+    updatingJobList = false;
     return {msg: jobInfoResponse.msg, ok: true};
   }
 
@@ -94,6 +104,7 @@
   let jobDownloading: {[key: number]: boolean} = {};
 
   let submitModalOpen: boolean = false;
+  let updatingJobList: boolean = false;
 
   let searchTerm: string = "";
   let searchTermEdited: boolean = false;
@@ -244,6 +255,15 @@
                   <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {:else}
+                {#if updatingJobList}
+                  <TableBodyRow>
+                    <TableBodyCell colspan="4">
+                      <div class="flex flex-col justify-center items-center mx-auto">
+                        <div><Spinner class="me-3" size="6"/>Updating table ...</div>
+                      </div>
+                    </TableBodyCell>
+                  </TableBodyRow>
+                {/if}
                 {#each sortItems.slice((page-1)*10, page*10) as item, i}
                   <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
                     <TableBodyCell>{item.ID}</TableBodyCell>
@@ -331,4 +351,4 @@
   </div>
 </CenterPage>
 
-<SubmitJobsModal bind:open={submitModalOpen}/>
+<SubmitJobsModal bind:open={submitModalOpen} on:close={(event) => {getJobInfo(event.detail.jobIds);}}/>

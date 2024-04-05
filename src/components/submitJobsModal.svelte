@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { createEventDispatcher } from "svelte";
   import { Modal, Select, Label, Dropzone, Heading } from "flowbite-svelte";
 
   import WaitingSubmitButton from "./waitingSubmitButton.svelte";
   import { alerts } from "../utils/stores";
   import { postLoggedIn } from "../utils/httpRequests";
+
+  const dispatchEvent = createEventDispatcher();
 
   function dropHandle(event: DragEvent): void {
     files = [];
@@ -59,8 +62,11 @@
     }
     let responses: {[key: string]: any} = await Promise.allSettled(promises);
 
+    const jobIds: number[] = [];
     for(let i: number = 0; i < files.length; i++){
       const response: {[key: string]: any} = responses[i].value;
+      jobIds.push(response.jobId);
+
       if(!response.ok){
         alerts.add("Error occurred while submitting job with filename '" + files[i].name + "': " + response.msg, "red")
       }
@@ -71,6 +77,8 @@
 
     open = false;
     waitingForPromise = false;
+
+    dispatchEvent('close', {jobIds: jobIds});
   }
 
   let models: {value: string, name: string}[] = [
