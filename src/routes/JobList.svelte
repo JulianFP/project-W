@@ -152,7 +152,7 @@
       sortDirection = -sortDirection;
     } else {
       sortKey = key;
-      sortDirection = 1;
+      sortDirection = -1; //default sort direction when clicking on table (ascending)
     }
     setParams({"sortkey": key, "sortdir": sortDirection});
   };
