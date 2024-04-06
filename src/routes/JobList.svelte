@@ -41,8 +41,8 @@
       if(job.model === null) job.model = "small";
       if(job.language === null) job.language = "Automatic";
 
-      //for easier access in table
-      job.progress = job.status.progress;
+      //for easier access in table (multiply by 100 to get it in percent)
+      job.progress = 100 * job.status.progress;
       delete job.status.progress;
 
       //assign progress values to steps other than RUNNER_IN_PROGRESS so that a progress bar can always be displayed
@@ -251,7 +251,20 @@
               <TableHeadCell/>
             </TableHead>
             <TableBody>
-              {#if items.length === 0}
+              {#if updatingJobList != 0}
+                <TableBodyRow>
+                  <TableBodyCell colspan="4">
+                    <div class="flex flex-col justify-center items-center mx-auto">
+                      {#if updatingJobList == 1}
+                        
+                        <div><Spinner class="me-3" size="6"/>Updating table ...</div>
+                      {:else if updatingJobList == 2}
+                        <ErrorMsg>{updatingJobListError}</ErrorMsg>
+                      {/if}
+                    </div>
+                  </TableBodyCell>
+                </TableBodyRow>
+              {:else if items.length === 0}
                 <TableBodyRow>
                   <TableBodyCell colspan="4">You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
@@ -260,24 +273,10 @@
                   <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {:else}
-                {#if updatingJobList != 0}
-                  <TableBodyRow>
-                    <TableBodyCell colspan="4">
-                      <div class="flex flex-col justify-center items-center mx-auto">
-                        {#if updatingJobList == 1}
-                          
-                          <div><Spinner class="me-3" size="6"/>Updating table ...</div>
-                        {:else if updatingJobList == 2}
-                          <ErrorMsg>{updatingJobListError}</ErrorMsg>
-                        {/if}
-                      </div>
-                    </TableBodyCell>
-                  </TableBodyRow>
-                {/if}
                 {#each sortItems.slice((page-1)*10, page*10) as item, i}
                   <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
                     <TableBodyCell>{item.ID}</TableBodyCell>
-                    <TableBodyCell>{item.fileName}</TableBodyCell>
+                    <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : item.fileName.slice(0,30) + "..."}</TableBodyCell>
                     <TableBodyCell class="w-full">
                       {#if item.status.step === "runnerInProgress"}
                         <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
@@ -307,6 +306,10 @@
                     <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
                       <TableBodyCell colspan="4">
                         <div class="grid grid-cols-2 gap-x-8 gap-y-2">
+                          <div class="col-span-full">
+                            <P class="inline" weight="extrabold" size="sm">Filename: </P>
+                            <P class="inline" size="sm">{item.fileName}</P>
+                          </div>
                           <div>
                             <P class="inline" weight="extrabold" size="sm">Language: </P>
                             <P class="inline" size="sm">{item.language}</P>
