@@ -10,8 +10,18 @@ export async function get(route: string, args: {[key: string]: string} = {}, hea
       method: "GET",
       headers: headers
     });
-    const responseContent: {[key: string]: any} = await response.json();
-    returnObj = Object.assign(response, responseContent);
+    const contentType = response.headers.get("content-type");
+    if(!contentType || !contentType.includes("application/json")) {
+      returnObj = {
+        ok: false,
+        status: response.status,
+        msg: "Response not in JSON format. HTTP status code " + response.status.toString()
+      }
+    }
+    else{
+      const responseContent: {[key: string]: any} = await response.json();
+      returnObj = Object.assign(response, responseContent);
+    }
   }
   catch (error: unknown) {
     returnObj = {
@@ -71,12 +81,21 @@ export async function post(route: string, form: {[key: string]: string|File} = {
       headers: headers
     });
 
-    //catch http 413 error before parsing json
+    const contentType = response.headers.get("content-type");
+
+    //catch http 413 error to display an understandable error message to user
     if(response.status === 413){
       returnObj = {
         ok: false,
         status: 413,
         msg: "Submitted file is too large. Please use smaller files."
+      }
+    }
+    else if(!contentType || !contentType.includes("application/json")) {
+      returnObj = {
+        ok: false,
+        status: response.status,
+        msg: "Response not in JSON format. HTTP status code " + response.status.toString()
       }
     }
     else{
