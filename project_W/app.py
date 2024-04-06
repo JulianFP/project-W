@@ -452,7 +452,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if not user.is_admin:
                 logger.info(
                     "Non-admin tried to list other users' jobs, denied")
-                return jsonify(msg="You don't have permission to read other users jobs", errorType="permission"), 403
+                return jsonify(msg="You don't have permission to list other users' jobs", errorType="permission"), 403
 
             if request.args.get("all", type=bool):
                 ids_by_user = list_job_ids_for_all_users()
@@ -485,7 +485,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             # isn't a big deal, but it still seems cleaner this way
             if not job:
                 if user.is_admin:
-                    return jsonify(msg=f"There exists no job with id {job_id}"), 404
+                    return jsonify(msg=f"There exists no job with id {job_id}", errorType="notInDatabase"), 404
                 return jsonify(msg=f"You don't have permission to access the job with id {job_id}", errorType="permission"), 403
             if job.user_id != user.id and not user.is_admin:
                 return jsonify(msg=f"You don't have permission to access the job with id {job_id}", errorType="permission"), 403
