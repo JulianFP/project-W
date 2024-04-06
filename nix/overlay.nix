@@ -12,6 +12,7 @@
           hash = "sha256-AkYRPLJJLbh1xr5Wl0p8iTMzvybNkokchfYxUc7gnTQ=";
         };
       });
+      sphinx-jsonschema = prev.callPackage ./pkgs/sphinx-jsonschema.nix { };
       pyaml-env = prev.callPackage ./pkgs/pyaml-env.nix { };
       project-W = prev.callPackage ./pkgs/project-W.nix { };
     };

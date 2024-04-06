@@ -321,12 +321,18 @@ First you need to import our flake into your flake containing the NixOS config o
           };
         };
 
-Next you need to pass your inputs as an argument to your outputs, where you then can import the module:
+Next you need to pass your inputs as an argument to your outputs, where you then can import the module and apply the overlay:
 
     .. code-block:: Nix 
 
         nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
           ...
+          pkgs = import nixpkgs {
+            ...
+            overlays = [
+               inputs.project-W.overlays.default
+            ];
+          };
           modules = [
             inputs.project-W.nixosModules.default
             ...
@@ -373,8 +379,8 @@ The envFile should contain the following. Please make sure to keep this secret!!
 
 .. code-block:: console
 
-   JWT_SECRET_KEY=<your jwt secret key>
-   SMTP_PASSWORD=<password of user at your smtp server>
+   JWT_SECRET_KEY="<your jwt secret key>"
+   SMTP_PASSWORD="<password of user at your smtp server>"
 
 The JWT_SECRET_KEY can be generated with the following command:
 
@@ -401,7 +407,7 @@ First you need to import our flake into your flake containing the NixOS config o
      };
    };
 
-Next you need to pass your inputs as an argument to your outputs, where you then can import the module:
+Next you need to pass your inputs as an argument to your outputs, where you then can import the module (for the frontend no overlay is required):
 
 .. code-block:: Nix 
 

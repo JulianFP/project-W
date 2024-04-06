@@ -10,7 +10,6 @@ let
     getExe
     escapeShellArgs
     ;
-  inherit (pkgs.stdenv.hostPlatform) system;
   cfg = config.services.project-W-backend;
   cfg_str = "services.project-W-backend";
 in {
@@ -19,7 +18,7 @@ in {
       enable = mkEnableOption (mdDoc "Backend of Project-W");
       package = mkOption {
         type = types.package;
-        default = inputs.self.packages.${system}.project-W;
+        default = pkgs.python3Packages.project-W;
         description = mdDoc ''
           Project-W python package to use.
         '';
@@ -62,7 +61,7 @@ in {
         loginSecurity = {
           sessionSecretKey = mkOption {
             type = types.singleLineStr;
-            default = "!ENV \${JWT_SECRET_KEY}";
+            default = "\${JWT_SECRET_KEY}";
             description = mdDoc ''
               Secret key used to generate JWT Tokens. Warning: This will be public in the /nix/store! For production systems please use [envFile](${cfg_str}.envFile) combined with a secret management tool like sops-nix instead!!!
             '';
@@ -128,12 +127,19 @@ in {
           };
           password = mkOption {
             type = types.singleLineStr;
-            default = "!ENV \${SMTP_PASSWORD}";
+            default = "\${SMTP_PASSWORD}";
             description = mdDoc ''
               Used to authenticate to the smtp server. Warning: This will be public in the /nix/store! For production systems please use [envFile](${cfg_str}.envFile) combined with a secret management tool like sops-nix instead!!!
             '';
           };
         };
+      };
+      envOptions = mkOption {
+        type = types.listOf types.singleLineStr;
+        default = [ "sessionSecretKey" "password" ];
+        description = mdDoc ''
+          Attributes that require loading of environment variables. An !ENV will be added to the yaml config for these. Just add the name of the attribute itself, not the name of the attribute set(s) it is in. 
+        '';
       };
       envFile = mkOption {
         type = types.nullOr types.singleLineStr;
@@ -153,19 +159,22 @@ in {
 
   config = 
   let 
-    socketDir = "/var/run/project-W";
-    socketName = "project-W-gunicorn_nginx-socket.sock";
-    configFile = pkgs.writeTextDir "config.yml" (builtins.toJSON cfg.settings);
+    socketPath = "/run/project-W-backend.sock";
+    stringsToReplace = builtins.map (x: x + ":") cfg.envOptions;
+    newStrings = builtins.map (x: x + " !ENV") stringsToReplace;
+    fileWithoutEnvs = (pkgs.formats.yaml { }).generate "project-W-backend-config-without-env.yaml" cfg.settings;
+    configFile = pkgs.writeTextDir "config.yml" (builtins.replaceStrings stringsToReplace newStrings (builtins.readFile fileWithoutEnvs));
     pythonPackage = (pkgs.python3.withPackages (ps: [
       cfg.package
       ps.gunicorn
     ]));
-    envExists = (attrSet:
+    #function that checks if we have attributes in cfg.envOptions that are not strings
+    invalidEnvOption = (attrSet:
       let 
         v = builtins.attrValues attrSet; 
         boolFunc = (element:
-          if (builtins.isAttrs element) then (envExists element)
-          else if (builtins.isString element && (builtins.substring 0 5 element) == "!ENV ") then true
+          if (builtins.isAttrs element) then (invalidEnvOption element)
+          else if (builtins.elem element cfg.envOptions && !(builtins.isString element)) then true
           else false
         );
         iterateV = (i:
@@ -179,10 +188,15 @@ in {
   in mkIf cfg.enable {
     assertions = [
       {
-        assertion = !(envExists cfg.settings) || cfg.envFile != null;
-        message = "The ${cfg_str}.envFile option can't be null if some of your options start with '!ENV '. Per default secrets like ${cfg_str}.settings.loginSecurity.sessionSecretKey and ${cfg_str}.settings.smtpServer.password have to be set in envFile.";
+        assertion = !(invalidEnvOption cfg.settings);
+        message = "The ${cfg_str}.envOptions option cannot contain attributes that are not some kind of string in ${cfg_str}.settings";
+      }
+      {
+        assertion = cfg.envOptions == [] || cfg.envFile != null;
+        message = "The ${cfg_str}.envFile option can't be null if ${cfg_str}.envOptions contains elements. Per default secrets like ${cfg_str}.settings.loginSecurity.sessionSecretKey and ${cfg_str}.settings.smtpServer.password have to be set in envFile.";
       }
     ];
+
     systemd = {
       #create directories for persistent stuff
       tmpfiles.settings.project-W-backend-dirs = {
@@ -190,33 +204,35 @@ in {
           mode = "700";
           inherit (cfg) user group;
         };
-        "${socketDir}"."d" = {
-          mode = "770";
-          inherit (cfg) user;
-          group = config.services.nginx.group;
-        };
       };
 
       #setup systemd service for gunicorn
       services.project-W-backend = {
         description = "Project-W backend server";
-        after = [ "network-online.target" ];
-        wants = [ "network-online.target" ];
+        requires = [ "project-W-backend.socket" ];
+        after = [ "network.target" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
-          Type = "simple";
+          Type = "notify";
           User = cfg.user;
           Group = cfg.group;
-          UMask = "0077";
           ExecStart = escapeShellArgs [
             "${getExe pythonPackage}"
             "-m" "gunicorn"
-            "--bind" "unix:${socketDir}/${socketName}"
             "project_W:create_app('${configFile}')"
           ];
-          Restart = "on-failure";
+          ExecReload = "${pkgs.util-linux}/bin/kill -s HUP $MAINPID";
+          KillMode = "mixed";
+          TimeoutStopSec = 5;
+          PrivateTmp = true;
           EnvironmentFile = mkIf (cfg.envFile != null) cfg.envFile;
         };
+      };
+      sockets.project-W-backend = {
+        description = "project-W backend socket for communication with nginx";
+        listenStreams = [ socketPath ];
+        socketConfig.SocketUser = config.services.nginx.user;
+        wantedBy = [ "sockets.target" ];
       };
     };
 
@@ -237,7 +253,7 @@ in {
       recommendedOptimisation = mkDefault true;
       recommendedProxySettings = mkDefault true;
 
-      virtualHosts.${cfg.hostName}.locations."/api/".proxyPass = "http://unix:${socketDir}/${socketName}";
+      virtualHosts.${cfg.hostName}.locations."/api/".proxyPass = "http://unix:${socketPath}";
     };
   };
 }

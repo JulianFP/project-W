@@ -4,12 +4,13 @@
 }:
 
 python3Packages.buildPythonPackage rec {
-  pname = "project-W";
+  pname = "project_W";
   version = "0.0.1";
-  pyproject = true;
+  format = "setuptools";
+
   src = ../../.;
+
   nativeBuildInputs = with python3Packages; [
-    setuptools
     setuptools-scm
   ];
   propagatedBuildInputs = with python3Packages; [
@@ -23,11 +24,21 @@ python3Packages.buildPythonPackage rec {
     pyaml-env
     jsonschema
   ];
+
+  nativeCheckInputs = with python3Packages; [
+    pytestCheckHook
+    pytest-mock
+    pytest-cov
+  ];
+  pythonImportsCheck = [ pname ];
+
   #hardcode version so that setuptools-scm works without .git folder:
   SETUPTOOLS_SCM_PRETEND_VERSION = version; 
+
   meta = {
     description = "Backend API server for Project-W";
     homepage = "https://github.com/JulianFP/project-W";
     license = lib.licenses.mit;
+    mainProgram = pname;
   };
 }
