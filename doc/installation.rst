@@ -259,7 +259,47 @@ Follow this guide if you want to run this behind a Reverse Proxy which takes car
 Runner
 ``````
 
-TODO
+The runner currently doesn't use docker-compose for installation. Instead, you will have to clone the repository and build the docker image manually.
+
+1. Clone the repository and enter it:
+
+   .. code-block:: bash
+
+      git clone https://JulianFP/project-W-runner.git && cd project-W-runner
+
+2. Build the docker image:
+
+   .. code-block:: bash
+
+      docker build -t runner .
+
+  Note that by default, the runner ``config.yml`` doesn't get copied into the image. Instead, you should mount it as a volume when running the container. If you really want the config as part of the image, remove the relevant line from the ``.dockerignore``.
+
+3. Set the relevant config values:
+
+  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. The runner token must be a token returned by the ``/api/runners/create`` route on the backend. The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked.
+
+4. Run the container:
+
+   .. code-block:: bash
+
+      docker run --rm -v /path/to/config.yml:/app/config.yml runner
+  
+  Note that the path to the config file should be an absolute path.
+
+5. If you wish to use a custom directory for the Whisper model cache, you should specify it in the ``config.yml`` file:
+
+  .. code-block:: yaml
+
+    modelCacheDir: /models
+
+  ... and mount it as a volume when running the container:
+
+  .. code-block:: bash
+      
+    docker run --rm -v /path/to/config.yml:/app/config.yml -v /path/to/cache:/models runner
+  
+  This way, you can remove the container without losing the cache, and you can prepopulate the cache by copying the Whisper models into the directory on the host.
 
 NixOS
 -----
