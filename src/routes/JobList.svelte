@@ -27,10 +27,14 @@
 
   //get info of all jobs in jobIds and update items object with them
   async function getJobInfo(jobIds: number[]): Promise<{msg: string, ok: boolean}> {
-    updatingJobList = true;
+    updatingJobList = 1;
 
     const jobInfoResponse = await getLoggedIn("jobs/info", {"jobIds": jobIds.toString()});
-    if(!jobInfoResponse.ok) return {msg: jobInfoResponse.msg, ok: false};
+    if(!jobInfoResponse.ok) {
+      updatingJobList = 2;
+      updatingJobListError = jobInfoResponse.msg;
+      return {msg: jobInfoResponse.msg, ok: false};
+    }
 
     for(let job of jobInfoResponse.jobs){
       //insert default values for model and language
@@ -70,7 +74,7 @@
     }
     items = items.concat(jobInfoResponse.jobs);
 
-    updatingJobList = false;
+    updatingJobList = 0;
     return {msg: jobInfoResponse.msg, ok: true};
   }
 
@@ -104,7 +108,8 @@
   let jobDownloading: {[key: number]: boolean} = {};
 
   let submitModalOpen: boolean = false;
-  let updatingJobList: boolean = false;
+  let updatingJobList: number = 0; //0: not updating, 1: updating, 2: error while updating
+  let updatingJobListError: string = "";
 
   let searchTerm: string = "";
   let searchTermEdited: boolean = false;
@@ -255,11 +260,16 @@
                   <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {:else}
-                {#if updatingJobList}
+                {#if updatingJobList != 0}
                   <TableBodyRow>
                     <TableBodyCell colspan="4">
                       <div class="flex flex-col justify-center items-center mx-auto">
-                        <div><Spinner class="me-3" size="6"/>Updating table ...</div>
+                        {#if updatingJobList == 1}
+                          
+                          <div><Spinner class="me-3" size="6"/>Updating table ...</div>
+                        {:else if updatingJobList == 2}
+                          <ErrorMsg>{updatingJobListError}</ErrorMsg>
+                        {/if}
                       </div>
                     </TableBodyCell>
                   </TableBodyRow>
@@ -351,4 +361,4 @@
   </div>
 </CenterPage>
 
-<SubmitJobsModal bind:open={submitModalOpen} on:close={(event) => {getJobInfo(event.detail.jobIds);}}/>
+<SubmitJobsModal bind:open={submitModalOpen} on:afterSubmit={(event) => {getJobInfo(event.detail.jobIds);}}/>

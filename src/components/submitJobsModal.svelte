@@ -62,23 +62,23 @@
     }
     let responses: {[key: string]: any} = await Promise.allSettled(promises);
 
-    const jobIds: number[] = [];
+    const successfulJobIds: number[] = [];
     for(let i: number = 0; i < files.length; i++){
       const response: {[key: string]: any} = responses[i].value;
-      jobIds.push(response.jobId);
 
       if(!response.ok){
         alerts.add("Error occurred while submitting job with filename '" + files[i].name + "': " + response.msg, "red")
       }
       else{
         alerts.add("You successfully submitted job with ID " + response.jobId.toString() + " and filename '" + files[i].name + "'", "green");
+        successfulJobIds.push(response.jobId);
       }
     }
 
     open = false;
     waitingForPromise = false;
 
-    dispatchEvent('close', {jobIds: jobIds});
+    if(successfulJobIds.length > 0) dispatchEvent('afterSubmit', {jobIds: successfulJobIds});
   }
 
   let models: {value: string, name: string}[] = [

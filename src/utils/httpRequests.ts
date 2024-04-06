@@ -1,12 +1,12 @@
 import { loggedIn, authHeader, alerts } from "./stores";
 
-export async function get(route: string, args: {[key: string]: string} = {}, headers: {[key: string]: string} = {}) {
+export async function get(route: string, args: {[key: string]: string} = {}, headers: {[key: string]: string} = {}): Promise<{[key: string]: any}> {
   const argsObj: URLSearchParams = new URLSearchParams(args);
 
   let returnObj: {[key: string]: any};
 
   try {
-    const response: {[key: string]: any} = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route + "?" + argsObj.toString(), {
+    const response: Response = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route + "?" + argsObj.toString(), {
       method: "GET",
       headers: headers
     });
@@ -33,7 +33,7 @@ export async function get(route: string, args: {[key: string]: string} = {}, hea
   return returnObj;
 }
 
-export async function getLoggedIn(route: string, args: {[key: string]: string} = {}) {
+export async function getLoggedIn(route: string, args: {[key: string]: string} = {}): Promise<{[key: string]: any}> {
   let loggedInVal: boolean = false;
   const loggedInUnsubscribe = loggedIn.subscribe((value) => {
     loggedInVal = value;
@@ -56,7 +56,7 @@ export async function getLoggedIn(route: string, args: {[key: string]: string} =
   return returnObj;
 }
 
-export async function post(route: string, form: {[key: string]: string|File} = {}, headers: {[key: string]: string} = {}) {
+export async function post(route: string, form: {[key: string]: string|File} = {}, headers: {[key: string]: string} = {}): Promise<{[key: string]: any}> {
   const formObj: FormData = new FormData();
   for (let key in form) {
     formObj.set(key, form[key]);
@@ -65,13 +65,24 @@ export async function post(route: string, form: {[key: string]: string|File} = {
   let returnObj: {[key: string]: any};
 
   try {
-    const response: {[key: string]: any} = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route, {
+    const response: Response = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + "/api/" + route, {
       method: "POST",
       body: formObj,
       headers: headers
     });
-    const responseContent: {[key: string]: any} = await response.json();
-    returnObj = Object.assign(response, responseContent);
+
+    //catch http 413 error before parsing json
+    if(response.status === 413){
+      returnObj = {
+        ok: false,
+        status: 413,
+        msg: "Submitted file is too large. Please use smaller files."
+      }
+    }
+    else{
+      const responseContent: {[key: string]: any} = await response.json();
+      returnObj = Object.assign(response, responseContent);
+    }
   }
   catch (error: unknown) {
     returnObj = {
@@ -93,7 +104,7 @@ export async function post(route: string, form: {[key: string]: string|File} = {
   return returnObj;
 }
 
-export async function postLoggedIn(route: string, form: {[key: string]: string|File} = {}) {
+export async function postLoggedIn(route: string, form: {[key: string]: string|File} = {}): Promise<{[key: string]: any}> {
   let loggedInVal: boolean = false;
   const loggedInUnsubscribe = loggedIn.subscribe((value) => {
     loggedInVal = value;
