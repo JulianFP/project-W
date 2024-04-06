@@ -360,10 +360,11 @@ class RunnerManager:
             return HeartbeatResponse(error="This runner is not currently registered as online!")
         online_runner = self.online_runners[runner.id]
         online_runner.last_heartbeat_timestamp = time.monotonic()
-        if online_runner.assigned_job_id:
-            return HeartbeatResponse(job_assigned=True)
         if online_runner.in_process_job is not None \
-                and (progress := req.args.get("progress", type=float)) is not None:
+                and (progress := req.form.get("progress", type=float)) is not None:
+            print(progress)
             job = online_runner.in_process_job
             job.progress = progress
+        if online_runner.assigned_job_id:
+            return HeartbeatResponse(job_assigned=True)
         return HeartbeatResponse()
