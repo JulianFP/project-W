@@ -245,7 +245,6 @@ class InputFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     # job_id = db.Column(db.Integer, ForeignKey("jobs.id"))
     job = relationship("Job", back_populates="file")
-    file_name = db.Column(db.Text)
     audio_data = db.Column(db.BLOB)
 
 
@@ -260,6 +259,7 @@ class Job(db.Model):
     transcript = db.Column(db.Text)
     downloaded = db.Column(db.Boolean, default=False, nullable=False)
     error_msg = db.Column(db.Text)
+    file_name = db.Column(db.Text)
     file_id = db.Column(db.Integer, ForeignKey("files.id"))
     file = relationship("InputFile", back_populates="job", uselist=False,
                         single_parent=True, cascade="all,delete-orphan", lazy="subquery")
@@ -277,10 +277,8 @@ class Job(db.Model):
 def submit_job(user: User, file_name: Optional[str], audio: bytes, model: Optional[str], language: Optional[str]) -> Job:
     job = Job(
         user_id=user.id,
-        file=InputFile(
-            file_name=file_name,
-            audio_data=audio
-        ),
+        file_name=file_name,
+        file=InputFile(audio_data=audio),
         model=model,
         language=language,
     )

@@ -491,7 +491,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 return jsonify(msg=f"You don't have permission to access the job with id {job_id}", errorType="permission"), 403
             result.append({
                 "jobId": job.id,
-                "fileName": job.file.file_name,
+                "fileName": job.file_name,
                 "model": job.model,
                 "language": job.language,
                 "status": runner_manager.status_dict(job)
