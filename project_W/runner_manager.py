@@ -362,9 +362,7 @@ class RunnerManager:
         online_runner.last_heartbeat_timestamp = time.monotonic()
         if online_runner.in_process_job is not None \
                 and (progress := req.form.get("progress", type=float)) is not None:
-            print(progress)
-            job = online_runner.in_process_job
-            job.progress = progress
+            online_runner.in_process_job.progress = progress
         if online_runner.assigned_job_id:
             return HeartbeatResponse(job_assigned=True)
         return HeartbeatResponse()
