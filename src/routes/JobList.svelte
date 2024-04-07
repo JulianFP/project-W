@@ -272,68 +272,67 @@
                 <TableBodyRow>
                   <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
-              {:else}
-                {#each sortItems.slice((page-1)*10, page*10) as item, i}
-                  <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
-                    <TableBodyCell>{item.ID}</TableBodyCell>
-                    <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : item.fileName.slice(0,30) + "..."}</TableBodyCell>
-                    <TableBodyCell class="w-full">
-                      {#if item.status.step === "runnerInProgress"}
-                        <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                      {:else if item.status.step === "success"}
-                        <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                      {:else if item.status.step === "failed"}
-                        <Progressbar color="red" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                      {:else if item.status.step === "downloaded"}
-                        <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
-                      {:else}
-                        <Progressbar color="gray" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+              {/if}
+              {#each sortItems.slice((page-1)*10, page*10) as item, i}
+                <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
+                  <TableBodyCell>{item.ID}</TableBodyCell>
+                  <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : item.fileName.slice(0,30) + "..."}</TableBodyCell>
+                  <TableBodyCell class="w-full">
+                    {#if item.status.step === "runnerInProgress"}
+                      <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                    {:else if item.status.step === "success"}
+                      <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                    {:else if item.status.step === "failed"}
+                      <Progressbar color="red" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                    {:else if item.status.step === "downloaded"}
+                      <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                    {:else}
+                      <Progressbar color="gray" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                    {/if}
+                  </TableBodyCell>
+                  <TableBodyCell tdClass="pr-6 py-4 whitespace-nowrap font-medium">
+                    <Button size="xs" color="alternative" 
+                    disabled={!(item.status.step === "success" || item.status.step === "downloaded") || jobDownloading[item.ID]} 
+                    on:click={() => downloadTranscript(item)}>
+                      {#if jobDownloading[item.ID]}
+                        <Spinner size="5"/>
+                      {:else} 
+                        <DownloadSolid/>
                       {/if}
-                    </TableBodyCell>
-                    <TableBodyCell tdClass="pr-6 py-4 whitespace-nowrap font-medium">
-                      <Button size="xs" color="alternative" 
-                      disabled={!(item.status.step === "success" || item.status.step === "downloaded") || jobDownloading[item.ID]} 
-                      on:click={() => downloadTranscript(item)}>
-                        {#if jobDownloading[item.ID]}
-                          <Spinner size="5"/>
-                        {:else} 
-                          <DownloadSolid/>
+                    </Button>
+                  </TableBodyCell>
+                </TableBodyRow>
+                {#if openRow === i}
+                  <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
+                    <TableBodyCell colspan="4">
+                      <div class="grid grid-cols-2 gap-x-8 gap-y-2">
+                        <div class="col-span-full">
+                          <P class="inline" weight="extrabold" size="sm">Filename: </P>
+                          <P class="inline" size="sm">{item.fileName}</P>
+                        </div>
+                        <div>
+                          <P class="inline" weight="extrabold" size="sm">Language: </P>
+                          <P class="inline" size="sm">{item.language}</P>
+                        </div>
+                        <div>
+                          <P class="inline" weight="extrabold" size="sm">Model: </P>
+                          <P class="inline" size="sm">{item.model}</P>
+                        </div>
+                        <div>
+                          <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
+                          <P class="inline" size="sm">{item.status.step}</P>
+                        </div>
+                        {#if item.status.runner}
+                        <div>
+                          <P class="inline" weight="extrabold" size="sm">ID of assigned runner: </P>
+                          <P class="inline" size="sm">{item.status.runner}</P>
+                        </div>
                         {/if}
-                      </Button>
+                      </div>
                     </TableBodyCell>
                   </TableBodyRow>
-                  {#if openRow === i}
-                    <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
-                      <TableBodyCell colspan="4">
-                        <div class="grid grid-cols-2 gap-x-8 gap-y-2">
-                          <div class="col-span-full">
-                            <P class="inline" weight="extrabold" size="sm">Filename: </P>
-                            <P class="inline" size="sm">{item.fileName}</P>
-                          </div>
-                          <div>
-                            <P class="inline" weight="extrabold" size="sm">Language: </P>
-                            <P class="inline" size="sm">{item.language}</P>
-                          </div>
-                          <div>
-                            <P class="inline" weight="extrabold" size="sm">Model: </P>
-                            <P class="inline" size="sm">{item.model}</P>
-                          </div>
-                          <div>
-                            <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
-                            <P class="inline" size="sm">{item.status.step}</P>
-                          </div>
-                          {#if item.status.runner}
-                          <div>
-                            <P class="inline" weight="extrabold" size="sm">ID of assigned runner: </P>
-                            <P class="inline" size="sm">{item.status.runner}</P>
-                          </div>
-                          {/if}
-                        </div>
-                      </TableBodyCell>
-                    </TableBodyRow>
-                  {/if}
-                {/each}
-              {/if}
+                {/if}
+              {/each}
             </TableBody>
           </TableSearch>
         {:else}
