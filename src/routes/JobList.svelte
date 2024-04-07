@@ -284,7 +284,7 @@
                   <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : item.fileName.slice(0,30) + "..."}</TableBodyCell>
                   <TableBodyCell class="w-full">
                     {#if item.status.step === "runnerInProgress"}
-                      <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside animate/>
                     {:else if item.status.step === "success"}
                       <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
                     {:else if item.status.step === "failed"}
