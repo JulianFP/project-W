@@ -290,7 +290,7 @@ class RunnerManager:
         # TODO: Implement some kind of priority queue, so that more powerful
         # runners are preferred over weaker ones.
         for runner in self.online_runners.values():
-            if runner.in_process_job is None:
+            if runner.assigned_job_id is None:
                 return runner
         return None
 
