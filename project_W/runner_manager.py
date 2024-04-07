@@ -337,6 +337,14 @@ class RunnerManager:
         del self.assigned_jobs[job.id]
         online_runner.in_process_job = None
         online_runner.assigned_job_id = None
+
+        # If there are any jobs in the queue, assign one to this runner.
+        # TODO: Maybe encapsulate this in a method?
+        if len(self.job_queue) > 0:
+            job_id, _ = self.job_queue.pop_max()
+            job = db.session.query(Job).where(job_id == Job.id).one_or_none()
+            self.assign_job_to_runner(job, online_runner)
+
         logger.info(f"Marked runner {online_runner.runner.id} as available!")
         return None
 
@@ -347,8 +355,6 @@ class RunnerManager:
         if (runner := self.find_available_runner(job)) is not None:
             self.assign_job_to_runner(job, runner)
             return
-        # Append the job to the end of the queue by inserting
-        # it into the job_queue dict with a dummy value.
         # TODO: Insert using job priority once added.
         self.job_queue.push(job.id, 0)
         logger.info(f"No runner available for job {job.id}, enqueuing...")
