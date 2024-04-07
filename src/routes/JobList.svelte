@@ -22,11 +22,11 @@
     if(!jobListResponse.ok) return {msg: jobListResponse.msg, ok: false};
     if(jobListResponse.jobIds.length === 0) return {msg: "No jobs", ok: true};
 
-    return getJobInfo(jobListResponse.jobIds, false);
+    return getJobInfo(jobListResponse.jobIds);
   }
 
   //get info of all jobs in jobIds and update items object with them
-  async function getJobInfo(jobIds: number[], concat: boolean): Promise<{msg: string, ok: boolean}> {
+  async function getJobInfo(jobIds: number[]): Promise<{msg: string, ok: boolean}> {
     updatingJobList = 1;
 
     const jobInfoResponse = await getLoggedIn("jobs/info", {"jobIds": jobIds.toString()});
@@ -35,6 +35,9 @@
       updatingJobListError = jobInfoResponse.msg;
       return {msg: jobInfoResponse.msg, ok: false};
     }
+
+    //copy item array to operate on it and the update everything at once
+    let tempItems: itemObj[] = items.slice();
 
     for(let job of jobInfoResponse.jobs){
       //insert default values for model and language
@@ -71,9 +74,18 @@
       //shorten 'jobId' to 'ID'
       job.ID = job.jobId;
       delete job.jobId;
+
+      //insert new job into tempItems
+      //push if it is new, replace it if not
+      let pos: number = -1;
+      for(let i = 0; i < tempItems.length; i++){
+        if(tempItems[i].ID === job.ID) pos = i;
+      }
+      if(pos === -1) tempItems.push(job);
+      else tempItems[pos] = job;
     }
-    if(concat) items = items.concat(jobInfoResponse.jobs);
-    else items = jobInfoResponse.jobs;
+
+    items = tempItems;
 
     updatingJobList = 0;
     return {msg: jobInfoResponse.msg, ok: true};
@@ -183,7 +195,7 @@
       for(let job of sortItems.slice((page-1)*10, page*10)){
         jobIds.push(job.ID);
       }
-      getJobInfo(jobIds, false);
+      getJobInfo(jobIds);
     }
   }, 15000);
 
@@ -370,4 +382,4 @@
   </div>
 </CenterPage>
 
-<SubmitJobsModal bind:open={submitModalOpen} on:afterSubmit={(event) => {getJobInfo(event.detail.jobIds, true);}}/>
+<SubmitJobsModal bind:open={submitModalOpen} on:afterSubmit={(event) => {getJobInfo(event.detail.jobIds);}}/>
