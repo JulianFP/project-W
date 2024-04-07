@@ -1,8 +1,8 @@
-{ pkgs ? import <nixpkgs> { } }:
-pkgs.mkShell {
-  buildInputs = with pkgs.python3Packages; [
+let
+  dontCheckPythonPkg = drv: drv.overridePythonAttrs (old: { doCheck = false; });
+  myPythonPackages = ps: with ps; [
     #all required dependencies + this projects package itself (required for sphinx)
-    project-W
+    (dontCheckPythonPkg project-W)
 
     #optional dependencies: tests
     pytest
@@ -15,5 +15,12 @@ pkgs.mkShell {
     sphinx-jsonschema
     sphinx-mdinclude
     sphinx-rtd-theme
+  ];
+in
+{ pkgs ? import <nixpkgs> { } }:
+pkgs.mkShell {
+  buildInputs = with pkgs; [
+    (python3.withPackages myPythonPackages)
+    sqlite
   ];
 }
