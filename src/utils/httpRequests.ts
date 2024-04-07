@@ -88,7 +88,7 @@ export async function post(route: string, form: {[key: string]: string|File} = {
       returnObj = {
         ok: false,
         status: 413,
-        msg: "Submitted file is too large. Please use smaller files."
+        msg: "Submitted file is too large. Please only submit files that are smaller than 1GB."
       }
     }
     else if(!contentType || !contentType.includes("application/json")) {
