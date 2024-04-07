@@ -178,11 +178,13 @@
 
   //update currently displayed entries of table every 15 seconds (-> equal to heartbeat interval of runner)
   setInterval(() => {
-    let jobIds: number[] = [];
-    for(let job of sortItems.slice((page-1)*10, page*10)){
-      jobIds.push(job.ID);
+    if(sortItems.length > 0 && updatingJobList !== 1){
+      let jobIds: number[] = [];
+      for(let job of sortItems.slice((page-1)*10, page*10)){
+        jobIds.push(job.ID);
+      }
+      getJobInfo(jobIds, false);
     }
-    getJobInfo(jobIds, false);
   }, 15000);
 
   $: if(searchTerm || searchTermEdited){
