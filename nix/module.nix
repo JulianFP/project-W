@@ -254,7 +254,7 @@ in {
       recommendedProxySettings = mkDefault true;
 
       #to allow upload of larger audio files
-      clientMaxBodySize = mkDefault "10g";
+      clientMaxBodySize = mkDefault "1g";
 
       virtualHosts.${cfg.hostName}.locations."/api/".proxyPass = "http://unix:${socketPath}";
     };

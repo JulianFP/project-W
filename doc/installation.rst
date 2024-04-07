@@ -213,7 +213,7 @@ With Reverse Proxy
 Follow this guide if you want to run this behind a Reverse Proxy which takes care of SSL. Please really only use this if this is the case since with this setup the webserver of the container will be set up with HTTP only. With a proper Reverse Proxy setup this means that the traffic would stay unencrypted between Project-W backend/frontend server and Reverse Proxy, but then would be encrypted before sending it to the internet. If you were to run the following setup without a Reverse Proxy then all the communication between client and backend as well as possibly backend and runners would be send unencrypted through the internet including passwords, session tokens and user data!
 
 .. attention::
-   Make sure that your reverse proxy is properly configured to handle the upload of large files. We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 10g;`` in your config (you can also choose to decrease that value a bit if you want).
+   Make sure that your reverse proxy is properly configured to handle the upload of large files. The backend can handle files up to a size of 1GB, setting this to anything less in your reverse proxy will limit the possible file size! We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 1g;`` in your config (you can also choose to decrease that value a bit if you want).
 
 1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
 2. Create initial directory structure and enter project-w directory:
@@ -379,13 +379,13 @@ Now you can start using the module. For a full list and description of options g
 This setup already enables https and automatic ssl certificate renewal over let's encrypt for you. If you want to run this behind a reverse proxy, then just leave the nginx and acme part away.
 
 .. attention::
-   If you are using a reverse proxy, please make sure that your reverse proxy is properly configured to handle the upload of large files. We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 10g;`` in your config (you can also choose to decrease that value a bit if you want).
+   Make sure that your reverse proxy is properly configured to handle the upload of large files. The backend can handle files up to a size of 1GB, setting this to anything less in your reverse proxy will limit the possible file size! We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 1g;`` in your config (you can also choose to decrease that value a bit if you want).
 
-If you want to configure the allowed upload size on your backend server, you can overwrite the value set by the module ("10g" by default). For example if you want to limit the size of uploaded files to 1GB just add this to your NixOS config:
+If you want to configure the allowed upload size on your backend server, you can overwrite the value set by the module ("1g" by default). The backend can't handle files larger than 1GB, so we advice you to not set this to more than that! For example if you want to limit the size of uploaded files to 500MB just add this to your NixOS config:
 
 .. code-block:: Nix
 
-   services.nginx.clientMaxBodySize = "1g";
+   services.nginx.clientMaxBodySize = "500m";
 
 The envFile should contain the following. Please make sure to keep this secret!!!:
 
