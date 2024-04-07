@@ -176,11 +176,13 @@ class RunnerManager:
 
     def load_jobs_from_db(self):
         """
-        Enqueues all jobs from the database that are not currently queued.
+        Enqueues all jobs from the database that are not finished yet.
+        We do not need to check if it already is in the queue since enqueue_job
+        already does that (-> no mutex needed for this method)
         Currently, this is only called once just after the server startup
         """
         for job in db.session.query(Job):
-            if self.job_status(job) == JobStatus.NOT_QUEUED:
+            if self.job_status(job) not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
                 self.enqueue_job(job)
 
     @synchronized("mtx")
