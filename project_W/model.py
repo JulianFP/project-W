@@ -262,7 +262,7 @@ class Job(db.Model):
     file_name = db.Column(db.Text)
     file_id = db.Column(db.Integer, ForeignKey("files.id"))
     file = relationship("InputFile", back_populates="job", uselist=False,
-                        single_parent=True, cascade="all,delete-orphan", lazy="subquery")
+                        single_parent=True, cascade="all,delete-orphan", lazy="select")
 
     def set_error(self, error_msg: str):
         self.error_msg = error_msg
