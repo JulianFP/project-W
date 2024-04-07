@@ -253,10 +253,12 @@ in {
       recommendedOptimisation = mkDefault true;
       recommendedProxySettings = mkDefault true;
 
-      #to allow upload of larger audio files
-      clientMaxBodySize = mkDefault "1g";
-
-      virtualHosts.${cfg.hostName}.locations."/api/".proxyPass = "http://unix:${socketPath}";
+      virtualHosts.${cfg.hostName}.locations."/api/" = {
+        proxyPass = "http://unix:${socketPath}";
+        extraConfig = ''
+          client_max_body_size 1G;
+        '';
+      };
     };
   };
 }
