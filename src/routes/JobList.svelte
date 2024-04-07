@@ -22,11 +22,11 @@
     if(!jobListResponse.ok) return {msg: jobListResponse.msg, ok: false};
     if(jobListResponse.jobIds.length === 0) return {msg: "No jobs", ok: true};
 
-    return getJobInfo(jobListResponse.jobIds);
+    return getJobInfo(jobListResponse.jobIds, false);
   }
 
   //get info of all jobs in jobIds and update items object with them
-  async function getJobInfo(jobIds: number[]): Promise<{msg: string, ok: boolean}> {
+  async function getJobInfo(jobIds: number[], concat: boolean): Promise<{msg: string, ok: boolean}> {
     updatingJobList = 1;
 
     const jobInfoResponse = await getLoggedIn("jobs/info", {"jobIds": jobIds.toString()});
@@ -72,7 +72,8 @@
       job.ID = job.jobId;
       delete job.jobId;
     }
-    items = items.concat(jobInfoResponse.jobs);
+    if(concat) items = items.concat(jobInfoResponse.jobs);
+    else items = jobInfoResponse.jobs;
 
     updatingJobList = 0;
     return {msg: jobInfoResponse.msg, ok: true};
@@ -175,6 +176,15 @@
     else setParams({"hideold": 0});
   }
 
+  //update currently displayed entries of table every 15 seconds (-> equal to heartbeat interval of runner)
+  setInterval(() => {
+    let jobIds: number[] = [];
+    for(let job of sortItems.slice((page-1)*10, page*10)){
+      jobIds.push(job.ID);
+    }
+    getJobInfo(jobIds, false);
+  }, 15000);
+
   $: if(searchTerm || searchTermEdited){
     setParams({"search": searchTerm});
     searchTermEdited = true;
@@ -222,8 +232,16 @@
 
 <CenterPage title="Your transcription jobs">
   <div>
-    <div class="flex justify-between">
+    <div class="flex justify-between items-center">
       <Checkbox id="hide_old_elements" bind:checked={hideOld} on:change={() => setHideOld(hideOld)}>Hide old jobs</Checkbox>
+      {#if updatingJobList == 1}
+        <div>
+          <Spinner class="me-3" size="6"/>
+          <P class="inline text-gray-900 dark:text-gray-300" size="sm" weight="medium">Updating entries ...</P>
+        </div>
+      {:else if updatingJobList == 2}
+        <P class="inline text-red-700 dark:text-red-500" size="sm" weight="medium">Error during update: {updatingJobListError}</P>
+      {/if}
       <Button pill on:click={() => submitModalOpen = true}><PlusOutline class="mr-2"/>New Job</Button>
     </div>
       {#await getJobs()}
@@ -251,20 +269,7 @@
               <TableHeadCell/>
             </TableHead>
             <TableBody>
-              {#if updatingJobList != 0}
-                <TableBodyRow>
-                  <TableBodyCell colspan="4">
-                    <div class="flex flex-col justify-center items-center mx-auto">
-                      {#if updatingJobList == 1}
-                        
-                        <div><Spinner class="me-3" size="6"/>Updating table ...</div>
-                      {:else if updatingJobList == 2}
-                        <ErrorMsg>{updatingJobListError}</ErrorMsg>
-                      {/if}
-                    </div>
-                  </TableBodyCell>
-                </TableBodyRow>
-              {:else if items.length === 0}
+              {#if items.length === 0}
                 <TableBodyRow>
                   <TableBodyCell colspan="4">You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
@@ -363,4 +368,4 @@
   </div>
 </CenterPage>
 
-<SubmitJobsModal bind:open={submitModalOpen} on:afterSubmit={(event) => {getJobInfo(event.detail.jobIds);}}/>
+<SubmitJobsModal bind:open={submitModalOpen} on:afterSubmit={(event) => {getJobInfo(event.detail.jobIds, true);}}/>
