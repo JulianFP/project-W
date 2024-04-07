@@ -304,6 +304,8 @@ The runner currently doesn't use docker-compose for installation. Instead, you w
   
   This way, you can remove the container without losing the cache, and you can prepopulate the cache by copying the Whisper models into the directory on the host.
 
+Note: If you wish to run the container with cuda support, the installation may need some additional steps. Refer to the the user guide for `the NVIDIA container toolkit <https://github.com/NVIDIA/nvidia-container-toolkit>`_ for more information.
+
 NixOS
 -----
 
