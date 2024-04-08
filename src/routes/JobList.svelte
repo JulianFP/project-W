@@ -131,8 +131,9 @@
   let hideOld: boolean = true;
   let sortItems: itemObj[] = items.slice(); // make a copy of the items array
 
-  let pagesCount: number = Math.round(sortItems.length / 10 + 0.5);
-  $: pagesCount = Math.round(sortItems.length / 10 + 0.5);
+  //Math.ceil rounds UP to nearest integer
+  let pagesCount: number = Math.ceil(sortItems.length / 10);
+  $: pagesCount = Math.ceil(sortItems.length / 10);
 
   let pages: LinkType[] = [];
   function calcPages(): void {
@@ -143,6 +144,8 @@
   }
   calcPages();
   let page: number = 1;
+
+  let displayItems: itemObj[] = sortItems.slice((page-1)*10, page*10);
 
   let openRow: number|null = null;
   function toggleRow(i: number): void {
@@ -190,9 +193,9 @@
 
   //update currently displayed entries of table every 15 seconds (-> equal to heartbeat interval of runner)
   setInterval(() => {
-    if(sortItems.length > 0 && updatingJobList !== 1){
+    if(displayItems.length > 0 && updatingJobList !== 1){
       let jobIds: number[] = [];
-      for(let job of sortItems.slice((page-1)*10, page*10)){
+      for(let job of displayItems){
         jobIds.push(job.ID);
       }
       getJobInfo(jobIds);
@@ -242,6 +245,9 @@
     });
     sortItems = sorted;
   }
+
+  //update displayItems when sortItems or page gets updated
+  $: displayItems = sortItems.slice((page-1)*10, page*10);
 </script>
 
 <CenterPage title="Your transcription jobs">
@@ -292,7 +298,7 @@
                   <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {/if}
-              {#each sortItems.slice((page-1)*10, page*10) as item, i}
+              {#each displayItems as item, i}
                 <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
                   <TableBodyCell>{item.ID}</TableBodyCell>
                   <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : item.fileName.slice(0,30) + "..."}</TableBodyCell>
