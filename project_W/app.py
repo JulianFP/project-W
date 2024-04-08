@@ -524,7 +524,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
         :qparam jobIds: List of Job-IDs as a string, separated by commas, e.g. `2,4,5,6`.
         :resjson string msg: Human-readable response message designed to be directly shown to users
-        :resjson string errorType: One of ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
+        :resjson string errorType: One of ``invalidRequest``, ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
         :resjson list_of_objects jobs: Info of all requested jobs. Each object can (but doesn't have to) contain the following fields: `jobId: integer`, `fileName: string`, `model: string`, `language: string`, `status: object that can contain the fields 'step: string', 'runner: integer', 'progress: float'`.
 
         :status 200: Returning the requested job infos.
@@ -595,8 +595,8 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             db.session.commit()
             return jsonify(msg="Returning transcript of job {job_id}", transcript=job.transcript)
         elif job.error_msg is not None:
-            return jsonify(msg=job.error_msg, errorType="operation"), 404
-        return jsonify(msg="Job isn't done yet", errorType="operation"), 404
+            return jsonify(msg=job.error_msg, errorType="operation"), 400
+        return jsonify(msg="Job isn't done yet", errorType="operation"), 400
 
     @app.get("/api/runners/create")
     @jwt_required()
