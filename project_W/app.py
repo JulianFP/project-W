@@ -235,7 +235,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         .. :quickref: Users; Get account information of an user account
 
         :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
-        :qparam email: Email of account that you want to access (leave empty if you want to access own account)
+        :qparam email (optional): Email of account that you want to access (leave empty if you want to access own account)
         :resjson string msg: Human-readable response message designed to be directly shown to users
         :resjson string errorType: One of ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
         :resjson string email: Email address of the account
@@ -278,7 +278,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
         :form password: Password of user account associated with the currently logged in account/`emailModify`
-        :form emailModify: Email of account that you want to access (leave empty if you want to access own account)
+        :form emailModify (optional): Email of account that you want to access (leave empty if you want to access own account)
         :resjson string msg: Human-readable response message designed to be directly shown to users
         :resjson string errorType: One of ``auth``, ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
 
@@ -312,7 +312,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
         :form password: Password of user account associated with the currently logged in account/`emailModify`
         :form newPassword: new password that should be set for this account
-        :form emailModify: Email of account that you want to access (leave empty if you want to access own account)
+        :form emailModify (optional): Email of account that you want to access (leave empty if you want to access own account)
         :resjson string msg: Human-readable response message designed to be directly shown to users
         :resjson string errorType: One of ``auth``, ``permission``, ``notInDatabase``, ``password`` for this route. Refer to :ref:`error_types-label`
 
@@ -353,7 +353,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
         :form password: Password of user account associated with the currently logged in account/`emailModify`
         :form newEmail: New email address that should be set for the user
-        :form emailModify: Email of account that you want to access (leave empty if you want to access own account)
+        :form emailModify (optional): Email of account that you want to access (leave empty if you want to access own account)
         :resjson string msg: Human-readable response message designed to be directly shown to users
         :resjson string errorType: One of ``auth``, ``permission``, ``notInDatabase``, ``email`` for this route. Refer to :ref:`error_types-label`
         :resjson string[] allowedEmailDomains: Exists only if msg=="'{email}' is not a valid email address". List of allowed email domains on this server. Can be empty which means that all domains are allowed. You probably want to show this to your users.
@@ -432,6 +432,25 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     @jwt_required()
     @activatedRequired
     def submitJob():
+        """
+        Submit a new transcription job by posting the file as well as some job details. The backend will create a new job, immediately assign it to a free runner (if one exists) and return its jobID. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid JWT Token has to be supplied in Authorization header. No errorType field.
+        - The user to which the JWT Token belongs has to be activated (i.e. has to have confirmed their email address). ErrorType: ``permission``.
+
+        .. :quickref: Jobs; Submit a new job
+
+        :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
+        :form file: Audio data that should be transcribed as a binary file
+        :form model (optional): Whisper model that should be used. One of: [ tiny, tiny.en, base, base.en, small, small.en, medium, medium.en, large ]. Defaults to: `small`.
+        :form language (optional): Language to transcribe to (spoken language in audio file). One of: [ af, am, ar, as, az, ba, be, bg, bn, bo, br, bs, ca, cs, cy, da, de, el, en, es, et, eu, fa, fi, fo, fr, gl, gu, ha, haw, he, hi, hr, ht, hu, hy, id, is, it, ja, jw, ka, kk, km, kn, ko, la, lb, ln, lo, lt, lv, mg, mi, mk, ml, mn, mr, ms, mt, my, ne, nl, nn, no, oc, pa, pl, ps, pt, ro, ru, sa, sd, si, sk, sl, sn, so, sq, sr, su, sv, sw, ta, te, tg, th, tk, tl, tr, tt, uk, ur, uz, vi, yi, yo, yue, zh ] or the same languages but written out (first letter in uppercase), e.g. `English` or `German`. If left away then whisper will detect the language automatically.
+        :resjson string msg: Human-readable response message designed to be directly shown to users
+        :resjson string errorType: ``permission`` for this route. Refer to :ref:`error_types-label`
+        :resjson integer jobId: ID of the newly created job.
+
+        :status 200: A new job with the submitted details was created successfully.
+        :status 403: With errorType ``permission``.
+        """
         user: User = current_user
         file = request.files["file"]
         file.stream.seek(0)
@@ -446,6 +465,26 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     @app.get("/api/jobs/list")
     @jwt_required()
     def listJobs():
+        """
+        Get a list of all jobs either of this user account or of another user account/all users (only possible if you are admin). Returns all jobs as a list of job ids. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid JWT Token has to be supplied in Authorization header. No errorType field.
+        - If trying to list jobs of other users accounts (e.g. if `email` or `all` is not empty): Currently logged in account has to be admin. ErrorType: ``permission``.
+        - If trying to list all jobs of another user (e.g. if `email` is not empty): An account with the provided email address has to exist. ErrorType: ``notInDatabase``.
+
+        .. :quickref: Jobs; List all job-IDs associated with an user account
+
+        :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
+        :qparam all (optional): Set to `1` if you want to get all jobs of all accounts.
+        :qparam email (optional): Email address of account of which you want to get all jobs from (leave empty to access all jobs of your own account).
+        :resjson string msg: Human-readable response message designed to be directly shown to users
+        :resjson string errorType: One of ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
+        :resjson list_of_integers jobIds: JobIds of all requested jobs.
+
+        :status 200: A new job with the submitted details was created successfully.
+        :status 400: With errorType ``notInDatabase``.
+        :status 403: With errorType ``permission``.
+        """
         user: User = current_user
         requested_user = user
         if "email" in request.args or "all" in request.args:
@@ -472,6 +511,27 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     @app.get("/api/jobs/info")
     @jwt_required()
     def jobInfo():
+        """
+        Get all information related to the given jobs. This contains stuff like the filename, the used model or the current status and progress. By giving a list of jobIds you can access the information of multiple jobs with just one request. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid JWT Token has to be supplied in Authorization header. No errorType field.
+        - `jobIds` has to have the correct format as described below. ErrorType: ``invalidRequest``
+        - If trying to access job of another user (e.g. if one of `jobIds` doesn't belong to this user): Currently logged in account has to be admin. ErrorType: ``permission``.
+        - If trying to access job of another user (e.g. if one of `jobIds` doesn't belong to this user): A job with the provided jobId has to exist. ErrorType: ``notInDatabase``.
+
+        .. :quickref: Jobs; Get detailed information to all provided jobIds
+
+        :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
+        :qparam jobIds: List of Job-IDs as a string, separated by commas, e.g. `2,4,5,6`.
+        :resjson string msg: Human-readable response message designed to be directly shown to users
+        :resjson string errorType: One of ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
+        :resjson list_of_objects jobs: Info of all requested jobs. Each object can (but doesn't have to) contain the following fields: `jobId: integer`, `fileName: string`, `model: string`, `language: string`, `status: object that can contain the fields 'step: string', 'runner: integer', 'progress: float'`.
+
+        :status 200: Returning the requested job infos.
+        :status 400: With errorType ``invalidRequest``.
+        :status 403: With errorType ``permission``.
+        :status 404: With errorType ``notInDatabase``.
+        """
         user: User = current_user
         try:
             job_ids = [int(job_id)
@@ -501,6 +561,27 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
     @app.get("/api/jobs/downloadTranscript")
     @jwt_required()
     def downloadTranscript():
+        """
+        Download the transcript of a successfully completed job in the form of a long String. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid JWT Token has to be supplied in Authorization header. No errorType field.
+        - A job with the provided jobId has to exist. ErrorType: ``notInDatabase``.
+        - If trying to access job of another user (e.g. if one of `jobIds` doesn't belong to this user): Currently logged in account has to be admin. ErrorType: ``permission``.
+        - The job with the provided jobId has to have a transcript as an attribute (meaning it needs to have finished without an error). ErrorType: ``operation``
+
+        .. :quickref: Jobs; Download transcript of a finished job.
+
+        :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
+        :qparam jobId: Job-ID of the job of which to download the transcript from.
+        :resjson string msg: Human-readable response message designed to be directly shown to users
+        :resjson string errorType: One of ``notInDatabase``, ``permission``, ``operation`` for this route. Refer to :ref:`error_types-label`
+        :resjson string transcript: Finished transcript. You may want to store this as a file.
+
+        :status 200: Returning the requested transcript.
+        :status 400: With errorType ``operation``.
+        :status 403: With errorType ``permission``.
+        :status 404: With errorType ``notInDatabase``.
+        """
         user: User = current_user
         job_id = request.args["jobId"]
         job: Job = Job.query.where(Job.id == job_id).one_or_none()
@@ -514,22 +595,52 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             db.session.commit()
             return jsonify(msg="Returning transcript of job {job_id}", transcript=job.transcript)
         elif job.error_msg is not None:
-            return jsonify(msg=job.error_msg, errorType="operation")
+            return jsonify(msg=job.error_msg, errorType="operation"), 404
         return jsonify(msg="Job isn't done yet", errorType="operation"), 404
 
     @app.get("/api/runners/create")
     @jwt_required()
     def createRunner():
+        """
+        Create a new runner and get its runner Token. You need to call this route before you can configure and start you Runner. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid JWT Token (of a user) has to be supplied in Authorization header.
+        - The user associated with that JWT Token has to be an admin.
+
+        .. :quickref: Runners; Create a new runner and get its token.
+
+        :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
+        :resjson string msg: Human-readable error message that tells you why the request failed (for debugging reasons).
+        :resjson string runnerToken: Token of the newly created runner.
+
+        :status 200: Runner successfully created and returning its token.
+        :status 403: User is not an admin.
+        """
         user: User = current_user
         if not user.is_admin:
             logger.info(f"non-admin ({user.email}) tried to create runner.")
-            return jsonify(msg="Only admins may create runner tokens.")
+            return jsonify(msg="Only admins may create runner tokens."), 403
         token, _ = create_runner()
         logger.info(f"Admin {user.email} created runner with token {token}")
-        return jsonify(runnerToken=token)
+        return jsonify(runnerToken=token), 200
 
     @app.post("/api/runners/register")
     def registerRunner():
+        """
+        The runner tells the backend that it is now online and capable of receiving jobs. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid Runner Token (that is known to the Backend) has to be supplied in Authorization header.
+        - The runner can't already be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat, so if this condition isn't true then just wait a bit.
+
+        .. :quickref: Runners; Runner tells Backend that it is now online.
+
+        :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
+        :resjson string msg: Human-readable success message.
+        :resjson string error: Human-readable error message that tells you why the request failed.
+
+        :status 200: Runner successfully registered.
+        :status 400: Failed. Refer to ``error`` field for the reason.
+        """
         token, error = auth_token_from_req(request)
         if error:
             return jsonify(error=error), 400
@@ -543,6 +654,21 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     @app.post("/api/runners/unregister")
     def unregisterRunner():
+        """
+        The runner tells the backend that it is going offline and can't accept any more jobs. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid Runner Token (that is known to the Backend) has to be supplied in Authorization header.
+        - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
+
+        .. :quickref: Runners; Runner tells Backend that it is now going offline.
+
+        :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
+        :resjson string msg: Human-readable success message.
+        :resjson string error: Human-readable error message that tells you why the request failed.
+
+        :status 200: Runner successfully registered.
+        :status 400: Failed. Refer to ``error`` field for the reason.
+        """
         runner, error = runner_manager.get_online_runner_for_req(request)
         if error:
             return jsonify(error=error), 400
@@ -554,6 +680,24 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     @app.post("/api/runners/retrieveJob")
     def retrieveJob():
+        """
+        The runner retrieves its job after it learned from the heartbeat response that the Backend assigned a job to it. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid Runner Token (that is known to the Backend) has to be supplied in Authorization header.
+        - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
+        - There has to be a job assigned to the runner associated with the given Runner Token.
+
+        .. :quickref: Runners; Runner retrieves the job that got assigned to it.
+
+        :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
+        :resjson string error: Human-readable error message that tells you why the request failed.
+        :resjson string audio: Content of audio-file encoded into base64.
+        :resjson string model: Whisper model that should be used for the job. May be null.
+        :resjson string language: Language of the audio. May be null.
+
+        :status 200: Returning assigned job.
+        :status 400: Failed. Refer to ``error`` field for the reason.
+        """
         online_runner, error = runner_manager.get_online_runner_for_req(
             request)
         if error:
@@ -565,6 +709,23 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     @app.post("/api/runners/submitJobResult")
     def submitJobResult():
+        """
+        The runner submits the result of the finished job by either submitting the transcript or an error message. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid Runner Token (that is known to the Backend) has to be supplied in Authorization header.
+        - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
+
+        .. :quickref: Runners; Runner submits the result (transcript or error msg) of a finished job.
+
+        :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
+        :form transcript: Text of the finished transcript. The job will get the status `SUCCESS`. Request has to either include this or `error_msg`.
+        :form error_msg: Error that occurred during transcribing. The job will get the status `FAILED`. Request has to either include this or `transcript`.
+        :resjson string error: Human-readable error message that tells you why the request failed.
+        :resjson string msg: Human-readable success message.
+
+        :status 200: Received job result and successfully updated the jobs status.
+        :status 400: Failed. Refer to ``error`` field for the reason.
+        """
         online_runner, error = runner_manager.get_online_runner_for_req(
             request)
         if error:
@@ -580,6 +741,22 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
     @app.post("/api/runners/heartbeat")
     def heartbeat():
+        """
+        The runner tells the Backend that it is still online and asks if there is any job assigned to it at the same time. If the Runner is currently working on a job then it tells the Backend the current progress. This route should be called by the runner every 15 seconds. If it isn't called for 60 seconds then the runner may be automatically unregistered by the Backend. The following conditions have to be met for this to succeed:
+        
+        - Correct and valid Runner Token (that is known to the Backend) has to be supplied in Authorization header.
+        - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
+
+        .. :quickref: Runners; Runner tells backend that it is still online and asks for a job or tells about the progress of the current job.
+
+        :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
+        :form float progress (optional): The progress of the current job as a float between 0 and 1. Will be processed up to a precision of 4 decimal digits (-> so 2 decimal digits if multiplied by 100 for percent representation)
+        :resjson string error: Human-readable error message that tells you why the request failed.
+        :resjson boolean jobAssigned: If set to `true`, then the Backend has assigned a job to this Runner. `false` or null otherwise. Note that this will also return `true` if the Runner is already processing the job that got assigned to it.
+
+        :status 200: Heartbeat acknowledged. Progress successfully updated.
+        :status 400: Failed. Refer to ``error`` field for the reason.
+        """
         token, error = auth_token_from_req(request)
         if error:
             return jsonify(error=error), 400
