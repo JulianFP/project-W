@@ -22,7 +22,7 @@ Backend & Frontend
 To run the backend you need a config.yml file that configures it. Prepare this file before running the installation steps below. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
 
 .. warning::
-   Please make sure save 'sessionSecretKey' and 'smtpServer.password' in a secret way on your server! With the 'sessionSecretKey' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtpServer.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
+   Please make sure to save 'sessionSecretKey' and 'smtpServer.password' in a secret way on your server! With the 'sessionSecretKey' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtpServer.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
 
 In this setup, sessionSecretKey and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret! 
 
@@ -264,31 +264,37 @@ Runner
 
 The runner currently doesn't use docker-compose for installation. Instead, you will have to clone the repository and build the docker image manually.
 
+.. note::
+   If you wish to run the container with cuda support, the installation may need some additional steps. Refer to the the user guide for `the NVIDIA container toolkit <https://github.com/NVIDIA/nvidia-container-toolkit>`_ for more information.
+
 1. Clone the repository and enter it:
 
    .. code-block:: bash
 
-      git clone https://JulianFP/project-W-runner.git && cd project-W-runner
+      git clone https://github.com/JulianFP/project-W-runner.git && cd project-W-runner
 
 2. Build the docker image:
 
    .. code-block:: bash
 
-      docker build -t runner .
+      docker build -t project-W-runner .
 
   Note that by default, the runner ``config.yml`` doesn't get copied into the image. Instead, you should mount it as a volume when running the container. If you really want the config as part of the image, remove the relevant line from the ``.dockerignore``.
 
 3. Set the relevant config values:
 
-  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. The runner token must be a token returned by the ``/api/runners/create`` route on the backend. The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked.
+  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that. 
+
+.. warning::
+   The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
 
 4. Run the container:
 
    .. code-block:: bash
 
-      docker run --rm -v /path/to/config.yml:/app/config.yml runner
+      docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml project-W-runner
   
-  Note that the path to the config file should be an absolute path.
+  Note that the path to the config file should be an absolute path. The `--restart unless-stopped` option should make sure that the Runner will restart if it should crash and thus always stay online.
 
 5. If you wish to use a custom directory for the Whisper model cache, you should specify it in the ``config.yml`` file:
 
@@ -300,11 +306,9 @@ The runner currently doesn't use docker-compose for installation. Instead, you w
 
   .. code-block:: bash
       
-    docker run --rm -v /path/to/config.yml:/app/config.yml -v /path/to/cache:/models runner
+    docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml -v /path/to/cache:/models runner
   
   This way, you can remove the container without losing the cache, and you can prepopulate the cache by copying the Whisper models into the directory on the host.
-
-Note: If you wish to run the container with cuda support, the installation may need some additional steps. Refer to the the user guide for `the NVIDIA container toolkit <https://github.com/NVIDIA/nvidia-container-toolkit>`_ for more information.
 
 NixOS
 -----
@@ -540,8 +544,17 @@ Runner
 
       python -m pip install .
 
+4. Set the relevant config values:
+
+  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that. 
+
+.. warning::
+   The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
+
 5. Start up the runner:
 
    .. code-block:: bash
 
       python -m project_W_runner
+
+6. You may want to make sure that the runner will always restart itself even if it crashes. Currently this might happen in rare cases, so maybe write a script or a systemd service that will always automatically restart the runner in case of a crash.

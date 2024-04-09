@@ -13,6 +13,7 @@ project W
 
    installation
    config
+   connect_runner_backend
 
 .. toctree::
    :maxdepth: 2
