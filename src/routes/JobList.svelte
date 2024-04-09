@@ -51,6 +51,9 @@
       //assign progress values to steps other than RUNNER_IN_PROGRESS so that a progress bar can always be displayed
       if(!job.progress){
         switch(job.status.step) {
+          case "failed":
+            job.progress = -4;
+            break;
           case "notQueued":
             job.progress = -3;
             break;
@@ -61,9 +64,6 @@
             job.progress = -1;
             break;
           case "runnerInProgress":
-          case "failed":
-            job.progress = 0;
-            break;
           case "success":
           case "downloaded":
             job.progress = 100;
@@ -308,7 +308,8 @@
                     {:else if item.status.step === "success"}
                       <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
                     {:else if item.status.step === "failed"}
-                      <Progressbar color="red" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      <P class="text-red-700 dark:text-red-500" size="sm">failed</P>
+                      <Progressbar color="red" progress={100} size="h-4"/>
                     {:else if item.status.step === "downloaded"}
                       <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
                     {:else}
