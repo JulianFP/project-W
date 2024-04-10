@@ -64,6 +64,8 @@
             job.progress = -1;
             break;
           case "runnerInProgress":
+            job.progress = 0;
+            break;
           case "success":
           case "downloaded":
             job.progress = 100;
