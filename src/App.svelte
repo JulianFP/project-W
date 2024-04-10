@@ -71,8 +71,8 @@
     <NavUl>
       <NavLi href="#/" active={true}>Home</NavLi>
       <NavLi href="#/about">About</NavLi>
-      <NavLi href="#/contact">Contact</NavLi>
-      <NavLi href="https://github.com/JulianFP/project-W"><GithubSolid class="mx-auto"/></NavLi>
+      <NavLi href="https://project-w.readthedocs.io" target="_blank" rel="noopener noreferrer">Docs</NavLi>
+      <NavLi href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="mx-auto"/></NavLi>
     </NavUl>
   </Navbar>
 
