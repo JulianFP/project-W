@@ -20,6 +20,7 @@ project W
    :caption: For Developers:
 
    dev_getting_started
+   tech-stack
    api
 
 Indices and tables

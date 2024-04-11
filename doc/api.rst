@@ -3,6 +3,9 @@ API
 
 This page is interesting to developers of Project-W, but also to people who want to write custom clients for it (like bash or python scripts or anything else). If the latter is the case then focus on the client-facing routes and ignore the runner-facing ones.
 
+.. note::
+   If you want to develop a client that is intended to replace the current frontend (not just as an addition) then make sure that is has both an ``/activate`` and a ``/resetPassword`` route! The backend expects that the client has these since it puts them into the emails it sends to the users. Both routes should accept a ``token`` as a query string that contains the activation/password reset token. If you don't do this, then the links in the emails the backend sends to the users will not work for your client.
+
 .. _general-label:
 
 General
