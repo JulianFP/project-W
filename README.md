@@ -31,6 +31,11 @@ You can access the full documentation for administrators and developers [here](h
 
 ![output](https://github.com/JulianFP/project-W/assets/70963316/2134852b-369c-4bda-a0f4-7575753414d9)
 
+## Presentation
+
+This project was created as part of the software practical "Research Software Engineering" at the university of Heidelberg during the winter term 2023/24. At the end of this practical we also held a presentation that you can [find here](https://github.com/JulianFP/project-W/files/14948960/presentation.pdf).
+
 ## Acknowledgments
 
 This repository was set up using the [SSC Cookiecutter for Python Packages](https://github.com/ssciwr/cookiecutter-python-package).
+
