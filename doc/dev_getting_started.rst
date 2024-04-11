@@ -88,7 +88,7 @@ the runner to download the models into a different directory, set ``modelCacheDi
 Alternatively: Nix
 ``````````````````
 
-If you have Nix installed you can set up your development environment with just one command (you don't have to use NixOS for this, you just need Nix). You can use the same process for all three components of the project (TODO: not for runner yet): 
+If you have Nix installed you can set up your development environment with just one command (you don't have to use NixOS for this, you just need Nix). You can use the same process for all three components of the project: 
 
 Clone the repository and enter its directory. After that run 
 

@@ -348,7 +348,7 @@ Next you need to pass your inputs as an argument to your outputs, where you then
           ];
         };
 
-Now you can start using the module. For a full list and description of options go to Nix/module.nix in the project-W repository. Also the `settings` attribute set is basically just a copy of the options of the config file (however with different default values), so you can also refer to :ref:`description_backend_config-label` for this part. However the following config should get you started as well:
+Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W repository. Also the `settings` attribute set is basically just a copy of the options of the config file (however with different default values), so you can also refer to :ref:`description_backend_config-label` for this part. However the following config should get you started as well:
 
 .. warning:: 
     The options 'settings.loginSecurity.sessionSecretKey' and 'settings.smtpServer.password' are available, but they are not very secure since it's contents will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that. 
@@ -431,7 +431,7 @@ Next you need to pass your inputs as an argument to your outputs, where you then
      ];
    };
 
-Now you can start using the module. For a full list and description of options go to Nix/module.nix in the project-W-frontend repository. However the following config should get you started as well:
+Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W-frontend repository. However the following config should get you started as well:
 
 .. code-block:: Nix 
 
@@ -459,7 +459,60 @@ Rebuild your NixOS config and you are done! The frontend is now being served by 
 Runner
 ``````
 
-TODO
+First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
+
+.. code-block:: Nix 
+
+   inputs = {
+     ...
+     project-W-runner = {
+       url = "github:JulianFP/project-W-runner";
+       inputs.nixpkgs.follows = "nixpkgs";
+     };
+   };
+
+Next you need to pass your inputs as an argument to your outputs, where you then can import the module (for the runner no overlay is required either):
+
+.. code-block:: Nix 
+
+   nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
+     ...
+     modules = [
+       inputs.project-W-runner.nixosModules.default
+       ...
+     ];
+   };
+
+Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W-runner repository. Also the `settings` attribute set is basically just a copy of the options of the runner config file (however with different default values), so you can also refer to :ref:`description_runner_config-label` for this part. However the following config should get you started as well:
+
+.. warning:: 
+    The option 'settings.runnerToken' is available, but it is not very secure since it's content will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that. 
+
+.. code-block:: Nix 
+
+   services.project-W-runner = {
+     enable = true;
+     settings = {
+       backendURL = "<URL of your backend>";
+       #torchDevice = "cuda:0"; #only enable this if you want to tell pytorch explicitly to use the first cuda device of the system
+     };
+     envFile = "<path to env file>";
+   };
+
+The envFile should contain the following. Please make sure to keep this secret!!!:
+
+.. code-block:: console
+
+   RUNNER_TOKEN="<your runners token>"
+
+Rebuild your NixOS config and you are done! The runner is running under the systemd service 'project-W-runner.service'.
+
+By default, whisper models will be cached in the `/var/cache/project-W-runner_whisperCache` directory. Go there if you want to replace them.
+
+.. note::
+   We didn't test if the NixOS module would work with CUDA since we didn't have access to a NixOS machine with NVIDIA GPUs. If additional configuration in the module should be necessary: Contributions welcome!
+
+For CUDA support please add the cuda toolkit you want to use to `environment.systemPackages` in your NixOS config. 
 
 .. _manual_installation-label:
 

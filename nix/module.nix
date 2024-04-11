@@ -216,6 +216,7 @@ in {
           Type = "notify";
           User = cfg.user;
           Group = cfg.group;
+          UMask = "0077";
           ExecStart = escapeShellArgs [
             "${getExe pythonPackage}"
             "-m" "gunicorn"
