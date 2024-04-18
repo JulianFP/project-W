@@ -20,8 +20,8 @@ def add_test_users(app):
             db.session.add(
                 Job(
                     user_id=id,
+                    file_name="sample.mp3",
                     file=InputFile(
-                        file_name="sample.mp3",
                         audio_data=b"",
                     )
                 )

@@ -176,11 +176,13 @@ class RunnerManager:
 
     def load_jobs_from_db(self):
         """
-        Enqueues all jobs from the database that are not currently queued.
+        Enqueues all jobs from the database that are not finished yet.
+        We do not need to check if it already is in the queue since enqueue_job
+        already does that (-> no mutex needed for this method)
         Currently, this is only called once just after the server startup
         """
         for job in db.session.query(Job):
-            if self.job_status(job) == JobStatus.NOT_QUEUED:
+            if self.job_status(job) not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
                 self.enqueue_job(job)
 
     @synchronized("mtx")
@@ -288,7 +290,7 @@ class RunnerManager:
         # TODO: Implement some kind of priority queue, so that more powerful
         # runners are preferred over weaker ones.
         for runner in self.online_runners.values():
-            if runner.in_process_job is None:
+            if runner.assigned_job_id is None:
                 return runner
         return None
 
@@ -335,6 +337,14 @@ class RunnerManager:
         del self.assigned_jobs[job.id]
         online_runner.in_process_job = None
         online_runner.assigned_job_id = None
+
+        # If there are any jobs in the queue, assign one to this runner.
+        # TODO: Maybe encapsulate this in a method?
+        if len(self.job_queue) > 0:
+            job_id, _ = self.job_queue.pop_max()
+            job = db.session.query(Job).where(job_id == Job.id).one_or_none()
+            self.assign_job_to_runner(job, online_runner)
+
         logger.info(f"Marked runner {online_runner.runner.id} as available!")
         return None
 
@@ -345,8 +355,6 @@ class RunnerManager:
         if (runner := self.find_available_runner(job)) is not None:
             self.assign_job_to_runner(job, runner)
             return
-        # Append the job to the end of the queue by inserting
-        # it into the job_queue dict with a dummy value.
         # TODO: Insert using job priority once added.
         self.job_queue.push(job.id, 0)
         logger.info(f"No runner available for job {job.id}, enqueuing...")
@@ -360,10 +368,9 @@ class RunnerManager:
             return HeartbeatResponse(error="This runner is not currently registered as online!")
         online_runner = self.online_runners[runner.id]
         online_runner.last_heartbeat_timestamp = time.monotonic()
+        if online_runner.in_process_job is not None \
+                and (progress := req.form.get("progress", type=float)) is not None:
+            online_runner.in_process_job.progress = progress
         if online_runner.assigned_job_id:
             return HeartbeatResponse(job_assigned=True)
-        if online_runner.in_process_job is not None \
-                and (progress := req.args.get("progress", type=float)) is not None:
-            job = online_runner.in_process_job
-            job.progress = progress
         return HeartbeatResponse()

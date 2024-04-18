@@ -41,7 +41,7 @@ jobs:
     
     - name: Run Python tests
       run: |
-        python -m pytest --nbval
+        python -m pytest
 
   coverage:
     name: Coverage Testing
