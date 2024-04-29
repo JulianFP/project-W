@@ -1,6 +1,6 @@
 # Welcome to project W!
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPLv3](https://img.shields.io/badge/License-agplv3-yellow.svg)](https://opensource.org/license/agpl-v3)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/JulianFP/project-W/ci.yml?branch=main)](https://github.com/JulianFP/project-W/actions/workflows/ci.yml)
 [![Documentation Status](https://readthedocs.org/projects/project-w/badge/?version=latest)](https://project-w.readthedocs.io/en/latest/?badge=latest)
 [![codecov](https://codecov.io/gh/JulianFP/project-W/branch/main/graph/badge.svg)](https://codecov.io/gh/JulianFP/project-W)
