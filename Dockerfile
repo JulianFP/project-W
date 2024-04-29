@@ -4,7 +4,7 @@ ARG BACKEND_BASE_URL=""
 
 LABEL org.opencontainers.image.source=https://github.com/JulianFP/project-W-frontend
 LABEL org.opencontainers.image.description="Project-W frontend production image"
-LABEL org.opencontainers.image.licenses=MIT
+LABEL org.opencontainers.image.licenses=AGPL-3.0-only
 
 WORKDIR /app
 
