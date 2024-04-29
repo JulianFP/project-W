@@ -292,7 +292,7 @@ The runner currently doesn't use docker-compose for installation. Instead, you w
 
    .. code-block:: bash
 
-      docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml project-w-runner
+      docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml --detach project-w-runner
   
   Note that the path to the config file should be an absolute path. The `--restart unless-stopped` option should make sure that the Runner will restart if it should crash and thus always stay online.
 
@@ -306,7 +306,7 @@ The runner currently doesn't use docker-compose for installation. Instead, you w
 
   .. code-block:: bash
       
-    docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml -v /path/to/cache:/models project-w-runner
+    docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml -v /path/to/cache:/models --detach project-w-runner
   
   This way, you can remove the container without losing the cache, and you can prepopulate the cache by copying the Whisper models into the directory on the host.
 
