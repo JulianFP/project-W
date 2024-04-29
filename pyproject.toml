@@ -21,11 +21,11 @@ maintainers = [
 ]
 dynamic = ["version"]
 requires-python = ">=3.8"
-license = { text = "MIT" }
+license = { text = "AGPLv3" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
 ]
 dependencies = [
     # Argon2 for password hashing
