@@ -12,6 +12,6 @@ mkPnpmPackage {
   meta = {
     description = "Frontend files for Project-W";
     homepage = "https://github.com/JulianFP/project-W-frontend";
-    license = lib.licenses.mit;
+    license = lib.licenses.agpl3Only;
   };
 }
