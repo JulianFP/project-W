@@ -38,7 +38,7 @@ python3Packages.buildPythonPackage rec {
   meta = {
     description = "Backend API server for Project-W";
     homepage = "https://github.com/JulianFP/project-W";
-    license = lib.licenses.mit;
+    license = lib.licenses.agpl3Only;
     mainProgram = pname;
   };
 }
