@@ -17,7 +17,7 @@ let
     sphinx-mdinclude
     sphinx-rtd-theme
   ];
-  wrappedPreCommit = (pkgs.buildFHSEnv { 
+  wrappedPreCommit = (pkgs.buildFHSEnv {
     pname = "pre-commit";
     targetPkgs = pkgs: [
       pkgs.pre-commit

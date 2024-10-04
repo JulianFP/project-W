@@ -1,25 +1,30 @@
 import base64
-from dataclasses import dataclass
 import hashlib
 import re
-from typing import Dict, List, Tuple, Optional
-from argon2 import PasswordHasher
-from flask import Response, jsonify, request
-from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import current_user
-from smtplib import SMTP, SMTP_SSL
+import secrets
+import ssl
+from dataclasses import dataclass
 from email.message import EmailMessage
 from functools import wraps
+from smtplib import SMTP, SMTP_SSL
+from typing import Dict, List, Optional, Tuple
+
+import argon2
+import flask
+from argon2 import PasswordHasher
+from flask import Response, jsonify, request
+from flask_jwt_extended import current_user
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
 from project_W.logger import get_logger
-from project_W.utils import encode_activation_token, decode_activation_token, encode_password_reset_token, decode_password_reset_token
-import secrets
-import ssl
-import argon2
-import flask
-import re
+from project_W.utils import (
+    decode_activation_token,
+    decode_password_reset_token,
+    encode_activation_token,
+    encode_password_reset_token,
+)
 
 db = SQLAlchemy()
 hasher = PasswordHasher()
@@ -35,13 +40,11 @@ class User(db.Model):
     # We use this key together with JWT_SECRET_KEY to generate session tokens.
     # That way, we can easily invalidate all existing session tokens by changing
     # this value.
-    user_key = db.Column(db.Text, nullable=False,
-                         default=lambda: secrets.token_urlsafe(16))
+    user_key = db.Column(db.Text, nullable=False, default=lambda: secrets.token_urlsafe(16))
     is_admin = db.Column(db.Boolean, nullable=False)
     activated = db.Column(db.Boolean, nullable=False)
 
-    jobs = relationship("Job", order_by="Job.id",
-                        backref="user", cascade="all,delete-orphan")
+    jobs = relationship("Job", order_by="Job.id", backref="user", cascade="all,delete-orphan")
 
     def set_password_unchecked(self, new_password: str):
         new_password_hash = hasher.hash(new_password)
@@ -74,22 +77,31 @@ class User(db.Model):
         db.session.commit()
 
 
-def add_new_user(
-        email: str, password: str, is_admin: bool
-) -> Tuple[Response, int]:
-    email_already_in_use = db.session.query(
-        User.query.where(User.email == email).exists()).scalar()
+def add_new_user(email: str, password: str, is_admin: bool) -> Tuple[Response, int]:
+    email_already_in_use = db.session.query(User.query.where(User.email == email).exists()).scalar()
     if email_already_in_use:
         return jsonify(msg="E-Mail is already used by another account", errorType="email"), 400
     if not send_activation_email(email, email):
-        return jsonify(msg=f"Failed to send activation email to {email}. Email address may not exist", errorType="email"), 400
+        return (
+            jsonify(
+                msg=f"Failed to send activation email to {email}. Email address may not exist",
+                errorType="email",
+            ),
+            400,
+        )
 
     logger.info(f" -> Created user with email {email}")
     db.session.add(
-        User(email=email, password_hash=hasher.hash(password), is_admin=is_admin, activated=False))
+        User(email=email, password_hash=hasher.hash(password), is_admin=is_admin, activated=False)
+    )
     db.session.commit()
 
-    return jsonify(msg=f"Successful signup for {email}. Please activate your account be clicking on the link provided in the email we just sent you"), 200
+    return (
+        jsonify(
+            msg=f"Successful signup for {email}. Please activate your account be clicking on the link provided in the email we just sent you"
+        ),
+        200,
+    )
 
 
 def activate_user(token: str) -> Tuple[Response, int]:
@@ -104,15 +116,16 @@ def activate_user(token: str) -> Tuple[Response, int]:
     new_email = emails["new_email"]
 
     logger.info(f"  -> activation request for email '{new_email}'")
-    user: Optional[User] = User.query.where(
-        User.email == old_email).one_or_none()
+    user: Optional[User] = User.query.where(User.email == old_email).one_or_none()
     if user is None:
-        logger.info(
-            f"  -> Invalid user email '{old_email}' for user activation token")
+        logger.info(f"  -> Invalid user email '{old_email}' for user activation token")
         return jsonify(msg=f"No user with email {old_email} exists", errorType="notInDatabase"), 400
     if user.activated is True and old_email == new_email:
         logger.info(f"  -> User with email {old_email} already activated")
-        return jsonify(msg=f"Account for {old_email} is already activated", errorType="operation"), 400
+        return (
+            jsonify(msg=f"Account for {old_email} is already activated", errorType="operation"),
+            400,
+        )
     user.activated = True
     # update email address (in case activation got issued for changed email address)
     user.set_email(new_email)
@@ -129,11 +142,9 @@ def reset_user_password(token: str, newPassword: str) -> Tuple[Response, int]:
         return jsonify(msg="Invalid or expired password reset link", errorType="auth"), 400
 
     logger.info(f"  -> initiated password reset for email '{email}'")
-    user: Optional[User] = User.query.where(
-        User.email == email).one_or_none()
+    user: Optional[User] = User.query.where(User.email == email).one_or_none()
     if user is None:
-        logger.info(
-            f"  -> Unknown email address '{email}' for password reset token")
+        logger.info(f"  -> Unknown email address '{email}' for password reset token")
         return jsonify(msg=f"Unknown email address {email}", errorType="notInDatabase"), 400
     user.set_password_unchecked(newPassword)
     db.session.commit()
@@ -141,9 +152,7 @@ def reset_user_password(token: str, newPassword: str) -> Tuple[Response, int]:
     return jsonify(msg=f"password changed successfully"), 200
 
 
-def delete_user(
-    user: User
-) -> Tuple[Response, int]:
+def delete_user(user: User) -> Tuple[Response, int]:
     db.session.delete(user)
     db.session.commit()
     logger.info(f" -> Deleted user with email {user.email}")
@@ -163,7 +172,10 @@ def is_valid_email(email: str) -> bool:
 
 
 def is_valid_password(password: str) -> bool:
-    return re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{12,}$", password) is not None
+    return (
+        re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{12,}$", password)
+        is not None
+    )
 
 
 def send_activation_email(old_email: str, new_email: str) -> bool:
@@ -202,9 +214,7 @@ def send_password_reset_email(email: str) -> bool:
     return _send_email(email, msg_body, msg_subject)
 
 
-def _send_email(
-    receiver: str, msg_body: str, msg_subject: str
-) -> bool:
+def _send_email(receiver: str, msg_body: str, msg_subject: str) -> bool:
     smtpConfig = flask.current_app.config["smtpServer"]
 
     msg = EmailMessage()
@@ -217,9 +227,11 @@ def _send_email(
     try:
         # default instance for unencrypted and starttls
         # ssl encrypts from beginning and requires a different instance
-        smtpInstance = (SMTP_SSL(smtpConfig["domain"], smtpConfig["port"], context=context)
-                        if smtpConfig["secure"] == "ssl"
-                        else SMTP(smtpConfig["domain"], smtpConfig["port"]))
+        smtpInstance = (
+            SMTP_SSL(smtpConfig["domain"], smtpConfig["port"], context=context)
+            if smtpConfig["secure"] == "ssl"
+            else SMTP(smtpConfig["domain"], smtpConfig["port"])
+        )
 
         with smtpInstance as server:
             if smtpConfig["secure"] == "starttls":
@@ -252,8 +264,7 @@ class InputFile(db.Model):
 class Job(db.Model):
     __tablename__ = "jobs"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, ForeignKey(
-        "users.id"), index=True, nullable=False)
+    user_id = db.Column(db.Integer, ForeignKey("users.id"), index=True, nullable=False)
     model = db.Column(db.Text)
     language = db.Column(db.Text)
     transcript = db.Column(db.Text)
@@ -261,8 +272,14 @@ class Job(db.Model):
     error_msg = db.Column(db.Text)
     file_name = db.Column(db.Text)
     file_id = db.Column(db.Integer, ForeignKey("files.id"))
-    file = relationship("InputFile", back_populates="job", uselist=False,
-                        single_parent=True, cascade="all,delete-orphan", lazy="select")
+    file = relationship(
+        "InputFile",
+        back_populates="job",
+        uselist=False,
+        single_parent=True,
+        cascade="all,delete-orphan",
+        lazy="select",
+    )
 
     def set_error(self, error_msg: str):
         self.error_msg = error_msg
@@ -271,10 +288,17 @@ class Job(db.Model):
     def set_transcript(self, transcript: str):
         self.transcript = transcript
         db.session.commit()
+
     # TODO Add some form of runner token/tag system
 
 
-def submit_job(user: User, file_name: Optional[str], audio: bytes, model: Optional[str], language: Optional[str]) -> Job:
+def submit_job(
+    user: User,
+    file_name: Optional[str],
+    audio: bytes,
+    model: Optional[str],
+    language: Optional[str],
+) -> Job:
     job = Job(
         user_id=user.id,
         file_name=file_name,
@@ -307,9 +331,11 @@ def list_job_ids_for_all_users() -> Dict[int, List[int]]:
 
 
 def runner_token_hash(token: str) -> str:
-    return base64.urlsafe_b64encode(
-        hashlib.sha256(token.encode("ascii")).digest()
-    ).rstrip(b"=").decode("ascii")
+    return (
+        base64.urlsafe_b64encode(hashlib.sha256(token.encode("ascii")).digest())
+        .rstrip(b"=")
+        .decode("ascii")
+    )
 
 
 @dataclass
@@ -351,42 +377,56 @@ def activatedRequired(f):
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
         if not user.activated:
-            return jsonify(msg="Your account is not activated. Please activate your user account to use this feature.", errorType="permission"), 403
+            return (
+                jsonify(
+                    msg="Your account is not activated. Please activate your user account to use this feature.",
+                    errorType="permission",
+                ),
+                403,
+            )
         else:
             return f(*args, **kwargs)
+
     return decoratedFunction
 
 
 def confirmIdentity(f):
     """if user should need to confirm their identity by entering their password"""
+
     @wraps(f)
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
-        password = request.form['password']
+        password = request.form["password"]
         if not user.check_password(password):
             logger.info(" -> incorrect password")
             return jsonify(msg="Incorrect password provided", errorType="auth"), 403
         else:
             return f(*args, **kwargs)
+
     return decoratedFunction
 
 
 def emailModifyForAdmins(f):
     """if admins can change other users with 'emailModify' over same route as users can change themselves
     will return user to be modified. This is either 'emailModify' or current_user"""
+
     @wraps(f)
     def decoratedFunction(*args, **kwargs):
         user: User = current_user
         toModify: User = current_user
 
-        if 'emailModify' in request.form:
-            specifiedEmail = request.form['emailModify']
-            specifiedUser = User.query.where(
-                User.email == specifiedEmail).one_or_none()
+        if "emailModify" in request.form:
+            specifiedEmail = request.form["emailModify"]
+            specifiedUser = User.query.where(User.email == specifiedEmail).one_or_none()
             if not user.is_admin:
-                logger.info(
-                    f"Non-admin tried to modify users {specifiedEmail} email, denied")
-                return jsonify(msg="You don't have permission to modify other users", errorType="permission"), 403
+                logger.info(f"Non-admin tried to modify users {specifiedEmail} email, denied")
+                return (
+                    jsonify(
+                        msg="You don't have permission to modify other users",
+                        errorType="permission",
+                    ),
+                    403,
+                )
             elif not specifiedUser:
                 logger.info(" -> Invalid user email")
                 return jsonify(msg="No user exists with that email", errorType="notInDatabase"), 400
@@ -395,4 +435,5 @@ def emailModifyForAdmins(f):
 
         kwargs["toModify"] = toModify
         return f(*args, **kwargs)
+
     return decoratedFunction

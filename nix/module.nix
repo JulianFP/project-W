@@ -1,4 +1,4 @@
-inputs: {config, lib, pkgs, ...}: 
+inputs: {config, lib, pkgs, ...}:
 let
   inherit (lib)
     mdDoc
@@ -138,7 +138,7 @@ in {
         type = types.listOf types.singleLineStr;
         default = [ "sessionSecretKey" "password" ];
         description = mdDoc ''
-          Attributes that require loading of environment variables. An !ENV will be added to the yaml config for these. Just add the name of the attribute itself, not the name of the attribute set(s) it is in. 
+          Attributes that require loading of environment variables. An !ENV will be added to the yaml config for these. Just add the name of the attribute itself, not the name of the attribute set(s) it is in.
         '';
       };
       envFile = mkOption {
@@ -157,8 +157,8 @@ in {
     };
   };
 
-  config = 
-  let 
+  config =
+  let
     socketPath = "/run/project-W-backend.sock";
     stringsToReplace = builtins.map (x: x + ":") cfg.envOptions;
     newStrings = builtins.map (x: x + " !ENV") stringsToReplace;
@@ -170,8 +170,8 @@ in {
     ]));
     #function that checks if we have attributes in cfg.envOptions that are not strings
     invalidEnvOption = (attrSet:
-      let 
-        v = builtins.attrValues attrSet; 
+      let
+        v = builtins.attrValues attrSet;
         boolFunc = (element:
           if (builtins.isAttrs element) then (invalidEnvOption element)
           else if (builtins.elem element cfg.envOptions && !(builtins.isString element)) then true
@@ -179,7 +179,7 @@ in {
         );
         iterateV = (i:
           if (i >= (builtins.length v)) then false
-          else if (boolFunc (builtins.elemAt v i)) then true 
+          else if (boolFunc (builtins.elemAt v i)) then true
           else iterateV (i+1)
         );
       in

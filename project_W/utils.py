@@ -1,8 +1,10 @@
-from typing import Optional, Dict, List, Tuple, TypeVar, Generic, Union
-from itsdangerous.url_safe import URLSafeTimedSerializer
-from project_W.logger import get_logger
-from flask import json, Request
 import re
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
+
+from flask import Request, json
+from itsdangerous.url_safe import URLSafeTimedSerializer
+
+from project_W.logger import get_logger
 
 logger = get_logger("project-W")
 
@@ -25,7 +27,9 @@ def _decode_string_from_token(
 
 
 def encode_activation_token(oldEmail: str, newEmail: str, secret_key: str) -> str:
-    return _encode_string_as_token(json.dumps({"old_email": oldEmail, "new_email": newEmail}), "activate", secret_key)
+    return _encode_string_as_token(
+        json.dumps({"old_email": oldEmail, "new_email": newEmail}), "activate", secret_key
+    )
 
 
 def decode_activation_token(token: str, secret_key: str) -> Optional[Dict]:
@@ -44,9 +48,7 @@ def encode_password_reset_token(email: str, secret_key: str) -> str:
 
 def decode_password_reset_token(token: str, secret_key: str) -> Optional[str]:
     one_hour_in_secs = 60 * 60
-    return _decode_string_from_token(
-        token, "password-reset", secret_key, one_hour_in_secs
-    )
+    return _decode_string_from_token(token, "password-reset", secret_key, one_hour_in_secs)
 
 
 TKey = TypeVar("TKey")
@@ -58,6 +60,7 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
     A max-heap priority queue that supports efficient
     lookup/removal of arbitrary elements.
     """
+
     _heap: List[Tuple[TKey, TPrio]]
     _key_to_index: Dict[TKey, int]
 
@@ -66,8 +69,7 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
         self._key_to_index = {}
 
     def _swap(self, i: int, j: int):
-        self._heap[i], self._heap[j] = \
-            self._heap[j], self._heap[i]
+        self._heap[i], self._heap[j] = self._heap[j], self._heap[i]
         self._key_to_index[self._heap[i][0]] = i
         self._key_to_index[self._heap[j][0]] = j
 
@@ -84,8 +86,10 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
         left_child = 2 * index + 1
         while left_child < len(self._heap):
             right_child = left_child + 1
-            if right_child < len(self._heap) and \
-                    self._heap[right_child][1] > self._heap[left_child][1]:
+            if (
+                right_child < len(self._heap)
+                and self._heap[right_child][1] > self._heap[left_child][1]
+            ):
                 max_child = right_child
             else:
                 max_child = left_child
@@ -93,7 +97,8 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
                 self._swap(index, max_child)
                 index = max_child
                 left_child = 2 * index + 1
-            else: return
+            else:
+                return
 
     def push(self, key: TKey, value: TPrio):
         self._heap.append((key, value))
@@ -140,7 +145,9 @@ def synchronized(lock_name: str):
             lock = getattr(self, lock_name)
             with lock:
                 return f(self, *args, **kw)
+
         return with_lock
+
     return wrap
 
 

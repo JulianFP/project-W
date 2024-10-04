@@ -33,7 +33,7 @@ python3Packages.buildPythonPackage rec {
   pythonImportsCheck = [ pname ];
 
   #hardcode version so that setuptools-scm works without .git folder:
-  SETUPTOOLS_SCM_PRETEND_VERSION = version; 
+  SETUPTOOLS_SCM_PRETEND_VERSION = version;
 
   meta = {
     description = "Backend API server for Project-W";

@@ -57,14 +57,14 @@ Why do we need error types? Sometimes the client wants to have additional inform
 The following strings can be returned in the ``errorType`` attribute. Please note that we may add additional types with future updates if necessary.
 
 - serverConfig
-    - error due to configuration of server 
+    - error due to configuration of server
     - e.g.: disableSignup is set in config
 - email
     - error due to email being invalid in some way
     - e.g. when trying to signup or changing email to something that is not an email address
     - not for login or any kind of authentication, only when it is NOT an authentication parameter (see auth for that)!
 - password
-    - error due to password being invalid in some way 
+    - error due to password being invalid in some way
     - e.g. when trying to signup or changing password to something invalid like a password which is too short
     - not for login or any kind of authentication, only when it is NOT an authentication parameter (see auth for that)!
 - invalidRequest
@@ -80,8 +80,8 @@ The following strings can be returned in the ``errorType`` attribute. Please not
     - authentication failed for some reason
     - e.g. invalid credentials, invalid password, invalid token, etc.
 - notInDatabase
-    - requested ressource is not in database 
-    - e.g. when no user with the provided email address could be found in the database 
+    - requested ressource is not in database
+    - e.g. when no user with the provided email address could be found in the database
 - operation
     - invalid operation at this time (e.g. some condition for this operation that is not part of the request itself is not met)
     - e.g. activate_user when user is already activated

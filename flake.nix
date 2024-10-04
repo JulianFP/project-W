@@ -6,13 +6,13 @@
     systems.url = "github:nix-systems/default";
   };
 
-  outputs = inputs@{ nixpkgs, systems, ...}: 
+  outputs = inputs@{ nixpkgs, systems, ...}:
   let
     pythonOverlay = import ./nix/overlay.nix;
     eachSystem = nixpkgs.lib.genAttrs (import systems);
-    pkgsFor = eachSystem (system: 
-      import nixpkgs { 
-        inherit system; 
+    pkgsFor = eachSystem (system:
+      import nixpkgs {
+        inherit system;
         #overlays add all new packages and their dependencies
         overlays = [pythonOverlay];
       }
