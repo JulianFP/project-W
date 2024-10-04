@@ -1,42 +1,58 @@
 <script lang="ts">
-  import type { ComponentType } from "svelte";
-  import { Navbar, NavBrand, NavHamburger, NavUl, NavLi, Avatar, Dropdown, DropdownItem, DarkMode, Alert } from "flowbite-svelte";
-  import { GithubSolid, InfoCircleSolid, UserEditSolid, LockSolid } from "flowbite-svelte-icons";
+import {
+	Alert,
+	Avatar,
+	DarkMode,
+	Dropdown,
+	DropdownItem,
+	NavBrand,
+	NavHamburger,
+	NavLi,
+	NavUl,
+	Navbar,
+} from "flowbite-svelte";
+import {
+	GithubSolid,
+	InfoCircleSolid,
+	LockSolid,
+	UserEditSolid,
+} from "flowbite-svelte-icons";
+import type { ComponentType } from "svelte";
 
-  import { location } from "svelte-spa-router";
+import { location } from "svelte-spa-router";
 
-  import Router from "svelte-spa-router";
-  import Login from "./routes/Login.svelte";
-  import Signup from "./routes/Signup.svelte";
-  import Activate from "./routes/Activate.svelte";
-  import RequestPasswordReset from "./routes/RequestPasswordReset.svelte";
-  import ResetPassword from "./routes/ResetPassword.svelte";
-  import About from "./routes/About.svelte";
-  import Account from "./routes/Account.svelte";
-  import Security from "./routes/Security.svelte";
-  import JobList from "./routes/JobList.svelte";
-  import NotFound from "./routes/NotFound.svelte";
+import Router from "svelte-spa-router";
+import About from "./routes/About.svelte";
+import Account from "./routes/Account.svelte";
+import Activate from "./routes/Activate.svelte";
+import JobList from "./routes/JobList.svelte";
+import Login from "./routes/Login.svelte";
+import NotFound from "./routes/NotFound.svelte";
+import RequestPasswordReset from "./routes/RequestPasswordReset.svelte";
+import ResetPassword from "./routes/ResetPassword.svelte";
+import Security from "./routes/Security.svelte";
+import Signup from "./routes/Signup.svelte";
 
-  import { loggedIn, authHeader, alerts } from "./utils/stores";
+import { alerts, authHeader, loggedIn } from "./utils/stores";
 
-  export const routes: {[key: string]: ComponentType} = {
-    "/": JobList,
-    "/login": Login,
-    "/signup": Signup,
-    "/activate": Activate,
-    "/requestPasswordReset": RequestPasswordReset,
-    "/resetPassword": ResetPassword,
-    "/about": About,
-    "/account": Account,
-    "/security": Security,
-    "*": NotFound
-  };
+export const routes: Record<string, ComponentType> = {
+	"/": JobList,
+	"/login": Login,
+	"/signup": Signup,
+	"/activate": Activate,
+	"/requestPasswordReset": RequestPasswordReset,
+	"/resetPassword": ResetPassword,
+	"/about": About,
+	"/account": Account,
+	"/security": Security,
+	"*": NotFound,
+};
 
-  //on application start: check localStorage for authHeader and login if it is there
-  const returnVal: string|null = localStorage.getItem("authHeader");
-  if(returnVal) authHeader.setToken(returnVal);
+//on application start: check localStorage for authHeader and login if it is there
+const returnVal: string | null = localStorage.getItem("authHeader");
+if (returnVal) authHeader.setToken(returnVal);
 
-  let dropDownOpen = false;
+let dropDownOpen = false;
 </script>
 
 <!--fixed: position is relative to browser window, w-full: full width, z-20: 3d pos (closer)-->
@@ -56,7 +72,7 @@
       {/if}
     </div>
     {#if $loggedIn}
-      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={"#" + $location} bind:open={dropDownOpen}>
+      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={`#${$location}`} bind:open={dropDownOpen}>
         <!-- TODO: get userinfo for this/>
         <DropdownHeader>
           <span class="block text-sm">Bonnie Green</span>
@@ -92,4 +108,3 @@
     <Router {routes}/>
   </div>
 </main>
-

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Button, Spinner } from "flowbite-svelte";
+import { Button, Spinner } from "flowbite-svelte";
 
-  export let waiting: boolean = false;
-  export let disabled: boolean = false;
+export let waiting = false;
+export let disabled = false;
 </script>
 
 {#if waiting}

@@ -1,66 +1,69 @@
 <script lang="ts">
-  import { Alert, Button, Helper } from "flowbite-svelte";
+import { Alert, Button, Helper } from "flowbite-svelte";
 
-  import Waiting from "../components/waiting.svelte";
-  import ChangeEmailField from "../components/changeEmailField.svelte";
-  import ConfirmPasswordModal from "../components/confirmPasswordModal.svelte";
-  import CenterPage from "../components/centerPage.svelte";
-  import WaitingSubmitButton from "../components/waitingSubmitButton.svelte";
-  import { getLoggedIn, postLoggedIn } from "./../utils/httpRequests";
-  import { authHeader, loggedIn } from "../utils/stores";
-  import { loginForward } from "../utils/navigation";
-  import { alerts } from "../utils/stores";
-    import ErrorMsg from "../components/errorMsg.svelte";
+import CenterPage from "../components/centerPage.svelte";
+import ChangeEmailField from "../components/changeEmailField.svelte";
+import ConfirmPasswordModal from "../components/confirmPasswordModal.svelte";
+import ErrorMsg from "../components/errorMsg.svelte";
+import Waiting from "../components/waiting.svelte";
+import WaitingSubmitButton from "../components/waitingSubmitButton.svelte";
+import { loginForward } from "../utils/navigation";
+import { authHeader, loggedIn } from "../utils/stores";
+import { alerts } from "../utils/stores";
+import {
+	type BackendResponse,
+	getLoggedIn,
+	postLoggedIn,
+} from "./../utils/httpRequests";
 
-  $: if(!$loggedIn) loginForward();
+let waitingForResend = false;
+let resendResponse: BackendResponse;
+let resendError = false;
 
-  async function postDeleteUser(): Promise<{[key: string]: any}> {
-    return postLoggedIn("users/delete", {"password": password});
-  }
+let password: string;
+let deleteError = false;
+let deleteErrorMsg: string;
+let modalOpen = false;
+let deleteResponse: BackendResponse | null = null;
 
-  async function getResendEmail(): Promise<void> {
-    waitingForResend = true;
-    resendError = false;
+$: if (!$loggedIn) loginForward();
 
-    resendResponse = await getLoggedIn("users/resendActivationEmail");
+async function postDeleteUser(): Promise<BackendResponse> {
+	return postLoggedIn("users/delete", { password: password });
+}
 
-    if(!resendResponse.ok) resendError = true;
-    else alerts.add(resendResponse.msg, "green");
+async function getResendEmail(): Promise<void> {
+	waitingForResend = true;
+	resendError = false;
 
-    waitingForResend = false;
-  }
+	resendResponse = await getLoggedIn("users/resendActivationEmail");
 
-  //post modal code
-  $: if(!modalOpen && Object.keys(deleteResponse).length !== 0){
-    if(deleteResponse.status === 200){
-      alerts.add(deleteResponse.msg, "green");
-      authHeader.forgetToken();
-      loginForward();
-    }
-    else{
-      deleteErrorMsg = deleteResponse.msg;
-      deleteError = true;
-    }
-    password = "";
-    deleteResponse = {};
-  }
+	if (!resendResponse.ok) resendError = true;
+	else alerts.add(resendResponse.msg, "green");
 
-  let waitingForResend: boolean = false;
-  let resendResponse: {[key: string]: any};
-  let resendError: boolean = false;
+	waitingForResend = false;
+}
 
-  let password: string;
-  let deleteError: boolean = false;
-  let deleteErrorMsg: string;
-  let modalOpen: boolean = false;
-  let deleteResponse: {[key: string]: any} = {};
+//post modal code
+$: if (!modalOpen && deleteResponse != null) {
+	if (deleteResponse.ok) {
+		alerts.add(deleteResponse.msg, "green");
+		authHeader.forgetToken();
+		loginForward();
+	} else {
+		deleteErrorMsg = deleteResponse.msg;
+		deleteError = true;
+	}
+	password = "";
+	deleteResponse = null;
+}
 </script>
 
 <CenterPage title="Account settings">
 {#await getLoggedIn("users/info")}
   <Waiting/>
-{:then userinfoResponse} 
-  {#if userinfoResponse.status !== 200}
+{:then userinfoResponse}
+  {#if !userinfoResponse.ok}
     <ErrorMsg>{userinfoResponse.msg}</ErrorMsg>
   {:else}
     {#if !userinfoResponse.activated}
@@ -84,7 +87,7 @@
       {userinfoResponse.isAdmin ? "This is an admin account." : "This is a non-admin account."}
     </Alert>
 
-    <ChangeEmailField defaultValue={userinfoResponse.email}/>
+    <ChangeEmailField defaultValue={userinfoResponse.email ?? "Error: Response didn't contain email address"}/>
 
     <Button outline color="red" on:click={() => {modalOpen = true;}}>Delete account</Button>
   {/if}

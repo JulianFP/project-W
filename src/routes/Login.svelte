@@ -1,39 +1,39 @@
 <script lang="ts">
-  import { Button, Helper, A } from "flowbite-svelte";
+import { A, Button, Helper } from "flowbite-svelte";
 
-  import GreetingPage from "../components/greetingPage.svelte";
-  import PasswordField from "../components/passwordField.svelte";
-  import EmailField from "../components/emailField.svelte";
-  import WaitingButton from "../components/waitingSubmitButton.svelte";
+import EmailField from "../components/emailField.svelte";
+import GreetingPage from "../components/greetingPage.svelte";
+import PasswordField from "../components/passwordField.svelte";
+import WaitingButton from "../components/waitingSubmitButton.svelte";
 
-  import { post } from "../utils/httpRequests";
-  import { authHeader, loggedIn } from "../utils/stores";
-  import { destForward, preserveQuerystringForward } from "../utils/navigation";
+import { type BackendResponse, post } from "../utils/httpRequests";
+import { destForward, preserveQuerystringForward } from "../utils/navigation";
+import { authHeader, loggedIn } from "../utils/stores";
 
-  $: if($loggedIn) destForward();
+$: if ($loggedIn) destForward();
 
-  let error: boolean = false;
-  let response: {[key: string]: any}
-  let waitingForPromise: boolean = false;
-  let email: string, password: string;
+let error = false;
+let response: BackendResponse;
+let waitingForPromise = false;
+let email: string;
+let password: string;
 
-  async function postLogin(event: Event): Promise<void> {
-    waitingForPromise = true; //show loading button
-    event.preventDefault(); //disable page reload after form submission
+async function postLogin(event: Event): Promise<void> {
+	waitingForPromise = true; //show loading button
+	event.preventDefault(); //disable page reload after form submission
 
-    //send post request and wait for response
-    response = await post("users/login", {"email": email, "password": password});
+	//send post request and wait for response
+	response = await post("users/login", { email: email, password: password });
 
-    if (response.status === 200) {
-      authHeader.setToken(response.accessToken)
-      //if it was successfull, forward to different page
-      destForward();
-    }
-    else {
-      error = true; //display error message
-      waitingForPromise = false;
-    }
-  }
+	if (response.ok && response.accessToken != null) {
+		authHeader.setToken(response.accessToken);
+		//if it was successfull, forward to different page
+		destForward();
+	} else {
+		error = true; //display error message
+		waitingForPromise = false;
+	}
+}
 </script>
 
 <GreetingPage>

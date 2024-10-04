@@ -1,6 +1,6 @@
 <script>
-  import { P, Span, Hr } from "flowbite-svelte";
-  import CenterPage from "../components/centerPage.svelte";
+import { Hr, P, Span } from "flowbite-svelte";
+import CenterPage from "../components/centerPage.svelte";
 </script>
 
 <CenterPage title="What is Project W?">

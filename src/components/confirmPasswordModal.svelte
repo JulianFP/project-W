@@ -1,30 +1,30 @@
 <script lang="ts">
-  import { Modal, Helper, Heading, P } from "flowbite-svelte";
+import { Heading, Helper, Modal, P } from "flowbite-svelte";
 
-  import PasswordField from "./passwordField.svelte";
-  import WaitingSubmitButton from "./waitingSubmitButton.svelte";
+import type { BackendResponse } from "../utils/httpRequests";
+import PasswordField from "./passwordField.svelte";
+import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-  async function submitAction(event: Event): Promise<void> {
-    waitingForPromise = true;
-    event.preventDefault();
+let waitingForPromise = false;
+let error = false;
 
-    response = await action();
+export let open = false;
+export let value: string;
+export let action: () => Promise<BackendResponse>;
+export let response: BackendResponse | null;
 
-    if(!response.ok && response.errorType === "auth"){
-      error = true;
-    }
-    else open = false;
+async function submitAction(event: Event): Promise<void> {
+	waitingForPromise = true;
+	event.preventDefault();
 
-    waitingForPromise = false;
-  }
+	response = await action();
 
-  let waitingForPromise: boolean = false;
-  let error: boolean = false;
+	if (!response.ok && response.errorType === "auth") {
+		error = true;
+	} else open = false;
 
-  export let open: boolean = false;
-  export let value: string;
-  export let action: () => Promise<{[key: string]: any}>;
-  export let response: {[key: string]: any};
+	waitingForPromise = false;
+}
 </script>
 
 <Modal bind:open={open} autoclose={false} class="w-fit">
@@ -35,7 +35,7 @@
     <WaitingSubmitButton class="w-full1" waiting={waitingForPromise} disabled={error}>Confirm</WaitingSubmitButton>
 
     {#if error}
-      <Helper class="mt-2" color="red"><span class="font-medium"></span> {response.msg}</Helper>
+      <Helper class="mt-2" color="red"><span class="font-medium"></span> {(response ?? {msg: "Couldn't read server response"}).msg}</Helper>
     {/if}
   </form>
 </Modal>

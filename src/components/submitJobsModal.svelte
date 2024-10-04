@@ -1,111 +1,250 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
-  import { Modal, Select, Label, Dropzone, Heading } from "flowbite-svelte";
+import { Dropzone, Heading, Label, Modal, Select } from "flowbite-svelte";
+import { createEventDispatcher } from "svelte";
 
-  import WaitingSubmitButton from "./waitingSubmitButton.svelte";
-  import { alerts } from "../utils/stores";
-  import { postLoggedIn } from "../utils/httpRequests";
+import { type BackendResponse, postLoggedIn } from "../utils/httpRequests";
+import { alerts } from "../utils/stores";
+import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-  const dispatchEvent = createEventDispatcher();
+let models: { value: string; name: string }[] = [
+	{ value: "tiny", name: "Tiny" },
+	{ value: "tiny.en", name: "Tiny - English only" },
+	{ value: "base", name: "Base" },
+	{ value: "base.en", name: "Base - English only" },
+	{ value: "small", name: "Small" },
+	{ value: "small.en", name: "Small - English only" },
+	{ value: "medium", name: "Medium" },
+	{ value: "medium.en", name: "Medium - English only" },
+	{ value: "large", name: "Large" },
+];
+let languages: string[] = [
+	"Automatic language detection",
+	"Afrikaans",
+	"Albanian",
+	"Amharic",
+	"Arabic",
+	"Armenian",
+	"Assamese",
+	"Azerbaijani",
+	"Bashkir",
+	"Basque",
+	"Belarusian",
+	"Bengali",
+	"Bosnian",
+	"Breton",
+	"Bulgarian",
+	"Burmese",
+	"Cantonese",
+	"Castilian",
+	"Catalan",
+	"Chinese",
+	"Croatian",
+	"Czech",
+	"Danish",
+	"Dutch",
+	"English",
+	"Estonian",
+	"Faroese",
+	"Finnish",
+	"Flemish",
+	"French",
+	"Galician",
+	"Georgian",
+	"German",
+	"Greek",
+	"Gujarati",
+	"Haitian",
+	"Haitian Creole",
+	"Hausa",
+	"Hawaiian",
+	"Hebrew",
+	"Hindi",
+	"Hungarian",
+	"Icelandic",
+	"Indonesian",
+	"Italian",
+	"Japanese",
+	"Javanese",
+	"Kannada",
+	"Kazakh",
+	"Khmer",
+	"Korean",
+	"Lao",
+	"Latin",
+	"Latvian",
+	"Letzeburgesch",
+	"Lingala",
+	"Lithuanian",
+	"Luxembourgish",
+	"Macedonian",
+	"Malagasy",
+	"Malay",
+	"Malayalam",
+	"Maltese",
+	"Mandarin",
+	"Maori",
+	"Marathi",
+	"Moldavian",
+	"Moldovan",
+	"Mongolian",
+	"Myanmar",
+	"Nepali",
+	"Norwegian",
+	"Nynorsk",
+	"Occitan",
+	"Panjabi",
+	"Pashto",
+	"Persian",
+	"Polish",
+	"Portuguese",
+	"Punjabi",
+	"Pushto",
+	"Romanian",
+	"Russian",
+	"Sanskrit",
+	"Serbian",
+	"Shona",
+	"Sindhi",
+	"Sinhala",
+	"Sinhalese",
+	"Slovak",
+	"Slovenian",
+	"Somali",
+	"Spanish",
+	"Sundanese",
+	"Swahili",
+	"Swedish",
+	"Tagalog",
+	"Tajik",
+	"Tamil",
+	"Tatar",
+	"Telugu",
+	"Thai",
+	"Tibetan",
+	"Turkish",
+	"Turkmen",
+	"Ukrainian",
+	"Urdu",
+	"Uzbek",
+	"Valencian",
+	"Vietnamese",
+	"Welsh",
+	"Yiddish",
+	"Yoruba",
+];
 
-  function dropHandle(event: DragEvent): void {
-    files = [];
-    event.preventDefault();
-    if (event.dataTransfer && event.dataTransfer.files) {
-      [...event.dataTransfer.files].forEach((file: File, i: number) => {
-        files.push(file);
-        files = files; //to trigger reactivity
-      });
-    }
-  };
+let files: File[] = [];
+let model = "medium";
+let language = "Automatic language detection";
 
-  function handleChange(event: Event): void {
-    files = [];
-    const target = event.target as HTMLInputElement;
-    if (target.files && target.files.length > 0) {
-      [...target.files].forEach((file: File, i: number) => {
-        files.push(file);
-        files = files; //to trigger reactivity
-      });
-    }
-  };
+let waitingForPromise = false;
 
-  function showFileNames(files: File[]): string {
-    if (files.length === 1) return files[0].name;
-    let concat: string = files.length + " files: ";
-    for(let file of files){
-      concat += file.name + ", ";
-    }
+export let open = false;
 
-    if (concat.length > 50) {
-      concat = concat.slice(0, 50);
-      concat += '...';
-    };
-    if (concat[concat.length - 2] == ',') concat = concat.slice(0, concat.length-2);
-    return concat;
-  };
+const dispatchEvent = createEventDispatcher();
 
-  async function submitAction(event: Event): Promise<void> {
-    waitingForPromise = true;
-    event.preventDefault();
+function dropHandle(event: DragEvent): void {
+	files = [];
+	event.preventDefault();
+	if (event.dataTransfer?.files != null) {
+		[...event.dataTransfer.files].forEach((file: File, _) => {
+			files.push(file);
+			files = files; //to trigger reactivity
+		});
+	}
+}
 
-    //send all requests at ones and wait for promises in parallel with "allSettled" method
-    //show results to user ones all promises have settled
-    let promises: Promise<{[key: string]: any}>[] = [];
-    for(let file of files){
-      if(language != "Automatic language detection"){
-        promises.push(postLoggedIn("jobs/submit", {"file": file, "model": model, "language": language}));
-      }
-      else{ //null for automatic language detection
-        promises.push(postLoggedIn("jobs/submit", {"file": file, "model": model}));
-      }
-    }
-    let responses: {[key: string]: any} = await Promise.allSettled(promises);
+function handleChange(event: Event): void {
+	files = [];
+	const target = event.target as HTMLInputElement;
+	if (target.files && target.files.length > 0) {
+		[...target.files].forEach((file: File, _) => {
+			files.push(file);
+			files = files; //to trigger reactivity
+		});
+	}
+}
 
-    const successfulJobIds: number[] = [];
-    for(let i: number = 0; i < files.length; i++){
-      const response: {[key: string]: any} = responses[i].value;
+function showFileNames(files: File[]): string {
+	if (files.length === 1) return files[0].name;
+	let concat = `${files.length.toString()} files: `;
+	for (let file of files) {
+		concat += `${file.name}, `;
+	}
 
-      if(!response.ok){
-        alerts.add("Error occurred while submitting job with filename '" + files[i].name + "': " + response.msg, "red")
-      }
-      else{
-        alerts.add("You successfully submitted job with ID " + response.jobId.toString() + " and filename '" + files[i].name + "'", "green");
-        successfulJobIds.push(response.jobId);
-      }
-    }
+	if (concat.length > 50) {
+		concat = `${concat.slice(0, 50)}...`;
+	}
+	if (concat[concat.length - 2] === ",")
+		concat = concat.slice(0, concat.length - 2);
+	return concat;
+}
 
-    open = false;
-    waitingForPromise = false;
+function isRejected(
+	input: PromiseFulfilledResult<BackendResponse> | PromiseRejectedResult,
+): input is PromiseRejectedResult {
+	return input.status === "rejected";
+}
 
-    if(successfulJobIds.length > 0) dispatchEvent('afterSubmit', {jobIds: successfulJobIds});
-  }
+async function submitAction(event: Event): Promise<void> {
+	waitingForPromise = true;
+	event.preventDefault();
 
-  let models: {value: string, name: string}[] = [
-    { value: "tiny", name: "Tiny"},
-    { value: "tiny.en", name: "Tiny - English only"},
-    { value: "base", name: "Base"},
-    { value: "base.en", name: "Base - English only"},
-    { value: "small", name: "Small"},
-    { value: "small.en", name: "Small - English only"},
-    { value: "medium", name: "Medium"},
-    { value: "medium.en", name: "Medium - English only"},
-    { value: "large", name: "Large"}
-  ]
-  let languages: string[] = [ "Automatic language detection", "Afrikaans","Albanian","Amharic","Arabic","Armenian","Assamese","Azerbaijani","Bashkir","Basque","Belarusian","Bengali","Bosnian","Breton","Bulgarian","Burmese","Cantonese","Castilian","Catalan","Chinese","Croatian","Czech","Danish","Dutch","English","Estonian","Faroese","Finnish","Flemish","French","Galician","Georgian","German","Greek","Gujarati","Haitian","Haitian Creole","Hausa","Hawaiian","Hebrew","Hindi","Hungarian","Icelandic","Indonesian","Italian","Japanese","Javanese","Kannada","Kazakh","Khmer","Korean","Lao","Latin","Latvian","Letzeburgesch","Lingala","Lithuanian","Luxembourgish","Macedonian","Malagasy","Malay","Malayalam","Maltese","Mandarin","Maori","Marathi","Moldavian","Moldovan","Mongolian","Myanmar","Nepali","Norwegian","Nynorsk","Occitan","Panjabi","Pashto","Persian","Polish","Portuguese","Punjabi","Pushto","Romanian","Russian","Sanskrit","Serbian","Shona","Sindhi","Sinhala","Sinhalese","Slovak","Slovenian","Somali","Spanish","Sundanese","Swahili","Swedish","Tagalog","Tajik","Tamil","Tatar","Telugu","Thai","Tibetan","Turkish","Turkmen","Ukrainian","Urdu","Uzbek","Valencian","Vietnamese","Welsh","Yiddish","Yoruba" ]
+	//send all requests at ones and wait for promises in parallel with "allSettled" method
+	//show results to user ones all promises have settled
+	let promises: Promise<BackendResponse>[] = [];
+	for (let file of files) {
+		if (language !== "Automatic language detection") {
+			promises.push(
+				postLoggedIn("jobs/submit", {
+					file: file,
+					model: model,
+					language: language,
+				}),
+			);
+		} else {
+			//null for automatic language detection
+			promises.push(postLoggedIn("jobs/submit", { file: file, model: model }));
+		}
+	}
+	let responses: PromiseSettledResult<BackendResponse>[] =
+		await Promise.allSettled(promises);
 
-  let files: File[] = [];
-  let model: string = "medium";
-  let language: string = "Automatic language detection";
+	const successfulJobIds: number[] = [];
+	for (let i = 0; i < files.length; i++) {
+		const response: PromiseSettledResult<BackendResponse> = responses[i];
+		let errorMsg: string;
+		if (isRejected(response) || response.value.msg == null) {
+			errorMsg = "Server response not valid";
+		} else if (!response.value.ok || response.value.jobId == null) {
+			errorMsg = response.value.msg;
+		} else {
+			alerts.add(
+				`You successfully submitted job with ID ${response.value.jobId.toString()} and filename '${
+					files[i].name
+				}'`,
+				"green",
+			);
+			successfulJobIds.push(response.value.jobId);
+			continue;
+		}
+		alerts.add(
+			`Error occurred while submitting job with filename '${files[i].name}': ${errorMsg}`,
+			"red",
+		);
+	}
 
-  let waitingForPromise: boolean = false;
+	open = false;
+	waitingForPromise = false;
 
-  export let open: boolean = false;
+	if (successfulJobIds.length > 0)
+		dispatchEvent("afterSubmit", { jobIds: successfulJobIds });
+}
 </script>
 
 <Modal bind:open={open} autoclose={false} class="w-fit">
   <form class="flex flex-col space-y-6" on:submit={submitAction}>
-    <Heading tag="h3">{files.length > 1 ? "Submit " + files.length + " new transcription jobs" : "Submit a new transcription job"}</Heading>
+    <Heading tag="h3">{files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"}</Heading>
 
     <div>
       <Label class="mb-2" for="language">Select a language (note that some models only understand English)</Label>

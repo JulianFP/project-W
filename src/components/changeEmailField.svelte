@@ -1,53 +1,56 @@
 <script lang="ts">
-  import { Input, Label, Helper, Button } from "flowbite-svelte";
-  import { LockSolid, LockOpenSolid } from "flowbite-svelte-icons";
+import { Button, Helper, Input, Label } from "flowbite-svelte";
+import { LockOpenSolid, LockSolid } from "flowbite-svelte-icons";
 
-  import ConfirmPasswordModal from "./confirmPasswordModal.svelte";
-  import { postLoggedIn } from "../utils/httpRequests";
-  import { alerts } from "../utils/stores";
+import { type BackendResponse, postLoggedIn } from "../utils/httpRequests";
+import { alerts } from "../utils/stores";
+import ConfirmPasswordModal from "./confirmPasswordModal.svelte";
 
-  function toggleLock(): void {
-    email = defaultValue;
-    error = false;
-    lockedInput = !lockedInput;
-  }
+export let defaultValue: string;
 
-  function openModal(event: Event){
-    event.preventDefault();
-    modalOpen = true;
-  }
+let lockedInput = true;
+let disabledSubmit: boolean;
+let email: string = defaultValue;
+let password: string;
+let error = false;
+let errorMsg: string;
+let modalOpen = false;
+let response: BackendResponse | null = null;
 
-  async function postChangeUserEmail(): Promise<{[key: string]: any}> {
-    return postLoggedIn("users/changeEmail", {"password": password, "newEmail": email});
-  }
+function toggleLock(): void {
+	email = defaultValue;
+	error = false;
+	lockedInput = !lockedInput;
+}
 
-  //post modal code
-  $: if(!modalOpen && Object.keys(response).length !== 0){
-    if(response.status === 200) alerts.add(response.msg, "green");
-    else{
-      errorMsg = response.msg;
-      error = true;
-    }
-    password = "";
-    response = {};
-  }
+function openModal(event: Event) {
+	event.preventDefault();
+	modalOpen = true;
+}
 
-  //make submit only possible if value has changed
-  $: {
-    if(email === defaultValue) disabledSubmit = true;
-    else disabledSubmit = false;
-  }
+async function postChangeUserEmail(): Promise<BackendResponse> {
+	return postLoggedIn("users/changeEmail", {
+		password: password,
+		newEmail: email,
+	});
+}
 
-  export let defaultValue: string;
+//post modal code
+$: if (!modalOpen && response != null) {
+	if (response.ok) alerts.add(response.msg, "green");
+	else {
+		errorMsg = response.msg;
+		error = true;
+	}
+	password = "";
+	response = null;
+}
 
-  let lockedInput: boolean = true; 
-  let disabledSubmit: boolean;
-  let email: string = defaultValue;
-  let password: string;
-  let error: boolean = false;
-  let errorMsg: string;
-  let modalOpen: boolean = false;
-  let response: {[key: string]: any} = {};
+//make submit only possible if value has changed
+$: {
+	if (email === defaultValue) disabledSubmit = true;
+	else disabledSubmit = false;
+}
 </script>
 
 <form on:submit={openModal}>

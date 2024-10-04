@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Spinner } from "flowbite-svelte";
+import { Spinner } from "flowbite-svelte";
 </script>
 
 <div class="flex flex-col w-full h-full justify-evenly items-center my-8">

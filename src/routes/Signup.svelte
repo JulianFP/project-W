@@ -1,63 +1,70 @@
 <script lang="ts">
-  import { Button,  Helper } from "flowbite-svelte";
+import { Button, Helper } from "flowbite-svelte";
 
-  import GreetingPage from "../components/greetingPage.svelte";
-  import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
-  import EmailField from "../components/emailField.svelte";
-  import WaitingButton from "../components/waitingSubmitButton.svelte";
+import EmailField from "../components/emailField.svelte";
+import GreetingPage from "../components/greetingPage.svelte";
+import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
+import WaitingButton from "../components/waitingSubmitButton.svelte";
 
-  import { post } from "../utils/httpRequests";
-  import { authHeader, loggedIn, alerts } from "../utils/stores";
-  import { destForward, preserveQuerystringForward } from "../utils/navigation";
+import { type BackendResponse, post } from "../utils/httpRequests";
+import { destForward, preserveQuerystringForward } from "../utils/navigation";
+import { alerts, authHeader, loggedIn } from "../utils/stores";
 
-  $: if($loggedIn) destForward();
+$: if ($loggedIn) destForward();
 
-  let email: string, password: string;
+let email: string;
+let password: string;
 
-  let emailError: boolean = false;
-  let passwordError: boolean = false;
-  let generalError: boolean = false;
-  let errorMessage: string;
-  $: anyError = emailError || passwordError || generalError;
+let emailError = false;
+let passwordError = false;
+let generalError = false;
+let errorMessage: string;
+$: anyError = emailError || passwordError || generalError;
 
-  let Signupresponse: {[key: string]: any}
-  let waitingForPromise: boolean = false;
+let Signupresponse: BackendResponse;
+let waitingForPromise = false;
 
-  async function postSignup(event: Event): Promise<void> {
-    waitingForPromise = true; //show loading button
-    event.preventDefault(); //disable page reload after form submission
+async function postSignup(event: Event): Promise<void> {
+	waitingForPromise = true; //show loading button
+	event.preventDefault(); //disable page reload after form submission
 
-    //send post request and wait for response
-    Signupresponse = await post("users/signup", {"email": email, "password": password});
+	//send post request and wait for response
+	Signupresponse = await post("users/signup", {
+		email: email,
+		password: password,
+	});
 
-    if (Signupresponse.status === 200) {
-      //login user 
-      let loginResponse = await post("users/login", {"email": email, "password": password})
-    
-      if (loginResponse.status === 200) {
-        authHeader.setToken(loginResponse.accessToken)
-        //if it was successfull, show alert and forward to different page
-        alerts.add(Signupresponse.msg, "green");
-        destForward();
-      }
-      else {
-        generalError = true; //display error message
-        errorMessage = "Account created, however automatic login failed: " + loginResponse.msg;
-      }
-    }
-    else {
-      errorMessage = Signupresponse.msg;
-      if(Signupresponse.errorType === "email"){
-        emailError = true;
-        const allowedDomains: String[] = Signupresponse.allowedEmailDomains;
-        if(allowedDomains) errorMessage += ". Allowed email domains: " + allowedDomains.join(", ");
-      }
-      else if(Signupresponse.errorType === "password") passwordError = true;
-      else generalError = true;
-    }
+	if (Signupresponse.ok) {
+		//login user
+		let loginResponse = await post("users/login", {
+			email: email,
+			password: password,
+		});
 
-    waitingForPromise = false;
-  }
+		if (loginResponse.ok && loginResponse.accessToken != null) {
+			authHeader.setToken(loginResponse.accessToken);
+			//if it was successfull, show alert and forward to different page
+			alerts.add(Signupresponse.msg, "green");
+			destForward();
+		} else {
+			generalError = true; //display error message
+			errorMessage = `Account created, however automatic login failed: ${loginResponse.msg}`;
+		}
+	} else {
+		errorMessage = Signupresponse.msg;
+		if (Signupresponse.errorType === "email") {
+			emailError = true;
+			if (Signupresponse.allowedEmailDomains != null) {
+				errorMessage += `. Allowed email domains: ${Signupresponse.allowedEmailDomains.join(
+					", ",
+				)}`;
+			}
+		} else if (Signupresponse.errorType === "password") passwordError = true;
+		else generalError = true;
+	}
+
+	waitingForPromise = false;
+}
 </script>
 
 <GreetingPage>

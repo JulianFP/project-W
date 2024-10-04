@@ -1,4 +1,10 @@
-inputs: {config, lib, pkgs, ...}: 
+inputs:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   inherit (lib)
     mdDoc
@@ -12,7 +18,8 @@ let
   inherit (pkgs.stdenv.hostPlatform) system;
   cfg = config.services.project-W-frontend;
   cfg_str = "services.project-W-frontend";
-in {
+in
+{
   options = {
     services.project-W-frontend = {
       enable = mkEnableOption (mdDoc "Frontend of Project-W");

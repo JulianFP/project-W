@@ -1,44 +1,46 @@
 <script lang="ts">
-  import { Helper } from "flowbite-svelte";
-  import { push } from "svelte-spa-router";
+import { Helper } from "flowbite-svelte";
+import { push } from "svelte-spa-router";
 
-  import GreetingPage from "../components/greetingPage.svelte";
-  import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
-  import WaitingButton from "../components/waitingSubmitButton.svelte";
+import GreetingPage from "../components/greetingPage.svelte";
+import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
+import WaitingButton from "../components/waitingSubmitButton.svelte";
 
-  import { post } from "../utils/httpRequests";
-  import { loggedIn, alerts } from "../utils/stores";
-  import { getParams } from "../utils/helperFunctions";
+import { getParams } from "../utils/helperFunctions";
+import { type BackendResponse, post } from "../utils/httpRequests";
+import { alerts, loggedIn } from "../utils/stores";
 
-  $: if($loggedIn) push("/");
+$: if ($loggedIn) push("/");
 
-  let response: {[key: string]: any};
-  let waitingForPromise: boolean = false;
-  let newPassword: string;
+let response: BackendResponse;
+let waitingForPromise = false;
+let newPassword: string;
 
-  let passwordError: boolean = false;
-  let generalError: boolean = false;
-  let anyError: boolean;
-  let errorMessage: string;
-  $: anyError = passwordError || generalError;
+let passwordError = false;
+let generalError = false;
+let anyError: boolean;
+let errorMessage: string;
+$: anyError = passwordError || generalError;
 
-  async function resetPassword(event: Event): Promise<void> {
-    waitingForPromise = true; //show loading button
-    event.preventDefault(); //disable page reload after form submission
+async function resetPassword(event: Event): Promise<void> {
+	waitingForPromise = true; //show loading button
+	event.preventDefault(); //disable page reload after form submission
 
-    response = await post("users/resetPassword", Object.assign({"newPassword": newPassword}, getParams()));
+	response = await post(
+		"users/resetPassword",
+		Object.assign({ newPassword: newPassword }, getParams()),
+	);
 
-    if (response.status === 200){
-      alerts.add(response.msg, "green");
-      push("/");
-    }
-    else {
-      errorMessage = response.msg;
-      if(response.errorType === "password") passwordError = true;
-      else generalError = true;
-      waitingForPromise = false;
-    }
-  }
+	if (response.ok) {
+		alerts.add(response.msg, "green");
+		push("/");
+	} else {
+		errorMessage = response.msg;
+		if (response.errorType === "password") passwordError = true;
+		else generalError = true;
+		waitingForPromise = false;
+	}
+}
 </script>
 
 <GreetingPage>

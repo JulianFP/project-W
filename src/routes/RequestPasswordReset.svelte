@@ -1,37 +1,35 @@
 <script lang="ts">
-  import { Helper } from "flowbite-svelte";
-  import { push } from "svelte-spa-router";
+import { Helper } from "flowbite-svelte";
+import { push } from "svelte-spa-router";
 
-  import GreetingPage from "../components/greetingPage.svelte";
-  import EmailField from "../components/emailField.svelte";
-  import WaitingButton from "../components/waitingSubmitButton.svelte";
+import EmailField from "../components/emailField.svelte";
+import GreetingPage from "../components/greetingPage.svelte";
+import WaitingButton from "../components/waitingSubmitButton.svelte";
 
-  import { get } from "../utils/httpRequests";
-  import { loggedIn, alerts } from "../utils/stores";
+import { type BackendResponse, get } from "../utils/httpRequests";
+import { alerts, loggedIn } from "../utils/stores";
 
-  $: if($loggedIn) push("/");
+$: if ($loggedIn) push("/");
 
-  let error: boolean = false;
-  let response: {[key: string]: any};
-  let waitingForPromise: boolean = false;
-  let email: string;
+let error = false;
+let response: BackendResponse;
+let waitingForPromise = false;
+let email: string;
 
-  async function postRequestPasswordReset(event: Event): Promise<void> {
-    waitingForPromise = true; //show loading button
-    event.preventDefault(); //disable page reload after form submission
+async function postRequestPasswordReset(event: Event): Promise<void> {
+	waitingForPromise = true; //show loading button
+	event.preventDefault(); //disable page reload after form submission
 
-    response = await get("users/requestPasswordReset", {"email": email})
+	response = await get("users/requestPasswordReset", { email: email });
 
-    if (response.status === 200) {
-      alerts.add(response.msg, "green");
-      push("/");
-    }
-    else {
-      error = true;
-      waitingForPromise = false;
-    }
-  }
-
+	if (response.ok) {
+		alerts.add(response.msg, "green");
+		push("/");
+	} else {
+		error = true;
+		waitingForPromise = false;
+	}
+}
 </script>
 
 <GreetingPage>

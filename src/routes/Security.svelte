@@ -1,71 +1,72 @@
 <script lang="ts">
-  import { Button, Helper } from "flowbite-svelte";
+import { Button, Helper } from "flowbite-svelte";
 
-  import CenterPage from "../components/centerPage.svelte";
-  import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
-  import ConfirmPasswordModal from "../components/confirmPasswordModal.svelte";
-  import ConfirmModal from "../components/confirmModal.svelte";
-  import { postLoggedIn } from "../utils/httpRequests";
-  import { loggedIn, alerts, authHeader } from "../utils/stores";
-  import { loginForward } from "../utils/navigation";
+import CenterPage from "../components/centerPage.svelte";
+import ConfirmModal from "../components/confirmModal.svelte";
+import ConfirmPasswordModal from "../components/confirmPasswordModal.svelte";
+import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
+import { type BackendResponse, postLoggedIn } from "../utils/httpRequests";
+import { loginForward } from "../utils/navigation";
+import { alerts, authHeader, loggedIn } from "../utils/stores";
 
-  $: if(!$loggedIn) loginForward();
+$: if (!$loggedIn) loginForward();
 
-  function openPasswordModal(event: Event){
-    event.preventDefault();
-    passwordModalOpen = true;
-  }
+let password: string;
+let newPassword: string;
+let passwordError = false;
+let genPasswordError = false;
+let anyPasswordError: boolean;
+let passwordErrorMsg: string;
+let passwordModalOpen = false;
+let passwordResponse: BackendResponse | null = null;
 
-  
-  async function postChangeUserPassword(): Promise<{[key: string]: any}> {
-    return postLoggedIn("users/changePassword", {"password": password, "newPassword": newPassword});
-  }
+$: anyPasswordError = passwordError || genPasswordError;
 
-  async function postInvalidateAllTokens(): Promise<{[key: string]: any}> {
-    return postLoggedIn("users/invalidateAllTokens");
-  }
+let invalidError = false;
+let invalidErrorMsg: string;
+let invalidModalOpen = false;
+let invalidResponse: BackendResponse | null = null;
 
-  //post password modal code
-  $: if(!passwordModalOpen && Object.keys(passwordResponse).length !== 0){
-    if(passwordResponse.status === 200) alerts.add(passwordResponse.msg, "green");
-    else{
-      passwordErrorMsg = passwordResponse.msg;
-      if(passwordResponse.errorType === "password") passwordError = true;
-      else genPasswordError = true;
-    }
-    password = "";
-    passwordResponse = {};
-  }
+function openPasswordModal(event: Event) {
+	event.preventDefault();
+	passwordModalOpen = true;
+}
 
-  //post invalid modal code 
-  $: if(!invalidModalOpen && Object.keys(invalidResponse).length !== 0){
-    if(invalidResponse.status === 200){
-      alerts.add(invalidResponse.msg, "green");
-      authHeader.forgetToken();
-      loginForward();
-    } 
-    else {
-      invalidErrorMsg = invalidResponse.msg;
-      invalidError = true;
-    }
-    invalidResponse = {};
-  }
+async function postChangeUserPassword(): Promise<BackendResponse> {
+	return postLoggedIn("users/changePassword", {
+		password: password,
+		newPassword: newPassword,
+	});
+}
 
-  let password: string;
-  let newPassword: string;
-  let passwordError: boolean = false;
-  let genPasswordError: boolean = false;
-  let anyPasswordError: boolean;
-  let passwordErrorMsg: string;
-  let passwordModalOpen: boolean = false;
-  let passwordResponse: {[key: string]: any} = {};
+async function postInvalidateAllTokens(): Promise<BackendResponse> {
+	return postLoggedIn("users/invalidateAllTokens");
+}
 
-  $: anyPasswordError = passwordError || genPasswordError;
+//post password modal code
+$: if (!passwordModalOpen && passwordResponse != null) {
+	if (passwordResponse.ok) alerts.add(passwordResponse.msg, "green");
+	else {
+		passwordErrorMsg = passwordResponse.msg;
+		if (passwordResponse.errorType === "password") passwordError = true;
+		else genPasswordError = true;
+	}
+	password = "";
+	passwordResponse = null;
+}
 
-  let invalidError: boolean = false;
-  let invalidErrorMsg: string;
-  let invalidModalOpen: boolean = false;
-  let invalidResponse: {[key: string]: any} = {};
+//post invalid modal code
+$: if (!invalidModalOpen && invalidResponse != null) {
+	if (invalidResponse.ok) {
+		alerts.add(invalidResponse.msg, "green");
+		authHeader.forgetToken();
+		loginForward();
+	} else {
+		invalidErrorMsg = invalidResponse.msg;
+		invalidError = true;
+	}
+	invalidResponse = null;
+}
 </script>
 
 <CenterPage title="Account security">
@@ -94,5 +95,5 @@
 </ConfirmPasswordModal>
 
 <ConfirmModal bind:open={invalidModalOpen} bind:response={invalidResponse} action={postInvalidateAllTokens}>
-  We will invalidate all your session tokens thus logging you out from all devices (including this). You will have to login again.  
+  We will invalidate all your session tokens thus logging you out from all devices (including this). You will have to login again.
 </ConfirmModal>
