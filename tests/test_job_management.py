@@ -49,14 +49,17 @@ def test_listJobs_invalid(client: Client, user, admin):
 def test_listJobs_valid(client: Client, user, admin):
     res = client.get("/api/jobs/list", headers=user)
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning list of all jobs of your account"
     assert len(res.json["jobIds"]) == 1
 
     res = client.get("/api/jobs/list", headers=admin, query_string={"email": "user@test.com"})
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning list of all jobs of your account"
     assert len(res.json["jobIds"]) == 1
 
     res = client.get("/api/jobs/list", headers=admin, query_string={"all": True})
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning all list of all jobs in database"
     assert len(res.json) == 2
 
 
@@ -107,4 +110,5 @@ def test_jobInfo_valid(client: Client, user, admin):
 
     res = client.get("/api/jobs/info", headers=admin, query_string={"jobIds": "1,2"})
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning requested jobs"
     assert len(res.json["jobs"]) == 2

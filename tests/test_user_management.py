@@ -32,7 +32,6 @@ def test_signup_invalid_missingFormData(client: Client):
     # leads to a flask error
     assert 400 <= res.status_code < 500
 
-
 # provided 'email' is not an email address
 @pytest.mark.parametrize(
     "client, email",
@@ -189,6 +188,7 @@ def test_activate_invalid_userDeleted(client: Client, mockedSMTP):
         "/api/users/signup", data={"email": "user2@test.com", "password": "user2Password1!"}
     )
     assert res.status_code == 200
+    assert res.json["msg"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
 
     msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
     tokenLine = msgBody.split("\n")[2]
@@ -197,6 +197,7 @@ def test_activate_invalid_userDeleted(client: Client, mockedSMTP):
     user2 = get_auth_headers(client, "user2@test.com", "user2Password1!")
     res = client.post("/api/users/delete", headers=user2, data={"password": "user2Password1!"})
     assert res.status_code == 200
+    assert res.json["msg"] == "Successfully deleted user with email user2@test.com"
 
     res = client.post("/api/users/activate", data={"token": token})
     assert res.status_code == 400
@@ -217,6 +218,7 @@ def test_activate_invalid_userAlreadyActivated(client: Client, mockedSMTP):
 
     res = client.post("/api/users/activate", data={"token": token})
     assert res.status_code == 200
+    assert res.json["msg"] == "Account user2@test.com activated"
 
     res = client.post("/api/users/activate", data={"token": token})
     assert res.status_code == 400
@@ -231,6 +233,7 @@ def test_activate_valid_signup(client: Client, mockedSMTP):
         "/api/users/signup", data={"email": "user2@test.com", "password": "user2Password1!"}
     )
     assert res.status_code == 200
+    assert res.json["msg"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
 
     msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
     tokenLine = msgBody.split("\n")[2]
@@ -250,6 +253,7 @@ def test_activate_valid_emailChange(client: Client, mockedSMTP, user):
         data={"password": "userPassword1!", "newEmail": "user2@test.com"},
     )
     assert res.status_code == 200
+    assert res.json["msg"] == "Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"
 
     msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
     tokenLine = msgBody.split("\n")[2]
@@ -267,6 +271,7 @@ def test_activate_valid_tokenStaysValid(client: Client, mockedSMTP):
     password: str = "user2Password1!"
     signupRes = client.post("/api/users/signup", data={"email": email, "password": password})
     assert signupRes.status_code == 200
+    assert signupRes.json["msg"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
 
     user2 = get_auth_headers(client, email, password)
 
@@ -275,9 +280,11 @@ def test_activate_valid_tokenStaysValid(client: Client, mockedSMTP):
     token = tokenLine.partition("token=")[2]
     activateRes = client.post("/api/users/activate", data={"token": token})
     assert activateRes.status_code == 200
+    assert signupRes.json["msg"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
 
     infoRes = client.get("/api/users/info", headers=user2)
     assert infoRes.status_code == 200
+    assert signupRes.json["msg"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
 
 
 # missing form data
@@ -408,6 +415,7 @@ def test_resetPassword_invalid_invalidToken(client: Client):
 def test_resetPassword_invalid_invalidPassword(client: Client, mockedSMTP, password: str):
     res = client.get("/api/users/requestPasswordReset", query_string={"email": "user@test.com"})
     assert res.status_code == 200
+    assert res.json["msg"] == "If an account with the address user@test.com exists, then we sent a password reset email to this address. Please check your emails"
 
     msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
     tokenLine = msgBody.split("\n")[2]
@@ -429,6 +437,7 @@ def test_resetPassword_invalid_invalidPassword(client: Client, mockedSMTP, passw
 def test_resetPassword_invalid_userDeleted(client: Client, mockedSMTP, user):
     res = client.get("/api/users/requestPasswordReset", query_string={"email": "user@test.com"})
     assert res.status_code == 200
+    assert res.json["msg"] == "If an account with the address user@test.com exists, then we sent a password reset email to this address. Please check your emails"
 
     msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
     tokenLine = msgBody.split("\n")[2]
@@ -436,6 +445,7 @@ def test_resetPassword_invalid_userDeleted(client: Client, mockedSMTP, user):
 
     res = client.post("/api/users/delete", headers=user, data={"password": "userPassword1!"})
     assert res.status_code == 200
+    assert res.json["msg"] == "Successfully deleted user with email user@test.com"
 
     res = client.post(
         "/api/users/resetPassword", data={"token": token, "newPassword": "user2Password1!"}
@@ -449,6 +459,7 @@ def test_resetPassword_invalid_userDeleted(client: Client, mockedSMTP, user):
 def test_resetPassword_valid(client: Client, mockedSMTP):
     res = client.get("/api/users/requestPasswordReset", query_string={"email": "user@test.com"})
     assert res.status_code == 200
+    assert res.json["msg"] == "If an account with the address user@test.com exists, then we sent a password reset email to this address. Please check your emails"
 
     msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
     tokenLine = msgBody.split("\n")[2]
@@ -486,6 +497,7 @@ def test_info_invalid_wrongEmail(client: Client, admin):
 def test_info_valid_nonAdmins(client: Client, user):
     res = client.get("/api/users/info", headers=user)
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning user info"
     assert res.json["email"] == "user@test.com"
     assert res.json["isAdmin"] == False
 
@@ -495,12 +507,14 @@ def test_info_valid_admins(client: Client, admin):
     # admins can also access their own user info
     res = client.get("/api/users/info", headers=admin)
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning user info"
     assert res.json["email"] == "admin@test.com"
     assert res.json["isAdmin"] == True
 
     # admins can access other users' info
     res = client.get("/api/users/info", headers=admin, query_string={"email": "user@test.com"})
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning user info"
     assert res.json["email"] == "user@test.com"
     assert res.json["isAdmin"] == False
 
@@ -897,6 +911,7 @@ def test_resendActivationEmail_invalid_brokenSMTP(client: Client, mockedSMTP, us
         "/api/users/signup", data={"email": "user2@test.com", "password": "user2Password1!"}
     )
     assert res.status_code == 200
+    assert res.json["msg"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
     user2 = get_auth_headers(client, "user2@test.com", "user2Password1!")
 
     mockedSMTP.side_effect = smtplib.SMTPException
@@ -915,6 +930,7 @@ def test_resendActivationEmail_valid(client: Client, mockedSMTP, user):
         "/api/users/signup", data={"email": "user2@test.com", "password": "user2Password1!"}
     )
     assert res.status_code == 200
+    assert res.json["msg"] == "Successful signup for user2@test.com. Please activate your account be clicking on the link provided in the email we just sent you"
     user2 = get_auth_headers(client, "user2@test.com", "user2Password1!")
 
     res = client.get("/api/users/resendActivationEmail", headers=user2)
@@ -947,6 +963,7 @@ def test_invalidateAllTokens_valid(client: Client, user):
     # the request should fail because the jwt token has been revoked
     # by changing the user password
     assert 400 <= res.status_code < 500
+    assert res.json["msg"] == "Signature verification failed"
 
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
@@ -958,11 +975,13 @@ def test_changePassword_revokes_session(client: Client, user):
         data={"password": "userPassword1!", "newPassword": "user2Password1!"},
     )
     assert res.status_code == 200
+    assert res.json["msg"] == "Successfully updated user password"
 
     res = client.get("/api/users/info", headers=user)
     # the request should fail because the jwt token has been revoked
     # by changing the user password
     assert 400 <= res.status_code < 500
+    assert res.json["msg"] == "Signature verification failed"
 
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
@@ -974,6 +993,7 @@ def test_changeEmail_revokes_session(client: Client, mockedSMTP, user):
         data={"password": "userPassword1!", "newEmail": "user2@test.com"},
     )
     assert res.status_code == 200
+    assert res.json["msg"] == "Successfully requested email address change. Please confirm your new address by clicking on the link provided in the email we just sent you"
 
     msgBody = mockedSMTP.mock_calls[3][1][0].get_content()
     tokenLine = msgBody.split("\n")[2]
@@ -981,16 +1001,19 @@ def test_changeEmail_revokes_session(client: Client, mockedSMTP, user):
 
     res = client.post("/api/users/activate", data={"token": token})
     assert res.status_code == 200
+    assert res.json["msg"] == "Account user2@test.com activated"
 
     res = client.get("/api/users/info", headers=user)
     # the request should fail because the jwt token has been revoked.
     # by changing the user password
     assert 400 <= res.status_code < 500
+    assert res.json["msg"] == "Signature verification failed"
 
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_corsSupport(client: Client, user):
     res = client.get("/api/users/info", headers=user)
     assert res.status_code == 200
+    assert res.json["msg"] == "Returning user info"
 
     assert res.headers.get("Access-Control-Allow-Origin") == "*"

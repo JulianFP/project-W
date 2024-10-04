@@ -318,7 +318,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 return jsonify(msg="No user exists with that email", errorType="notInDatabase"), 400
         else:
             logger.info(f"Requested user info for {user.email}")
-        return jsonify(email=user.email, isAdmin=user.is_admin, activated=user.activated)
+        return jsonify(msg="Returning user info", email=user.email, isAdmin=user.is_admin, activated=user.activated)
 
     @app.post("/api/users/delete")
     @jwt_required()
