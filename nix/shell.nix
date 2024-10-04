@@ -1,3 +1,4 @@
+{ pkgs ? import <nixpkgs> { } }:
 let
   dontCheckPythonPkg = drv: drv.overridePythonAttrs (old: { doCheck = false; });
   myPythonPackages = ps: with ps; [
@@ -16,11 +17,18 @@ let
     sphinx-mdinclude
     sphinx-rtd-theme
   ];
+  wrappedPreCommit = (pkgs.buildFHSEnv { 
+    pname = "pre-commit";
+    targetPkgs = pkgs: [
+      pkgs.pre-commit
+    ];
+    runScript = "pre-commit";
+  });
 in
-{ pkgs ? import <nixpkgs> { } }:
 pkgs.mkShell {
   buildInputs = with pkgs; [
     (python3.withPackages myPythonPackages)
     sqlite
+    wrappedPreCommit
   ];
 }
