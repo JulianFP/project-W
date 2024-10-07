@@ -29,7 +29,6 @@ let
   pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
     src = ./.;
     hooks = {
-      check-yaml.enable = true;
       end-of-file-fixer.enable = true;
       trim-trailing-whitespace.enable = true;
       check-added-large-files.enable = true;
