@@ -8,6 +8,10 @@
       url = "github:nzbr/pnpm2nix-nzbr";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    pre-commit-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -30,6 +34,7 @@
       });
       devShells = eachSystem (system: {
         default = import ./nix/shell.nix {
+          inherit inputs system;
           pkgs = pkgsFor.${system};
         };
       });
