@@ -1,7 +1,4 @@
-{
-  lib,
-  python3Packages
-}:
+{ lib, python3Packages }:
 
 python3Packages.buildPythonPackage rec {
   pname = "project_W";
@@ -10,9 +7,7 @@ python3Packages.buildPythonPackage rec {
 
   src = ../../.;
 
-  nativeBuildInputs = with python3Packages; [
-    setuptools-scm
-  ];
+  nativeBuildInputs = with python3Packages; [ setuptools-scm ];
   propagatedBuildInputs = with python3Packages; [
     argon2-cffi
     click
