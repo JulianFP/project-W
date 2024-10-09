@@ -1,4 +1,5 @@
 import argon2
+
 from project_W.model import InputFile, Job, User, db
 
 
@@ -14,7 +15,7 @@ def add_test_users(app):
                     email=email,
                     password_hash=ph.hash(name + "Password1!"),
                     is_admin=is_admin,
-                    activated=True
+                    activated=True,
                 )
             )
             db.session.add(
@@ -23,7 +24,7 @@ def add_test_users(app):
                     file_name="sample.mp3",
                     file=InputFile(
                         audio_data=b"",
-                    )
+                    ),
                 )
             )
         db.session.commit()

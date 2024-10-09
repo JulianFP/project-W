@@ -17,7 +17,7 @@ Unfortunately the only way to currently do this is to directly set the correct v
 2. Enter the sql shell of the sqlite database:
 
    .. code-block:: console
-   
+
       sqlite3 database.db
 
 3. Set ``is_admin`` attribute of the user you want to make an admin to `true` (make sure to replace <users email> with the email address of this user):
@@ -91,13 +91,13 @@ If a runner token got leaked or if you just don't use this runner anymore and wa
 2. Enter the sql shell of the sqlite database:
 
    .. code-block:: console
-   
+
       sqlite3 database.db
 
 3. Delete the runner from the table. Make sure to replace <runners id> by the id of the runner from which you want to revoke the token. Runner IDs are created sequentially, so the first runner you created will have ID 1, the second ID 2 and so on:
 
    .. code-block:: sql
-   
+
       DELETE FROM runners WHERE id=<runners id>;
 
 4. Print whole table and check if change was successful:

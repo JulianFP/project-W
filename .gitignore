@@ -140,9 +140,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-#ignore config files 
+#ignore config files
 JWT_SECRET_KEY
 config.yml
 
-#docker data dir 
+#docker data dir
 project-W-data

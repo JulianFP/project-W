@@ -2,12 +2,13 @@ import enum
 import threading
 import time
 from typing import Dict, Optional, Tuple, Union
-from attr import dataclass
-from flask import Request, jsonify, Flask
-from project_W.utils import AddressablePriorityQueue, auth_token_from_req, synchronized
-from project_W.logger import get_logger
 
-from project_W.model import Job, Runner, get_runner_by_token, db
+from attr import dataclass
+from flask import Flask, Request, jsonify
+
+from project_W.logger import get_logger
+from project_W.model import Job, Runner, db, get_runner_by_token
+from project_W.utils import AddressablePriorityQueue, auth_token_from_req, synchronized
 
 logger = get_logger("project-W")
 
@@ -24,6 +25,7 @@ class JobStatus(enum.Enum):
     Represents all the possible statuses that a
     job request might have.
     """
+
     # The job request has been received by the server,
     # but is not currently queued for processing.
     # TODO: Do we even need to support this?
@@ -55,6 +57,7 @@ class InProcessJob:
     audio file from the server, and live until the server fully retrieves
     the completed transcript or until the runner fails.
     """
+
     runner: Runner
     job_id: int
     # A float between 0 and 1 representing the progress of the job.
@@ -72,6 +75,7 @@ class OnlineRunner:
     Since job assignments and such don't persist across server restarts, we don't need to
     store them to the DB anyways.
     """
+
     # The runner that this instance corresponds to.
     runner: Runner
 
@@ -159,7 +163,8 @@ class RunnerManager:
                 time_since_last_heartbeat = now - online_runner.last_heartbeat_timestamp
                 if time_since_last_heartbeat > DEFAULT_HEARTBEAT_TIMEOUT:
                     logger.info(
-                        f"Runner {online_runner.runner.id} hasn't sent a heartbeat in {time_since_last_heartbeat:.2f} seconds, unregistering...")
+                        f"Runner {online_runner.runner.id} hasn't sent a heartbeat in {time_since_last_heartbeat:.2f} seconds, unregistering..."
+                    )
                     runners_to_unregister.append(online_runner)
 
             for online_runner in runners_to_unregister:
@@ -171,8 +176,9 @@ class RunnerManager:
         self.online_runners = {}
         self.assigned_jobs = {}
         self.job_queue = AddressablePriorityQueue()
-        threading.Thread(target=self.background_thread,
-                         name="runner_manager_bg", daemon=True).start()
+        threading.Thread(
+            target=self.background_thread, name="runner_manager_bg", daemon=True
+        ).start()
 
     def load_jobs_from_db(self):
         """
@@ -182,7 +188,11 @@ class RunnerManager:
         Currently, this is only called once just after the server startup
         """
         for job in db.session.query(Job):
-            if self.job_status(job) not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
+            if self.job_status(job) not in [
+                JobStatus.SUCCESS,
+                JobStatus.FAILED,
+                JobStatus.DOWNLOADED,
+            ]:
                 self.enqueue_job(job)
 
     @synchronized("mtx")
@@ -232,12 +242,15 @@ class RunnerManager:
 
         if online_runner.assigned_job_id is not None:
             logger.info(
-                f"  -> Runner was unregistered while still processing a job! Enqueuing job again.")
+                f"  -> Runner was unregistered while still processing a job! Enqueuing job again."
+            )
             self.enqueue_job(online_runner.assigned_job())
         return True
 
     @synchronized("mtx")
-    def get_online_runner_for_req(self, request: Request) -> Union[Tuple[OnlineRunner, None], Tuple[None, str]]:
+    def get_online_runner_for_req(
+        self, request: Request
+    ) -> Union[Tuple[OnlineRunner, None], Tuple[None, str]]:
         """
         Returns the online runner whose token is specified in the Authorization header of
         the request. If the token doesn't correspond to any online runner, returns
@@ -296,8 +309,9 @@ class RunnerManager:
 
     @synchronized("mtx")
     def assign_job_to_runner(self, job: Job, runner: OnlineRunner):
-        assert runner.assigned_job_id is None and runner.in_process_job is None, \
-            "Runner already has an assigned job!"
+        assert (
+            runner.assigned_job_id is None and runner.in_process_job is None
+        ), "Runner already has an assigned job!"
         self.assigned_jobs[job.id] = runner
         runner.assigned_job_id = job.id
         logger.info(f"Assigned job {job.id} to runner {runner.runner.id}!")
@@ -314,13 +328,14 @@ class RunnerManager:
             return None
         if online_runner.in_process_job is None:
             online_runner.in_process_job = InProcessJob(
-                runner=online_runner.runner,
-                job_id=online_runner.assigned_job_id
+                runner=online_runner.runner, job_id=online_runner.assigned_job_id
             )
         return online_runner.assigned_job()
 
     @synchronized("mtx")
-    def submit_job_result(self, online_runner: OnlineRunner, result: str, error: bool) -> Optional[str]:
+    def submit_job_result(
+        self, online_runner: OnlineRunner, result: str, error: bool
+    ) -> Optional[str]:
         """
         Handles the submission of a job result by a runner. If the runner is not currently
         processing a job, returns an error message. Otherwise, marks the job as completed/failed
@@ -368,8 +383,10 @@ class RunnerManager:
             return HeartbeatResponse(error="This runner is not currently registered as online!")
         online_runner = self.online_runners[runner.id]
         online_runner.last_heartbeat_timestamp = time.monotonic()
-        if online_runner.in_process_job is not None \
-                and (progress := req.form.get("progress", type=float)) is not None:
+        if (
+            online_runner.in_process_job is not None
+            and (progress := req.form.get("progress", type=float)) is not None
+        ):
             online_runner.in_process_job.progress = progress
         if online_runner.assigned_job_id:
             return HeartbeatResponse(job_assigned=True)

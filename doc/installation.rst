@@ -12,7 +12,7 @@ The following installation guides are for Linux only. Theoretically all the comp
 Docker
 ------
 
-We provide a Dockerfile for each of the components of this software (client, backend, runner). The best way to use them is with Docker Compose. In the following we assume that you want to host our backend and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;). 
+We provide a Dockerfile for each of the components of this software (client, backend, runner). The best way to use them is with Docker Compose. In the following we assume that you want to host our backend and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
 
 .. _docker_backend_frontend-label:
 
@@ -24,7 +24,7 @@ To run the backend you need a config.yml file that configures it. Prepare this f
 .. warning::
    Please make sure to save 'sessionSecretKey' and 'smtpServer.password' in a secret way on your server! With the 'sessionSecretKey' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtpServer.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
 
-In this setup, sessionSecretKey and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret! 
+In this setup, sessionSecretKey and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
 .. code-block:: yaml
 
@@ -166,7 +166,7 @@ If you want to bring your own ssl certificate (e.g. self-signed or using some ot
       mkdir -p project-W/project-W-data/sslCert/ && mkdir project-W/project-W-data/config && cd project-W
 
 3. Put your config.yml into ./project-W-data/config
-4. Put your ssl certificate files into ./project-W-data/sslCert. The following files should be in that directory: fullchain.pem (ssl certificate), privkey.pem (ssl certificate private key) and chain.pem (ssl trusted certificate for OCSP stapling). 
+4. Put your ssl certificate files into ./project-W-data/sslCert. The following files should be in that directory: fullchain.pem (ssl certificate), privkey.pem (ssl certificate private key) and chain.pem (ssl trusted certificate for OCSP stapling).
 5. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
 
    .. code-block:: yaml
@@ -283,7 +283,7 @@ The runner currently doesn't use docker-compose for installation. Instead, you w
 
 3. Set the relevant config values:
 
-  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that. 
+  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that.
 
 .. warning::
    The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
@@ -293,7 +293,7 @@ The runner currently doesn't use docker-compose for installation. Instead, you w
    .. code-block:: bash
 
       docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml --detach project-w-runner
-  
+
   Note that the path to the config file should be an absolute path. The `--restart unless-stopped` option should make sure that the Runner will restart if it should crash and thus always stay online.
 
 5. If you wish to use a custom directory for the Whisper model cache, you should specify it in the ``config.yml`` file:
@@ -305,9 +305,9 @@ The runner currently doesn't use docker-compose for installation. Instead, you w
   ... and mount it as a volume when running the container:
 
   .. code-block:: bash
-      
+
     docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml -v /path/to/cache:/models --detach project-w-runner
-  
+
   This way, you can remove the container without losing the cache, and you can prepopulate the cache by copying the Whisper models into the directory on the host.
 
 NixOS
@@ -320,7 +320,7 @@ Backend
 
 First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
 
-    .. code-block:: Nix 
+    .. code-block:: Nix
 
         inputs = {
           ...
@@ -332,7 +332,7 @@ First you need to import our flake into your flake containing the NixOS config o
 
 Next you need to pass your inputs as an argument to your outputs, where you then can import the module and apply the overlay:
 
-    .. code-block:: Nix 
+    .. code-block:: Nix
 
         nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
           ...
@@ -350,10 +350,10 @@ Next you need to pass your inputs as an argument to your outputs, where you then
 
 Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W repository. Also the `settings` attribute set is basically just a copy of the options of the config file (however with different default values), so you can also refer to :ref:`description_backend_config-label` for this part. However the following config should get you started as well:
 
-.. warning:: 
-    The options 'settings.loginSecurity.sessionSecretKey' and 'settings.smtpServer.password' are available, but they are not very secure since it's contents will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that. 
+.. warning::
+    The options 'settings.loginSecurity.sessionSecretKey' and 'settings.smtpServer.password' are available, but they are not very secure since it's contents will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that.
 
-.. code-block:: Nix 
+.. code-block:: Nix
 
    services.project-W-backend = {
      enable = true;
@@ -409,7 +409,7 @@ Frontend
 
 First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
 
-.. code-block:: Nix 
+.. code-block:: Nix
 
    inputs = {
      ...
@@ -421,7 +421,7 @@ First you need to import our flake into your flake containing the NixOS config o
 
 Next you need to pass your inputs as an argument to your outputs, where you then can import the module (for the frontend no overlay is required):
 
-.. code-block:: Nix 
+.. code-block:: Nix
 
    nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
      ...
@@ -433,7 +433,7 @@ Next you need to pass your inputs as an argument to your outputs, where you then
 
 Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W-frontend repository. However the following config should get you started as well:
 
-.. code-block:: Nix 
+.. code-block:: Nix
 
    services.project-W-frontend = {
      enable = true;
@@ -461,7 +461,7 @@ Runner
 
 First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
 
-.. code-block:: Nix 
+.. code-block:: Nix
 
    inputs = {
      ...
@@ -473,7 +473,7 @@ First you need to import our flake into your flake containing the NixOS config o
 
 Next you need to pass your inputs as an argument to your outputs, where you then can import the module (for the runner no overlay is required either):
 
-.. code-block:: Nix 
+.. code-block:: Nix
 
    nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
      ...
@@ -485,10 +485,10 @@ Next you need to pass your inputs as an argument to your outputs, where you then
 
 Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W-runner repository. Also the `settings` attribute set is basically just a copy of the options of the runner config file (however with different default values), so you can also refer to :ref:`description_runner_config-label` for this part. However the following config should get you started as well:
 
-.. warning:: 
-    The option 'settings.runnerToken' is available, but it is not very secure since it's content will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that. 
+.. warning::
+    The option 'settings.runnerToken' is available, but it is not very secure since it's content will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that.
 
-.. code-block:: Nix 
+.. code-block:: Nix
 
    services.project-W-runner = {
      enable = true;
@@ -512,7 +512,7 @@ By default, whisper models will be cached in the `/var/cache/project-W-runner_wh
 .. note::
    We didn't test if the NixOS module would work with CUDA since we didn't have access to a NixOS machine with NVIDIA GPUs. If additional configuration in the module should be necessary: Contributions welcome!
 
-For CUDA support please add the cuda toolkit you want to use to `environment.systemPackages` in your NixOS config. 
+For CUDA support please add the cuda toolkit you want to use to `environment.systemPackages` in your NixOS config.
 
 .. _manual_installation-label:
 
@@ -561,7 +561,7 @@ The frontend is written in Svelte and needs to be compiled into native Javascrip
 
       git clone https://github.com/JulianFP/project-W-frontend.git & cd project-W-frontend
 
-3. Install pnpm: 
+3. Install pnpm:
 
    .. code-block:: console
 
@@ -599,7 +599,7 @@ Runner
 
 4. Set the relevant config values:
 
-  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that. 
+  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that.
 
 .. warning::
    The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.

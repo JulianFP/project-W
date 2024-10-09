@@ -1,6 +1,9 @@
 Development - Getting started
 =============================
 
+.. note::
+   Before contributing code please also read :ref:`code_style-label` for the guidelines we use for code styling in this project and :ref:`test_setup-label` for how to write test cases for your code.
+
 This is a guide for how to get a basic Project-W development environment up and running. Please also refer to :ref:`manual_installation-label` for additional instructions (however focused on deployment).
 
 Setup instructions
@@ -34,7 +37,7 @@ Backend
 
       python -m pip install .[tests,docs]
 
-You are now ready to go! 
+You are now ready to go!
 
 Frontend
 ````````
@@ -52,7 +55,7 @@ Frontend
 
       pnpm install
 
-You are now ready to go! 
+You are now ready to go!
 
 Runner
 ``````
@@ -85,15 +88,17 @@ Runner
 You are now ready to go! Note that by default, Whisper caches downloaded models in ``$HOME/.cache/whisper/``. If you would like
 the runner to download the models into a different directory, set ``modelCacheDir`` in your ``config.yml`` to the desired directory.
 
+.. _nix_develop-label:
+
 Alternatively: Nix
 ``````````````````
 
-If you have Nix installed you can set up your development environment with just one command (you don't have to use NixOS for this, you just need Nix). You can use the same process for all three components of the project: 
+If you have Nix installed you can set up your development environment with just one command (you don't have to use NixOS for this, you just need Nix). This will also set up pre-commit for you. You can use the same process for all three components of the project:
 
-Clone the repository and enter its directory. After that run 
+Clone the repository and enter its directory. After that run
 
    .. code-block:: console
-         
+
       nix develop
 
 You can also use `Direnv <https://github.com/nix-community/nix-direnv>`_ using `use flake` to do this automatically every time you enter the directory.

@@ -1,7 +1,7 @@
 {
   lib,
   fetchPypi,
-  python3Packages
+  python3Packages,
 }:
 
 python3Packages.buildPythonPackage rec {
