@@ -1,6 +1,6 @@
 <script>
-  import { P } from "flowbite-svelte";
-  import CenterPage from "../components/centerPage.svelte";
+import { P } from "flowbite-svelte";
+import CenterPage from "../components/centerPage.svelte";
 </script>
 
 <CenterPage title="404: Page not found">

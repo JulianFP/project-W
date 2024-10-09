@@ -1,25 +1,24 @@
 <script lang="ts">
-  import { replace } from "svelte-spa-router";
+import Waiting from "../components/waiting.svelte";
+import { type BackendResponse, post } from "../utils/httpRequests";
+import { alerts, routing } from "../utils/stores";
 
-  import Waiting from "../components/waiting.svelte";
-  import { alerts } from "../utils/stores";
-  import { post } from "../utils/httpRequests";
-  import { getParams } from "../utils/helperFunctions";
+let response: BackendResponse;
 
-  let response: {[key: string]: any}
+async function activate(): Promise<void> {
+	//send get request and wait for response
+	response = await post(
+		"users/activate",
+		Object.fromEntries($routing.querystring),
+	);
 
-  async function activate(): Promise<void> {
-    //send get request and wait for response
-    response = await post("users/activate", getParams());
-
-    if (response.status === 200) {
-      alerts.add("Account activation successful", "green");
-    }
-    else {
-      alerts.add("Error during account activation: " + response.msg, "red");
-    }
-    replace("/");
-  }
+	if (response.ok) {
+		alerts.add("Account activation successful", "green");
+	} else {
+		alerts.add(`Error during account activation: ${response.msg}`, "red");
+	}
+	routing.set({ destination: "/", params: {}, overwriteParams: true });
+}
 </script>
 
 {#await activate()}

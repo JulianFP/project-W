@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heading, Span } from "flowbite-svelte";
+import { Heading, Span } from "flowbite-svelte";
 </script>
 
 <div class="flex flex-col w-full h-full justify-evenly items-center">

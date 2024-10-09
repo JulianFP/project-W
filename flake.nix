@@ -8,24 +8,36 @@
       url = "github:nzbr/pnpm2nix-nzbr";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    pre-commit-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = inputs@{ nixpkgs, systems, pnpm2nix-nzbr, ...}: 
-  let
-    eachSystem = nixpkgs.lib.genAttrs (import systems);
-    pkgsFor = eachSystem (system: 
-      import nixpkgs { inherit system; }
-    );
-  in {
-    packages = eachSystem (system: rec {
-      default = project-W_frontend;
-      project-W_frontend = pkgsFor.${system}.callPackage ./nix/derivation-frontendFiles.nix { 
-        mkPnpmPackage=pnpm2nix-nzbr.packages.${system}.mkPnpmPackage;
-      };
-    });
-    devShells = eachSystem (system: {
-      default = import ./nix/shell.nix { pkgs=pkgsFor.${system}; };
-    });
-    nixosModules.default = import ./nix/module.nix inputs;
-  };
+  outputs =
+    inputs@{
+      nixpkgs,
+      systems,
+      pnpm2nix-nzbr,
+      ...
+    }:
+    let
+      eachSystem = nixpkgs.lib.genAttrs (import systems);
+      pkgsFor = eachSystem (system: import nixpkgs { inherit system; });
+    in
+    {
+      packages = eachSystem (system: rec {
+        default = project-W_frontend;
+        project-W_frontend = pkgsFor.${system}.callPackage ./nix/derivation-frontendFiles.nix {
+          mkPnpmPackage = pnpm2nix-nzbr.packages.${system}.mkPnpmPackage;
+        };
+      });
+      devShells = eachSystem (system: {
+        default = import ./nix/shell.nix {
+          inherit inputs system;
+          pkgs = pkgsFor.${system};
+        };
+      });
+      nixosModules.default = import ./nix/module.nix inputs;
+    };
 }

@@ -1,15 +1,14 @@
 <script lang="ts">
-  import { Label, Input } from "flowbite-svelte";
-  import { EyeOutline, EyeSlashOutline} from "flowbite-svelte-icons";
+import { Input, Label } from "flowbite-svelte";
+import { EyeOutline, EyeSlashOutline } from "flowbite-svelte-icons";
 
+export let value: string;
+export let passwordVisible = false;
+export let error = false;
 
-  function disableError(): void {
-    error = false
-  }
-
-  export let value: string;
-  export let passwordVisible: boolean = false;
-  export let error: boolean = false;
+function disableError(): void {
+	error = false;
+}
 </script>
 
 <div class="mb-6">

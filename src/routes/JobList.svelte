@@ -1,255 +1,403 @@
 <script lang="ts">
-  import { P, Span, TableSearch, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Pagination, Checkbox, Button, Spinner, Progressbar } from "flowbite-svelte";
-  import type { LinkType} from "flowbite-svelte";
-  import { CaretSortSolid, CaretUpSolid, CaretDownSolid, ChevronLeftOutline, ChevronRightOutline, PlusOutline, DownloadSolid } from "flowbite-svelte-icons";
-  import { querystring, location } from "svelte-spa-router";
+import {
+	Button,
+	Checkbox,
+	P,
+	Pagination,
+	Progressbar,
+	Span,
+	Spinner,
+	TableBody,
+	TableBodyCell,
+	TableBodyRow,
+	TableHead,
+	TableHeadCell,
+	TableSearch,
+} from "flowbite-svelte";
+import type { LinkType } from "flowbite-svelte";
+import {
+	CaretDownSolid,
+	CaretSortSolid,
+	CaretUpSolid,
+	ChevronLeftOutline,
+	ChevronRightOutline,
+	DownloadSolid,
+	PlusOutline,
+} from "flowbite-svelte-icons";
 
-  import SubmitJobsModal from "../components/submitJobsModal.svelte";
-  import CenterPage from "../components/centerPage.svelte";
-  import Waiting from "../components/waiting.svelte";
-  import ErrorMsg from "../components/errorMsg.svelte";
-  import { alerts, loggedIn } from "../utils/stores";
-  import { getLoggedIn } from "../utils/httpRequests";
-  import { loginForward } from "../utils/navigation";
-  import { setParams, paramsLoc } from "../utils/helperFunctions";
+import CenterPage from "../components/centerPage.svelte";
+import ErrorMsg from "../components/errorMsg.svelte";
+import SubmitJobsModal from "../components/submitJobsModal.svelte";
+import Waiting from "../components/waiting.svelte";
+import {
+	type BackendResponse,
+	type JobStatus,
+	getLoggedIn,
+} from "../utils/httpRequests";
+import { loginForward } from "../utils/navigation";
+import { alerts, loggedIn, routing } from "../utils/stores";
 
-  $: if(!$loggedIn) loginForward();
+$: if (!$loggedIn) loginForward();
 
-  //gets list of all jobIds and call getJobInfo on them
-  async function getJobs(): Promise<{msg: string, ok: boolean}> {
-    const jobListResponse = await getLoggedIn("jobs/list");
+type itemValue = string | number | { step: string; runner: number };
+type itemObj = {
+	ID: number;
+	fileName: string;
+	model: string;
+	language: string;
+	progress: number;
+	status: { step: string; runner: number };
+};
+type itemKey = "ID" | "fileName" | "model" | "language" | "progress" | "status";
+//type guard to check if an arbitrary string is an itemKey
+function isItemKey(str: string): str is itemKey {
+	return ["ID", "fileName", "model", "language", "progress", "status"].includes(
+		str,
+	);
+}
 
-    if(!jobListResponse.ok) return {msg: jobListResponse.msg, ok: false};
-    if(jobListResponse.jobIds.length === 0) return {msg: "No jobs", ok: true};
+let keys: itemKey[] = ["ID", "fileName", "progress"];
 
-    return getJobInfo(jobListResponse.jobIds);
-  }
+let items: itemObj[] = [];
+let jobDownloading: Record<number, boolean> = {};
 
-  //get info of all jobs in jobIds and update items object with them
-  async function getJobInfo(jobIds: number[]): Promise<{msg: string, ok: boolean}> {
-    updatingJobList = 1;
+let submitModalOpen = false;
+let updatingJobList = 0; //0: not updating, 1: updating, 2: error while updating
+let updatingJobListError = "";
+let fetchedJobs = false;
 
-    const jobInfoResponse = await getLoggedIn("jobs/info", {"jobIds": jobIds.toString()});
-    if(!jobInfoResponse.ok) {
-      updatingJobList = 2;
-      updatingJobListError = jobInfoResponse.msg;
-      return {msg: jobInfoResponse.msg, ok: false};
-    }
+let searchTerm = "";
+let searchTermEdited = false;
+let sortKey: itemKey = "ID"; // default sort key
+let sortDirection = -1; // default sort direction (descending)
+let hideOld = true;
+let sortItems: itemObj[] = items.slice(); // make a copy of the items array
 
-    //copy item array to operate on it and the update everything at once
-    let tempItems: itemObj[] = items.slice();
+let pages: LinkType[] = [];
+let page = 1;
 
-    for(let job of jobInfoResponse.jobs){
-      //insert default values for model and language
-      if(job.model === null) job.model = "small";
-      if(job.language === null) job.language = "Automatic";
+let paginationHandlerPlsUnsubsribeMe = false;
+let paginationHandlerUnsubscribe = () => {};
 
-      //for easier access in table (multiply by 100 to get it in percent)
-      job.progress = 100 * job.status.progress;
-      delete job.status.progress;
+let displayItems: itemObj[] = sortItems.slice((page - 1) * 10, page * 10);
+let openRow: number | null = null;
 
-      //assign progress values to steps other than RUNNER_IN_PROGRESS so that a progress bar can always be displayed
-      if(!job.progress){
-        switch(job.status.step) {
-          case "failed":
-            job.progress = -4;
-            break;
-          case "notQueued":
-            job.progress = -3;
-            break;
-          case "pendingRunner":
-            job.progress = -2;
-            break;
-          case "runnerAssigned":
-            job.progress = -1;
-            break;
-          case "runnerInProgress":
-            job.progress = 0;
-            break;
-          case "success":
-          case "downloaded":
-            job.progress = 100;
-            break;
-        }
-      }
+let pagesCount = 1; //initialize with 1 since number of items isn't known at this stage anyway
 
-      //shorten 'jobId' to 'ID'
-      job.ID = job.jobId;
-      delete job.jobId;
+//gets list of all jobIds and call getJobInfo on them
+async function getJobs(): Promise<{ msg: string; ok: boolean }> {
+	const jobListResponse: BackendResponse = await getLoggedIn("jobs/list");
 
-      //insert new job into tempItems
-      //push if it is new, replace it if not
-      let pos: number = -1;
-      for(let i = 0; i < tempItems.length; i++){
-        if(tempItems[i].ID === job.ID) pos = i;
-      }
-      if(pos === -1) tempItems.push(job);
-      else tempItems[pos] = job;
-    }
+	if (!jobListResponse.ok) return { msg: jobListResponse.msg, ok: false };
+	if (jobListResponse.jobIds == null)
+		return { msg: "Couldn't read server response", ok: false };
+	if (jobListResponse.jobIds.length === 0) {
+		routing.set({ params: {}, overwriteParams: true }); //if there are not jobs then it is just confusing to keep filter querystrings around
+		return { msg: "No jobs", ok: true };
+	}
 
-    items = tempItems;
+	return getJobInfo(jobListResponse.jobIds);
+}
 
-    updatingJobList = 0;
-    return {msg: jobInfoResponse.msg, ok: true};
-  }
+//get info of all jobs in jobIds and update items object with them
+async function getJobInfo(
+	jobIds: number[],
+): Promise<{ msg: string; ok: boolean }> {
+	updatingJobList = 1;
 
-  async function downloadTranscript(item: itemObj): Promise<void> {
-    jobDownloading[item.ID] = true;
+	const jobInfoResponse: BackendResponse = await getLoggedIn("jobs/info", {
+		jobIds: jobIds.toString(),
+	});
+	if (!jobInfoResponse.ok || jobInfoResponse.jobs == null) {
+		updatingJobList = 2;
+		updatingJobListError = jobInfoResponse.msg;
+		return { msg: jobInfoResponse.msg, ok: false };
+	}
 
-    const downloadTranscriptResponse = await getLoggedIn("jobs/downloadTranscript", {jobId: item.ID.toString()});
-    if(!downloadTranscriptResponse.ok){
-      alerts.add("Could not download transcript of job with ID " + item.ID.toString() + ": " + downloadTranscriptResponse.msg, "red");
-      return;
-    }
+	//copy item array to operate on it and the update everything at once
+	let tempItems: itemObj[] = items.slice();
 
-    //convert transcript to Blob and generate url for it
-    const blob = new Blob([downloadTranscriptResponse.transcript], { type: "text/plain"});
-    const url = URL.createObjectURL(blob);
+	for (const job of jobInfoResponse.jobs) {
+		//skip job if it hasn't an id because then it must be invalid
+		if (job.jobId == null) continue;
 
-    //create document element with this url and 'click' it
-    const element = document.createElement('a');
-    element.href = url;
-    element.download = item.fileName.replace(/\.[^/.]+$/, "") + "_transcribed.txt";
-    element.click();
+		//copy values from job into item and make sure that every value is defined in the process
+		let jobStatus: JobStatus = job.status != null ? job.status : { runner: -1 };
+		jobStatus.step = jobStatus.step != null ? jobStatus.step : "notReported";
+		jobStatus.runner = jobStatus.runner != null ? jobStatus.runner : -1;
 
-    jobDownloading[item.ID] = false;
-  }
+		//assign progress values. This is dependent on RUNNER_IN_PROGRESS so that if the user sorts after progress if will also respect the current step
+		if (jobStatus.progress == null) {
+			switch (jobStatus.step) {
+				case "failed":
+					jobStatus.progress = -5;
+					break;
+				case "notQueued":
+					jobStatus.progress = -3;
+					break;
+				case "pendingRunner":
+					jobStatus.progress = -2;
+					break;
+				case "runnerAssigned":
+					jobStatus.progress = -1;
+					break;
+				case "runnerInProgress":
+					jobStatus.progress = 0;
+					break;
+				case "success":
+				case "downloaded":
+					jobStatus.progress = 100;
+					break;
+				default: //if the step wasn't reported
+					jobStatus.progress = -4;
+			}
+		} else {
+			//multiply by 100 to get it in percent in the table
+			jobStatus.progress *= 100;
+		}
 
-  type itemKey = 'ID'|'fileName'|'model'|'language'|'progress'|'status';
-  let keys: itemKey[] = ['ID','fileName','progress'];
-  type itemValue = string|number;
-  type itemObj = {ID: number, fileName: string, model: string, language: string, progress: number, status: {step: string, runner: number}, downloadWaiting: boolean};
-  let items: itemObj[] = [];
-  let jobDownloading: {[key: number]: boolean} = {};
+		const item: itemObj = {
+			//insert default values for model and language if they are not present (some of them are already tested above)
+			ID: job.jobId,
+			fileName: job.fileName != null ? job.fileName : "",
+			model: job.model != null ? job.model : "small",
+			language: job.language != null ? job.language : "Automatic",
+			progress: jobStatus.progress,
+			status: {
+				step: jobStatus.step,
+				runner: jobStatus.runner,
+			},
+		};
 
-  let submitModalOpen: boolean = false;
-  let updatingJobList: number = 0; //0: not updating, 1: updating, 2: error while updating
-  let updatingJobListError: string = "";
+		//insert new job into tempItems
+		//push if it is new, replace it if not
+		let pos = -1;
+		for (let i = 0; i < tempItems.length; i++) {
+			if (tempItems[i].ID === item.ID) pos = i;
+		}
+		if (pos === -1) tempItems.push(item);
+		else tempItems[pos] = item;
+	}
 
-  let searchTerm: string = "";
-  let searchTermEdited: boolean = false;
-  let sortKey: itemKey = 'ID'; // default sort key
-  let sortDirection: number = -1; // default sort direction (descending)
-  let hideOld: boolean = true;
-  let sortItems: itemObj[] = items.slice(); // make a copy of the items array
+	items = tempItems;
 
-  //Math.ceil rounds UP to nearest integer
-  let pagesCount: number = Math.ceil(sortItems.length / 10);
-  $: pagesCount = Math.ceil(sortItems.length / 10);
+	updatingJobList = 0;
+	fetchedJobs = true;
+	return { msg: jobInfoResponse.msg, ok: true };
+}
 
-  let pages: LinkType[] = [];
-  function calcPages(): void {
-    pages = [];
-    for(let i = 1; i <= pagesCount; i++){
-      pages.push({name: i.toString(), href: "#" + paramsLoc({"page": i})});
-    }
-  }
-  calcPages();
-  let page: number = 1;
+async function downloadTranscript(item: itemObj): Promise<void> {
+	jobDownloading[item.ID] = true;
 
-  let displayItems: itemObj[] = sortItems.slice((page-1)*10, page*10);
+	const downloadTranscriptResponse: BackendResponse = await getLoggedIn(
+		"jobs/downloadTranscript",
+		{ jobId: item.ID.toString() },
+	);
+	if (
+		!downloadTranscriptResponse.ok ||
+		downloadTranscriptResponse.transcript == null
+	) {
+		alerts.add(
+			`Could not download transcript of job with ID ${item.ID.toString()}: ${
+				downloadTranscriptResponse.msg
+			}`,
+			"red",
+		);
+		return;
+	}
 
-  let openRow: number|null = null;
-  function toggleRow(i: number): void {
-    openRow = (openRow === i) ? null : i;
-  }
+	//convert transcript to Blob and generate url for it
+	const blob = new Blob([downloadTranscriptResponse.transcript], {
+		type: "text/plain",
+	});
+	const url = URL.createObjectURL(blob);
 
-  //get values from querystring
-  {
-    const params: URLSearchParams = new URLSearchParams($querystring);
+	//create document element with this url and 'click' it
+	const element = document.createElement("a");
+	element.href = url;
+	element.download = `${item.fileName.replace(
+		/\.[^/.]+$/,
+		"",
+	)}_transcribed.txt`;
+	element.click();
 
-    if(params.has("sortkey")) sortKey = params.get("sortkey");
-    if(params.has("sortdir")) sortDirection = params.get("sortdir");
-    if(params.has("search")) searchTerm = params.get("search");
-    if(params.has("hideold")) hideOld = Boolean(+params.get("hideold"));
-    if(params.has("page")){
-      const newPage = Math.min(+params.get("page"), pagesCount);
-      page = newPage;
-    }
-  }
+	jobDownloading[item.ID] = false;
+}
 
-  // Define a function to sort the items
-  function sortTable(key: itemKey): void {
-    // If the same key is clicked, reverse the sort direction
-    if (sortKey === key) {
-      sortDirection = -sortDirection;
-    } else {
-      sortKey = key;
-      sortDirection = -1; //default sort direction when clicking on table (ascending)
-    }
-    setParams({"sortkey": key, "sortdir": sortDirection});
-  };
+function calcPages(): void {
+	pages = [];
+	let params = new URLSearchParams($routing.querystring); //copy because it will be modified down below
+	for (let i = 1; i <= pagesCount; i++) {
+		params.set("page", i.toString());
+		params.sort();
 
-  function setPage(newNum: number): void {
-    if(newNum <= pagesCount && newNum > 0){
-      page = newNum;
-      setParams({"page": newNum});
-    }
-  }
+		pages.push({
+			name: i.toString(),
+			href: `#${$routing.location}?${params.toString()}`,
+		});
+	}
+}
 
-  function setHideOld(newVal: boolean): void {
-    hideOld = newVal;
-    if(newVal) setParams({"hideold": 1});
-    else setParams({"hideold": 0});
-  }
+function toggleRow(i: number): void {
+	openRow = openRow === i ? null : i;
+}
 
-  //update currently displayed entries of table every 15 seconds (-> equal to heartbeat interval of runner)
-  setInterval(() => {
-    if(displayItems.length > 0 && updatingJobList !== 1){
-      let jobIds: number[] = [];
-      for(let job of displayItems){
-        jobIds.push(job.ID);
-      }
-      getJobInfo(jobIds);
-    }
-  }, 15000);
+// Define a function to sort the items
+function sortTable(key: itemKey): void {
+	// If the same key is clicked, reverse the sort direction
+	if (sortKey === key) {
+		sortDirection = -sortDirection;
+	} else {
+		sortKey = key;
+		sortDirection = -1; //default sort direction when clicking on table (ascending)
+	}
+	routing.set({ params: { sortkey: key, sortdir: sortDirection.toString() } });
+}
 
-  $: if(searchTerm || searchTermEdited){
-    setParams({"search": searchTerm});
-    searchTermEdited = true;
-  }
+function setPage(newNum: number): void {
+	if (newNum <= pagesCount && newNum > 0) {
+		page = newNum;
+		routing.set({ params: { page: newNum.toString() } });
+	}
+}
 
-  //keep hrefs up to date with querystring
-  $: {
-    pages = [];
-    const params = new URLSearchParams($querystring);
-    for(let i = 1; i <= pagesCount; i++){
-      params.set("page", ""+i);
-      params.sort();
+function setHideOld(newVal: boolean): void {
+	hideOld = newVal;
+	if (newVal) routing.set({ params: { hideold: "1" } });
+	else routing.set({ params: { hideold: "0" } });
+}
 
-      pages.push({name: i.toString(), href: "#" + $location + "?" + params.toString()});
-    }
-  }
+function paginationClickedHandler(): void {
+	paginationHandlerUnsubscribe = routing.subscribe((routingObject) => {
+		const newPage: string | null = routingObject.querystring.get("page");
+		if (newPage != null && newPage !== page.toString()) {
+			//update hrefs
+			calcPages();
 
-  //keep local variable up to date after following href link
-  $: {
-    const params = new URLSearchParams($querystring);
-    if(params.has("page")){
-      const newPage = Math.min(+params.get("page"), pagesCount);
-      page = newPage;
-    }
-  }
+			//update local page variable
+			setPage(Number.parseInt(newPage)); //comes from our href, so parsing it as int always works
 
-  $: {
-    const key: itemKey = sortKey;
-    const direction: number = sortDirection;
-    const filteredItems = hideOld ? items.filter((item) => item.status.step !== "downloaded") : items.slice();
-    const searchedItems = filteredItems.filter((item) => item.fileName.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1);
-    const sorted = [...searchedItems].sort((a: itemObj, b: itemObj) => {
-      const aVal: itemValue = a[key];
-      const bVal: itemValue = b[key];
-      if (aVal < bVal) {
-        return -direction;
-      } else if (aVal > bVal) {
-        return direction;
-      }
-      return 0;
-    });
-    sortItems = sorted;
-  }
+			paginationHandlerPlsUnsubsribeMe = true;
+		}
+	});
+}
 
-  //update displayItems when sortItems or page gets updated
-  $: displayItems = sortItems.slice((page-1)*10, page*10);
+//get values from querystring
+{
+	const params: URLSearchParams = $routing.querystring;
+	let newParams: Record<string, string> = {};
+
+	const newSortKey: string | null = params.get("sortkey");
+	if (newSortKey != null) {
+		if (isItemKey(newSortKey)) {
+			sortKey = newSortKey;
+			newParams.sortkey = newSortKey;
+		}
+	}
+	const newSortDir: string | null = params.get("sortdir");
+	if (newSortDir != null) {
+		const newSortDirInt: number = Number.parseInt(newSortDir);
+		if (newSortDirInt === 1 || newSortDirInt === -1) {
+			sortDirection = newSortDirInt; //NaN is also unequal to 1 and -1
+			newParams.sortdir = newSortDir;
+		}
+	}
+	const newSearch: string | null = params.get("search");
+	if (newSearch != null) {
+		if (newSearch !== "") {
+			searchTerm = newSearch;
+			newParams.search = newSearch;
+		}
+	}
+	const newHideOld: string | null = params.get("hideold");
+	if (newHideOld != null) {
+		if (newHideOld === "0") {
+			hideOld = false;
+			newParams.hideold = newHideOld;
+		} else if (newHideOld === "1") {
+			hideOld = true;
+			newParams.hideold = newHideOld;
+		}
+	}
+	const newPage: string | null = params.get("page");
+	if (newPage != null) {
+		let newPageInt = Number.parseInt(newPage);
+		if (!Number.isNaN(newPageInt)) {
+			//cannot check yet if newPageInt is larger than pagesCount because pagesCount isn't known at this stage yet since getJobs hasn't run yet
+			page = newPageInt;
+			newParams.page = newPageInt.toString();
+		}
+	}
+
+	routing.set({
+		params: newParams,
+		overwriteParams: true,
+		ensureLoggedIn: true,
+	}); //without ensureLoggedIn this might get called after loginForward resulting in a constant back and forth between Login  and JobList
+	calcPages();
+}
+
+//update currently displayed entries of table every 15 seconds (-> equal to heartbeat interval of runner)
+setInterval(() => {
+	if (displayItems.length > 0 && updatingJobList !== 1) {
+		let jobIds: number[] = [];
+		for (let job of displayItems) {
+			jobIds.push(job.ID);
+		}
+		getJobInfo(jobIds);
+	}
+}, 15000);
+
+//update pagesCount due to change of amount of items
+$: {
+	//only do this if the items were already fetched at least once
+	if (fetchedJobs) {
+		//Math.ceil rounds UP to nearest integer. max ensures that there is always at least one page even though there are no items
+		pagesCount = Math.max(Math.ceil(sortItems.length / 10), 1);
+		if (page > pagesCount) setPage(pagesCount); //make sure page isn't larger than new pagesCount
+		calcPages();
+	}
+}
+
+$: if (searchTerm || searchTermEdited) {
+	routing.set({ params: { search: searchTerm }, ensureLoggedIn: true });
+	searchTermEdited = true;
+}
+
+$: {
+	const key: itemKey = sortKey;
+	const direction: number = sortDirection;
+	const filteredItems = hideOld
+		? items.filter((item) => item.status.step !== "downloaded")
+		: items.slice();
+	const searchedItems = filteredItems.filter(
+		(item) =>
+			item.fileName.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1,
+	);
+	const sorted = [...searchedItems].sort((a: itemObj, b: itemObj) => {
+		const aVal: itemValue = a[key];
+		const bVal: itemValue = b[key];
+		if (aVal < bVal) {
+			return -direction;
+		}
+		if (aVal > bVal) {
+			return direction;
+		}
+		return 0;
+	});
+	sortItems = sorted;
+}
+
+//after the paginationHandlers subscription set the page variable it should be unsubscribed so that it doesn't get triggered constantly
+$: {
+	if (paginationHandlerPlsUnsubsribeMe) {
+		paginationHandlerUnsubscribe();
+		paginationHandlerPlsUnsubsribeMe = false;
+	}
+}
+
+//update displayItems when sortItems or page gets updated
+$: displayItems = sortItems.slice((page - 1) * 10, page * 10);
 </script>
 
 <CenterPage title="Your transcription jobs">
@@ -271,12 +419,12 @@
       {:then response}
         {#if response.ok}
           <TableSearch shadow placeholder="Search by file name" hoverable={true} bind:inputValue={searchTerm}>
-            <TableHead> 
+            <TableHead>
               {#each keys as key}
                 <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" on:click={() => sortTable(key)}>
                   <div class="flex">
                     {#if sortKey === key}
-                      {#if +sortDirection === 1}
+                      {#if sortDirection === 1}
                         <CaretUpSolid class="inline mr-2"/>
                       {:else}
                         <CaretDownSolid class="inline mr-2"/>
@@ -303,7 +451,7 @@
               {#each displayItems as item, i}
                 <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
                   <TableBodyCell>{item.ID}</TableBodyCell>
-                  <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : item.fileName.slice(0,30) + "..."}</TableBodyCell>
+                  <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : `${item.fileName.slice(0,30)}...`}</TableBodyCell>
                   <TableBodyCell class="w-full">
                     {#if item.status.step === "runnerInProgress"}
                       <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside animate/>
@@ -319,12 +467,12 @@
                     {/if}
                   </TableBodyCell>
                   <TableBodyCell tdClass="pr-6 py-4 whitespace-nowrap font-medium">
-                    <Button size="xs" color="alternative" 
-                    disabled={!(item.status.step === "success" || item.status.step === "downloaded") || jobDownloading[item.ID]} 
+                    <Button size="xs" color="alternative"
+                    disabled={!(item.status.step === "success" || item.status.step === "downloaded") || jobDownloading[item.ID]}
                     on:click={() => downloadTranscript(item)}>
                       {#if jobDownloading[item.ID]}
                         <Spinner size="5"/>
-                      {:else} 
+                      {:else}
                         <DownloadSolid/>
                       {/if}
                     </Button>
@@ -378,7 +526,7 @@
       <span class="font-semibold text-gray-900 dark:text-white">{sortItems.length}</span>
       Entries
     </div>
-    <Pagination {pages} on:previous={() => setPage(+page-1)} on:next={() => setPage(+page+1)} icon>
+    <Pagination {pages} on:previous={() => setPage(page-1)} on:next={() => setPage(page+1)} on:click={paginationClickedHandler} icon>
       <svelte:fragment slot="prev">
         <span class="sr-only">Previous</span>
         <ChevronLeftOutline/>

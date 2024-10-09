@@ -3,7 +3,7 @@
   mkPnpmPackage,
 
   #needs to be supplied explicitly
-  backend_base_url ? ""
+  backend_base_url ? "",
 }:
 
 mkPnpmPackage {

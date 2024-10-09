@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { Label, Input } from "flowbite-svelte";
+import { Input, Label } from "flowbite-svelte";
 
-  function disableError(): void {
-    error = false
-  }
+export let value: string;
+export let error = false;
 
-  export let value: string;
-  export let error: boolean = false;
+function disableError(): void {
+	error = false;
+}
 </script>
 
 <div class="mb-6">

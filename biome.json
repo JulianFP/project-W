@@ -1,0 +1,18 @@
+{
+	"overrides": [
+		{
+			"include": ["*.svelte", "*.vue"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useConst": "off",
+						"useImportType": "off"
+					},
+					"correctness": {
+						"noSelfAssign": "off"
+					}
+				}
+			}
+		}
+	]
+}

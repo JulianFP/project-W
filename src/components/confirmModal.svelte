@@ -1,20 +1,21 @@
 <script lang="ts">
-  import { Modal, Heading, P } from "flowbite-svelte";
+import { Heading, Modal, P } from "flowbite-svelte";
 
-  import WaitingSubmitButton from "./waitingSubmitButton.svelte";
+import type { BackendResponse } from "../utils/httpRequests";
+import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-  async function submitAction(): Promise<void> {
-    waitingForPromise = true;
-    response = await action();
-    open = false;
-    waitingForPromise = false;
-  }
+let waitingForPromise = false;
 
-  let waitingForPromise: boolean = false;
+export let open = false;
+export let action: () => Promise<BackendResponse>;
+export let response: BackendResponse | null;
 
-  export let open: boolean = false;
-  export let action: () => Promise<{[key: string]: any}>;
-  export let response: {[key: string]: any};
+async function submitAction(): Promise<void> {
+	waitingForPromise = true;
+	response = await action();
+	open = false;
+	waitingForPromise = false;
+}
 </script>
 
 <Modal bind:open={open} autoclose={false} class="w-fit">
