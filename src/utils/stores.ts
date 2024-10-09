@@ -1,5 +1,6 @@
-import { writable } from "svelte/store";
-import type { Writable } from "svelte/store";
+import { querystring, location, push, replace } from "svelte-spa-router";
+import { derived, get, writable } from "svelte/store";
+import type { Readable, Writable } from "svelte/store";
 
 const loggedInWrit: Writable<boolean> = writable(false);
 function createAuthHeaderStore() {
@@ -42,7 +43,67 @@ function createAlertsStore() {
 	};
 }
 
+export type RoutingObjectType = {
+	destination?: string;
+	params?: Record<string, string> | null;
+	overwriteParams?: boolean;
+	removeParams?: string[];
+	history?: boolean;
+	ensureLoggedIn?: boolean;
+};
+function createRoutingStore() {
+	const derivedQueryString: Readable<{
+		location: string;
+		querystring: URLSearchParams;
+	}> = derived([location, querystring], ([$location, $querystring]) => {
+		return {
+			location: $location,
+			querystring: new URLSearchParams($querystring),
+		};
+	});
+
+	return {
+		subscribe: derivedQueryString.subscribe,
+		set: ({
+			destination = get(derivedQueryString).location,
+			params = null,
+			overwriteParams = false,
+			removeParams = [],
+			history = false,
+			ensureLoggedIn = false,
+		}: RoutingObjectType): void => {
+			if (!ensureLoggedIn || get(loggedIn)) {
+				let newParams: URLSearchParams;
+
+				if (params == null)
+					newParams = get(derivedQueryString).querystring; //preserve current querystring
+				else if (overwriteParams) {
+					//overwrite old querystring with new querystring
+					newParams = new URLSearchParams(params);
+					newParams.sort();
+				} else {
+					//overlay new querystring on top of old querystring (don't touch keys that were not in params)
+					newParams = get(derivedQueryString).querystring;
+					for (const key in params) {
+						newParams.set(key, params[key]);
+					}
+					newParams.sort();
+				}
+
+				for (const key of removeParams) {
+					newParams.delete(key);
+				}
+
+				if (history) push(`${destination}?${newParams.toString()}`);
+				else replace(`${destination}?${newParams.toString()}`);
+			}
+		},
+	};
+}
+
 export const authHeader = createAuthHeaderStore();
 export const loggedIn = { subscribe: loggedInWrit.subscribe };
 
 export const alerts = createAlertsStore();
+
+export const routing = createRoutingStore();

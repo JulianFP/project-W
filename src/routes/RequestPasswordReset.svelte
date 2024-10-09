@@ -1,15 +1,20 @@
 <script lang="ts">
 import { Helper } from "flowbite-svelte";
-import { push } from "svelte-spa-router";
 
 import EmailField from "../components/emailField.svelte";
 import GreetingPage from "../components/greetingPage.svelte";
 import WaitingButton from "../components/waitingSubmitButton.svelte";
 
 import { type BackendResponse, get } from "../utils/httpRequests";
-import { alerts, loggedIn } from "../utils/stores";
+import { alerts, loggedIn, routing } from "../utils/stores";
 
-$: if ($loggedIn) push("/");
+$: if ($loggedIn)
+	routing.set({
+		destination: "/",
+		params: {},
+		overwriteParams: true,
+		history: true,
+	});
 
 let error = false;
 let response: BackendResponse;
@@ -24,7 +29,12 @@ async function postRequestPasswordReset(event: Event): Promise<void> {
 
 	if (response.ok) {
 		alerts.add(response.msg, "green");
-		push("/");
+		routing.set({
+			destination: "/",
+			params: {},
+			overwriteParams: true,
+			history: true,
+		});
 	} else {
 		error = true;
 		waitingForPromise = false;

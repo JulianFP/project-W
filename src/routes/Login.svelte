@@ -7,8 +7,8 @@ import PasswordField from "../components/passwordField.svelte";
 import WaitingButton from "../components/waitingSubmitButton.svelte";
 
 import { type BackendResponse, post } from "../utils/httpRequests";
-import { destForward, preserveQuerystringForward } from "../utils/navigation";
-import { authHeader, loggedIn } from "../utils/stores";
+import { destForward } from "../utils/navigation";
+import { authHeader, loggedIn, routing } from "../utils/stores";
 
 $: if ($loggedIn) destForward();
 
@@ -27,8 +27,7 @@ async function postLogin(event: Event): Promise<void> {
 
 	if (response.ok && response.accessToken != null) {
 		authHeader.setToken(response.accessToken);
-		//if it was successfull, forward to different page
-		destForward();
+		//if it was successful, forward to different page
 	} else {
 		error = true; //display error message
 		waitingForPromise = false;
@@ -47,7 +46,7 @@ async function postLogin(event: Event): Promise<void> {
 
     <div class="flex max-w-lg justify-between items-center my-2">
       <WaitingButton waiting={waitingForPromise} disabled={error} tabindex="3">Login</WaitingButton>
-      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/signup")}} tabindex="4">Signup instead</Button>
+      <Button color="alternative" type="button" on:click={() => {routing.set({destination: "/signup", history: true})}} tabindex="4">Signup instead</Button>
     </div>
 
     <A href="#/requestPasswordReset" tabindex=5>Forgot password?</A>

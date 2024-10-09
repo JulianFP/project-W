@@ -24,20 +24,18 @@ import {
 	DownloadSolid,
 	PlusOutline,
 } from "flowbite-svelte-icons";
-import { querystring, location } from "svelte-spa-router";
 
 import CenterPage from "../components/centerPage.svelte";
 import ErrorMsg from "../components/errorMsg.svelte";
 import SubmitJobsModal from "../components/submitJobsModal.svelte";
 import Waiting from "../components/waiting.svelte";
-import { paramsLoc, setParams } from "../utils/helperFunctions";
 import {
 	type BackendResponse,
 	type JobStatus,
 	getLoggedIn,
 } from "../utils/httpRequests";
 import { loginForward } from "../utils/navigation";
-import { alerts, loggedIn } from "../utils/stores";
+import { alerts, loggedIn, routing } from "../utils/stores";
 
 $: if (!$loggedIn) loginForward();
 
@@ -66,6 +64,7 @@ let jobDownloading: Record<number, boolean> = {};
 let submitModalOpen = false;
 let updatingJobList = 0; //0: not updating, 1: updating, 2: error while updating
 let updatingJobListError = "";
+let fetchedJobs = false;
 
 let searchTerm = "";
 let searchTermEdited = false;
@@ -77,12 +76,13 @@ let sortItems: itemObj[] = items.slice(); // make a copy of the items array
 let pages: LinkType[] = [];
 let page = 1;
 
+let paginationHandlerPlsUnsubsribeMe = false;
+let paginationHandlerUnsubscribe = () => {};
+
 let displayItems: itemObj[] = sortItems.slice((page - 1) * 10, page * 10);
 let openRow: number | null = null;
 
-//Math.ceil rounds UP to nearest integer
-let pagesCount: number = Math.ceil(sortItems.length / 10);
-$: pagesCount = Math.ceil(sortItems.length / 10);
+let pagesCount = 1; //initialize with 1 since number of items isn't known at this stage anyway
 
 //gets list of all jobIds and call getJobInfo on them
 async function getJobs(): Promise<{ msg: string; ok: boolean }> {
@@ -91,7 +91,10 @@ async function getJobs(): Promise<{ msg: string; ok: boolean }> {
 	if (!jobListResponse.ok) return { msg: jobListResponse.msg, ok: false };
 	if (jobListResponse.jobIds == null)
 		return { msg: "Couldn't read server response", ok: false };
-	if (jobListResponse.jobIds.length === 0) return { msg: "No jobs", ok: true };
+	if (jobListResponse.jobIds.length === 0) {
+		routing.set({ params: {}, overwriteParams: true }); //if there are not jobs then it is just confusing to keep filter querystrings around
+		return { msg: "No jobs", ok: true };
+	}
 
 	return getJobInfo(jobListResponse.jobIds);
 }
@@ -179,6 +182,7 @@ async function getJobInfo(
 	items = tempItems;
 
 	updatingJobList = 0;
+	fetchedJobs = true;
 	return { msg: jobInfoResponse.msg, ok: true };
 }
 
@@ -219,12 +223,17 @@ async function downloadTranscript(item: itemObj): Promise<void> {
 
 	jobDownloading[item.ID] = false;
 }
+
 function calcPages(): void {
 	pages = [];
+	let params = new URLSearchParams($routing.querystring); //copy because it will be modified down below
 	for (let i = 1; i <= pagesCount; i++) {
+		params.set("page", i.toString());
+		params.sort();
+
 		pages.push({
 			name: i.toString(),
-			href: `#${paramsLoc({ page: i.toString() })}`,
+			href: `#${$routing.location}?${params.toString()}`,
 		});
 	}
 }
@@ -242,63 +251,91 @@ function sortTable(key: itemKey): void {
 		sortKey = key;
 		sortDirection = -1; //default sort direction when clicking on table (ascending)
 	}
-	setParams({ sortkey: key, sortdir: sortDirection.toString() });
+	routing.set({ params: { sortkey: key, sortdir: sortDirection.toString() } });
 }
 
 function setPage(newNum: number): void {
 	if (newNum <= pagesCount && newNum > 0) {
 		page = newNum;
-		setParams({ page: newNum.toString() });
+		routing.set({ params: { page: newNum.toString() } });
 	}
 }
 
 function setHideOld(newVal: boolean): void {
 	hideOld = newVal;
-	if (newVal) setParams({ hideold: "1" });
-	else setParams({ hideold: "0" });
+	if (newVal) routing.set({ params: { hideold: "1" } });
+	else routing.set({ params: { hideold: "0" } });
+}
+
+function paginationClickedHandler(): void {
+	paginationHandlerUnsubscribe = routing.subscribe((routingObject) => {
+		const newPage: string | null = routingObject.querystring.get("page");
+		if (newPage != null && newPage !== page.toString()) {
+			//update hrefs
+			calcPages();
+
+			//update local page variable
+			setPage(Number.parseInt(newPage)); //comes from our href, so parsing it as int always works
+
+			paginationHandlerPlsUnsubsribeMe = true;
+		}
+	});
 }
 
 //get values from querystring
 {
-	const params: URLSearchParams = new URLSearchParams($querystring);
+	const params: URLSearchParams = $routing.querystring;
 	let newParams: Record<string, string> = {};
 
 	const newSortKey: string | null = params.get("sortkey");
 	if (newSortKey != null) {
-		if (isItemKey(newSortKey)) sortKey = newSortKey;
-		else newParams.sortkey = sortKey;
+		if (isItemKey(newSortKey)) {
+			sortKey = newSortKey;
+			newParams.sortkey = newSortKey;
+		}
 	}
 	const newSortDir: string | null = params.get("sortdir");
 	if (newSortDir != null) {
 		const newSortDirInt: number = Number.parseInt(newSortDir);
-		if (newSortDirInt === 1 || newSortDirInt === -1)
+		if (newSortDirInt === 1 || newSortDirInt === -1) {
 			sortDirection = newSortDirInt; //NaN is also unequal to 1 and -1
-		else newParams.sortdir = sortDirection.toString();
+			newParams.sortdir = newSortDir;
+		}
 	}
 	const newSearch: string | null = params.get("search");
 	if (newSearch != null) {
-		searchTerm = newSearch;
+		if (newSearch !== "") {
+			searchTerm = newSearch;
+			newParams.search = newSearch;
+		}
 	}
 	const newHideOld: string | null = params.get("hideold");
 	if (newHideOld != null) {
-		if (newHideOld === "0") hideOld = false;
-		else if (newHideOld === "1") hideOld = true;
+		if (newHideOld === "0") {
+			hideOld = false;
+			newParams.hideold = newHideOld;
+		} else if (newHideOld === "1") {
+			hideOld = true;
+			newParams.hideold = newHideOld;
+		}
 	}
 	const newPage: string | null = params.get("page");
 	if (newPage != null) {
 		let newPageInt = Number.parseInt(newPage);
 		if (!Number.isNaN(newPageInt)) {
-			newPageInt = Math.min(newPageInt, pagesCount);
+			//cannot check yet if newPageInt is larger than pagesCount because pagesCount isn't known at this stage yet since getJobs hasn't run yet
 			page = newPageInt;
+			newParams.page = newPageInt.toString();
 		}
-		newParams.page = page.toString();
 	}
 
-	setParams(newParams);
-	setHideOld(hideOld);
+	routing.set({
+		params: newParams,
+		overwriteParams: true,
+		ensureLoggedIn: true,
+	}); //without ensureLoggedIn this might get called after loginForward resulting in a constant back and forth between Login  and JobList
+	calcPages();
 }
-
-calcPages();
 
 //update currently displayed entries of table every 15 seconds (-> equal to heartbeat interval of runner)
 setInterval(() => {
@@ -311,38 +348,20 @@ setInterval(() => {
 	}
 }, 15000);
 
+//update pagesCount due to change of amount of items
+$: {
+	//only do this if the items were already fetched at least once
+	if (fetchedJobs) {
+		//Math.ceil rounds UP to nearest integer. max ensures that there is always at least one page even though there are no items
+		pagesCount = Math.max(Math.ceil(sortItems.length / 10), 1);
+		if (page > pagesCount) setPage(pagesCount); //make sure page isn't larger than new pagesCount
+		calcPages();
+	}
+}
+
 $: if (searchTerm || searchTermEdited) {
-	setParams({ search: searchTerm });
+	routing.set({ params: { search: searchTerm }, ensureLoggedIn: true });
 	searchTermEdited = true;
-}
-
-//keep hrefs up to date with querystring
-$: {
-	pages = [];
-	const params = new URLSearchParams($querystring);
-	for (let i = 1; i <= pagesCount; i++) {
-		params.set("page", i.toString());
-		params.sort();
-
-		pages.push({
-			name: i.toString(),
-			href: `#${$location}?${params.toString()}`,
-		});
-	}
-}
-
-//keep local variable up to date after following href link
-$: {
-	const params = new URLSearchParams($querystring);
-	const newPage: string | null = params.get("page");
-	if (newPage != null) {
-		let newPageInt = Number.parseInt(newPage);
-
-		if (!Number.isNaN(newPageInt)) {
-			newPageInt = Math.min(newPageInt, pagesCount);
-			page = newPageInt;
-		}
-	}
 }
 
 $: {
@@ -367,6 +386,14 @@ $: {
 		return 0;
 	});
 	sortItems = sorted;
+}
+
+//after the paginationHandlers subscription set the page variable it should be unsubscribed so that it doesn't get triggered constantly
+$: {
+	if (paginationHandlerPlsUnsubsribeMe) {
+		paginationHandlerUnsubscribe();
+		paginationHandlerPlsUnsubsribeMe = false;
+	}
 }
 
 //update displayItems when sortItems or page gets updated
@@ -499,7 +526,7 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
       <span class="font-semibold text-gray-900 dark:text-white">{sortItems.length}</span>
       Entries
     </div>
-    <Pagination {pages} on:previous={() => setPage(page-1)} on:next={() => setPage(page+1)} icon>
+    <Pagination {pages} on:previous={() => setPage(page-1)} on:next={() => setPage(page+1)} on:click={paginationClickedHandler} icon>
       <svelte:fragment slot="prev">
         <span class="sr-only">Previous</span>
         <ChevronLeftOutline/>

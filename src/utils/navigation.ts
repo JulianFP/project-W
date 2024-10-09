@@ -1,34 +1,20 @@
-import { querystring, location, push, replace } from "svelte-spa-router";
-import { getStoreStringValue } from "./helperFunctions";
+import { get } from "svelte/store";
+import { routing } from "./stores";
 
 export function loginForward(): void {
-	const params = new URLSearchParams(getStoreStringValue(querystring));
-	const locationVal: string = getStoreStringValue(location);
+	const locationVal: string = get(routing).location;
+	let newParams: Record<string, string> | null = null;
 
-	if (locationVal && locationVal !== "/") {
-		params.set("dest", locationVal);
-	}
-	let newQueryString = "";
-	if (params.size > 0) newQueryString = `?${params.toString()}`;
+	if (locationVal && locationVal !== "/") newParams = { dest: locationVal };
 
-	replace(`/login${newQueryString}`);
+	routing.set({ destination: "/login", params: newParams });
 }
 
 export function destForward(): void {
-	const params = new URLSearchParams(getStoreStringValue(querystring));
+	const destination: string | null = get(routing).querystring.get("dest");
+	console.log(`destForward called with destination ${destination}`);
 
-	const destination: string | null = params.get("dest");
-	params.delete("dest");
-
-	let newQueryString = "";
-	if (params.size > 0) newQueryString = `?${params.toString()}`;
-
-	if (destination) push(destination + newQueryString);
-	else push(`/${newQueryString}`);
-}
-
-export function preserveQuerystringForward(route: string): void {
-	const params = new URLSearchParams(getStoreStringValue(querystring));
-	if (params.size > 0) push(`${route}?${params.toString()}`);
-	else push(route);
+	if (destination)
+		routing.set({ destination: destination, removeParams: ["dest"] });
+	else routing.set({ destination: "/" });
 }

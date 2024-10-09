@@ -7,8 +7,8 @@ import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelt
 import WaitingButton from "../components/waitingSubmitButton.svelte";
 
 import { type BackendResponse, post } from "../utils/httpRequests";
-import { destForward, preserveQuerystringForward } from "../utils/navigation";
-import { alerts, authHeader, loggedIn } from "../utils/stores";
+import { destForward } from "../utils/navigation";
+import { alerts, authHeader, loggedIn, routing } from "../utils/stores";
 
 $: if ($loggedIn) destForward();
 
@@ -45,7 +45,6 @@ async function postSignup(event: Event): Promise<void> {
 			authHeader.setToken(loginResponse.accessToken);
 			//if it was successfull, show alert and forward to different page
 			alerts.add(Signupresponse.msg, "green");
-			destForward();
 		} else {
 			generalError = true; //display error message
 			errorMessage = `Account created, however automatic login failed: ${loginResponse.msg}`;
@@ -78,7 +77,7 @@ async function postSignup(event: Event): Promise<void> {
 
     <div class="flex max-w-lg justify-between items-center my-2">
       <WaitingButton waiting={waitingForPromise} disabled={anyError} tabindex="3">Signup</WaitingButton>
-      <Button color="alternative" type="button" on:click={() => {preserveQuerystringForward("/login")}} tabindex="4">Login instead</Button>
+      <Button color="alternative" type="button" on:click={() => {routing.set({destination: "/login", history: true})}} tabindex="4">Login instead</Button>
     </div>
   </form>
 </GreetingPage>

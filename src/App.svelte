@@ -18,9 +18,6 @@ import {
 	UserEditSolid,
 } from "flowbite-svelte-icons";
 import type { ComponentType } from "svelte";
-
-import { location } from "svelte-spa-router";
-
 import Router from "svelte-spa-router";
 import About from "./routes/About.svelte";
 import Account from "./routes/Account.svelte";
@@ -33,7 +30,7 @@ import ResetPassword from "./routes/ResetPassword.svelte";
 import Security from "./routes/Security.svelte";
 import Signup from "./routes/Signup.svelte";
 
-import { alerts, authHeader, loggedIn } from "./utils/stores";
+import { alerts, authHeader, loggedIn, routing } from "./utils/stores";
 
 export const routes: Record<string, ComponentType> = {
 	"/": JobList,
@@ -72,7 +69,7 @@ let dropDownOpen = false;
       {/if}
     </div>
     {#if $loggedIn}
-      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={`#${$location}`} bind:open={dropDownOpen}>
+      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={`#${$routing.location}`} bind:open={dropDownOpen}>
         <!-- TODO: get userinfo for this/>
         <DropdownHeader>
           <span class="block text-sm">Bonnie Green</span>

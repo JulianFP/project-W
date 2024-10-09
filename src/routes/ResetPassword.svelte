@@ -1,16 +1,20 @@
 <script lang="ts">
 import { Helper } from "flowbite-svelte";
-import { push } from "svelte-spa-router";
 
 import GreetingPage from "../components/greetingPage.svelte";
 import PasswordWithRepeatField from "../components/passwordWithRepeatField.svelte";
 import WaitingButton from "../components/waitingSubmitButton.svelte";
 
-import { getParams } from "../utils/helperFunctions";
 import { type BackendResponse, post } from "../utils/httpRequests";
-import { alerts, loggedIn } from "../utils/stores";
+import { alerts, loggedIn, routing } from "../utils/stores";
 
-$: if ($loggedIn) push("/");
+$: if ($loggedIn)
+	routing.set({
+		destination: "/",
+		params: {},
+		overwriteParams: true,
+		history: true,
+	});
 
 let response: BackendResponse;
 let waitingForPromise = false;
@@ -28,12 +32,20 @@ async function resetPassword(event: Event): Promise<void> {
 
 	response = await post(
 		"users/resetPassword",
-		Object.assign({ newPassword: newPassword }, getParams()),
+		Object.assign(
+			{ newPassword: newPassword },
+			Object.fromEntries($routing.querystring),
+		),
 	);
 
 	if (response.ok) {
 		alerts.add(response.msg, "green");
-		push("/");
+		routing.set({
+			destination: "/",
+			params: {},
+			overwriteParams: true,
+			history: true,
+		});
 	} else {
 		errorMessage = response.msg;
 		if (response.errorType === "password") passwordError = true;
