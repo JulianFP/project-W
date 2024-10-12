@@ -5,7 +5,9 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     systems.url = "github:nix-systems/default";
     pnpm2nix-nzbr = {
-      url = "github:nzbr/pnpm2nix-nzbr";
+      #use this instead of main repo nzbr/pnpm2nix-nzbr because this pr fixes compatibility with lockfile v9
+      #see https://github.com/nzbr/pnpm2nix-nzbr/pull/40
+      url = "github:wrvsrx/pnpm2nix-nzbr/adapt-to-v9";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     pre-commit-hooks = {

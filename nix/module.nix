@@ -13,7 +13,6 @@ let
     mkEnableOption
     mkDefault
     types
-    optionalAttrs
     ;
   inherit (pkgs.stdenv.hostPlatform) system;
   cfg = config.services.project-W-frontend;
