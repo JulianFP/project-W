@@ -21,6 +21,7 @@ project W
 
    dev_getting_started
    tech-stack
+   testing_and_code-quality
    api
 
 Indices and tables
