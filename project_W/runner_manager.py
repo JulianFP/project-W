@@ -62,6 +62,7 @@ class InProcessJob:
     job_id: int
     # A float between 0 and 1 representing the progress of the job.
     progress: float = 0.0
+    abort: bool = False
 
     def job(self) -> Job:
         return db.session.query(Job).where(self.job_id == Job.id).one_or_none()
@@ -317,6 +318,21 @@ class RunnerManager:
         logger.info(f"Assigned job {job.id} to runner {runner.runner.id}!")
 
     @synchronized("mtx")
+    def abort_job(self, job: Job):
+        jobStatus = self.job_status(job)
+        assert (
+            jobStatus is not JobStatus.SUCCESS or JobStatus.FAILED or JobStatus.DOWNLOADED
+        ), "you cannot abort a job that has already run!"
+        if jobStatus is JobStatus.NOT_QUEUED:
+            job.set_error("job was aborted")
+        elif jobStatus is JobStatus.PENDING_RUNNER:
+            del self.job_queue[job.id]
+            job.set_error("job was aborted")
+        elif jobStatus is JobStatus.RUNNER_ASSIGNED or JobStatus.RUNNER_IN_PROGRESS:
+            online_runner = self.assigned_jobs[job.id]
+            online_runner.in_process_job.abort = True
+
+    @synchronized("mtx")
     def retrieve_job(self, online_runner: OnlineRunner) -> Optional[Job]:
         """
         For a given online runner, retrieves the job that it has been assigned.
@@ -388,6 +404,8 @@ class RunnerManager:
             and (progress := req.form.get("progress", type=float)) is not None
         ):
             online_runner.in_process_job.progress = progress
+            if online_runner.in_process_job.abort:
+                return HeartbeatResponse(error="Current job was aborted")
         if online_runner.assigned_job_id:
             return HeartbeatResponse(job_assigned=True)
         return HeartbeatResponse()
