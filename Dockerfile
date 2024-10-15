@@ -32,4 +32,4 @@ RUN apk --no-cache add curl
 CMD ln -sfT /NginxConfigs/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
 
 #-k needed for self-signed certificates
-HEALTHCHECK CMD curl -kf https://localhost/ || exit 1
+HEALTHCHECK CMD if [ $NGINX_CONFIG == "ssl" ]; then curl -kf https://localhost/; else curl -f http://localhost/; fi || exit 1
