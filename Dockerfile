@@ -16,7 +16,7 @@ RUN pnpm install
 
 RUN VITE_BACKEND_BASE_URL=$BACKEND_BASE_URL pnpm build
 
-FROM nginx
+FROM nginx:alpine-slim
 
 ENV NGINX_CONFIG "ssl"
 
@@ -24,4 +24,4 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 COPY Docker/ /NginxConfigs
 
-CMD ln -s /etc/letsencrypt/live/${SERVER_NAME} /ssl && cp /NginxConfigs/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
+CMD ln -sfT /NginxConfigs/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
