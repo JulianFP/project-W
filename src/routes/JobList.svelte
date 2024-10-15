@@ -23,6 +23,7 @@ import {
 	ChevronRightOutline,
 	DownloadSolid,
 	PlusOutline,
+	StopSolid,
 } from "flowbite-svelte-icons";
 
 import CenterPage from "../components/centerPage.svelte";
@@ -33,6 +34,7 @@ import {
 	type BackendResponse,
 	type JobStatus,
 	getLoggedIn,
+	postLoggedIn,
 } from "../utils/httpRequests";
 import { loginForward } from "../utils/navigation";
 import { alerts, loggedIn, routing } from "../utils/stores";
@@ -126,10 +128,25 @@ async function getJobInfo(
 		jobStatus.step = jobStatus.step != null ? jobStatus.step : "notReported";
 		jobStatus.runner = jobStatus.runner != null ? jobStatus.runner : -1;
 
+		//make sure that job status "aborted" stays the same until the backend updates it to "failed"
+		for (const item of items) {
+			if (item.ID === job.jobId) {
+				if (
+					item.status.step === "aborting" &&
+					!["failed", "success", "downloaded"].includes(jobStatus.step)
+				)
+					jobStatus.step = "aborting";
+				break;
+			}
+		}
+
 		//assign progress values. This is dependent on RUNNER_IN_PROGRESS so that if the user sorts after progress if will also respect the current step
 		if (jobStatus.progress == null) {
 			switch (jobStatus.step) {
 				case "failed":
+					jobStatus.progress = -6;
+					break;
+				case "aborting":
 					jobStatus.progress = -5;
 					break;
 				case "notQueued":
@@ -148,7 +165,7 @@ async function getJobInfo(
 				case "downloaded":
 					jobStatus.progress = 100;
 					break;
-				default: //if the step wasn't reported
+				default: //most notably also if step is notReported
 					jobStatus.progress = -4;
 			}
 		} else {
@@ -222,6 +239,30 @@ async function downloadTranscript(item: itemObj): Promise<void> {
 	element.click();
 
 	jobDownloading[item.ID] = false;
+}
+
+async function abortJobs(items: itemObj[]): Promise<void> {
+	const jobIds = items.map((item) => item.ID);
+	const JobIdsString = jobIds.toString();
+	const abortJobsResponse: BackendResponse = await postLoggedIn("jobs/abort", {
+		jobIds: JobIdsString,
+	});
+	if (!abortJobsResponse.ok) {
+		alerts.add(
+			`Could not abort the jobs with the following IDs: ${JobIdsString}: ${abortJobsResponse.msg}`,
+			"red",
+		);
+		return;
+	}
+
+	for (let item of items) {
+		//set item to internal status "aborting", adjusting sorting and delete runner id from it
+		item.status = {
+			step: "aborting",
+			runner: -1,
+		};
+		item.progress = -5;
+	}
 }
 
 function calcPages(): void {
@@ -449,12 +490,13 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                 </TableBodyRow>
               {/if}
               {#each displayItems as item, i}
-                <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
+                <TableBodyRow on:click={() => toggleRow(i)}>
                   <TableBodyCell>{item.ID}</TableBodyCell>
                   <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : `${item.fileName.slice(0,30)}...`}</TableBodyCell>
                   <TableBodyCell class="w-full">
-                    {#if item.status.step === "runnerInProgress"}
+                    {#if (["runnerAssigned", "runnerInProgress"].includes(item.status.step))}
                       <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside animate/>
+                      <StopSolid color="red" withEvents on:click={() => abortJobs([item])}/>
                     {:else if item.status.step === "success"}
                       <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
                     {:else if item.status.step === "failed"}
@@ -462,8 +504,12 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                       <Progressbar color="red" progress={100} size="h-4"/>
                     {:else if item.status.step === "downloaded"}
                       <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                    {:else if item.status.step === "aborting"}
+                      <P class="text-red-700 dark:text-red-500" size="sm">aborting...</P>
+                      <Progressbar color="yellow" progress={0} size="h-4"/>
                     {:else}
                       <Progressbar color="gray" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                      <StopSolid color="red" withEvents on:click={() => abortJobs([item])}/>
                     {/if}
                   </TableBodyCell>
                   <TableBodyCell tdClass="pr-6 py-4 whitespace-nowrap font-medium">
