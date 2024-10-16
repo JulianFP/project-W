@@ -12,7 +12,10 @@ The following installation guides are for Linux only. Theoretically all the comp
 Docker
 ------
 
-We provide a Dockerfile for each of the components of this software (client, backend, runner). The best way to use them is with Docker Compose. In the following we assume that you want to host our backend and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
+We provide a docker image for each of the components of this software (client, backend, runner). The best way to use them is with Docker Compose. In the following we assume that you want to host our backend and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
+
+.. note::
+   For each of the three components there are multiple docker image tags. The examples below will use the 'latest' tag which will pull the latest stable release (recommended). If you want to pull the development version (latest git commit on main branch), then choose the 'main' tag instead. Alternatively you can also pinpoint the docker image to a specific versions. Go to the Packages section of each GitHub repository to find out which tags are available. To use a tag other than 'latest' add it to the end of the 'image:' lines in the docker-compose.yml files below like this: image: <source>/<name>:<tag>
 
 .. _docker_backend_frontend-label:
 
@@ -63,7 +66,7 @@ Additionally to the backend and frontend, the following instructions will also s
 
       services:
         backend:
-          build: https://github.com/JulianFP/project-W.git
+          image: ghcr.io/julianfp/project-w_backend
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -71,12 +74,12 @@ Additionally to the backend and frontend, the following instructions will also s
             - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
-          build: https://github.com/JulianFP/project-W-frontend.git
+          image: ghcr.io/julianfp/project-w_frontend
           ports:
             - 80:80
             - 443:443
           volumes:
-            - ./project-W-data/sslCert:/etc/letsencrypt:ro
+            - ./project-W-data/sslCert:/ssl:ro
             - ./acme:/acme
           environment:
             - NGINX_CONFIG=initial
@@ -90,7 +93,7 @@ Additionally to the backend and frontend, the following instructions will also s
                    --email <YOUR EMAIL ADDRESS> --agree-tos --no-eff-email
                    -d <DOMAIN>
           volumes:
-            - ./project-W-data/sslCert:/etc/letsencrypt
+            - ./project-W-data/sslCert:/etc/letsencrypt/live/<DOMAIN>
             - ./acme:/var/www/certbot
 
 5. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
@@ -117,7 +120,7 @@ Additionally to the backend and frontend, the following instructions will also s
 
       services:
         backend:
-          build: https://github.com/JulianFP/project-W.git
+          image: ghcr.io/julianfp/project-w_backend
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -125,12 +128,12 @@ Additionally to the backend and frontend, the following instructions will also s
             - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
-          build: https://github.com/JulianFP/project-W-frontend.git
+          image: ghcr.io/julianfp/project-w_frontend
           ports:
             - 80:80
             - 443:443
           volumes:
-            - ./project-W-data/sslCert:/etc/letsencrypt:ro
+            - ./project-W-data/sslCert:/ssl:ro
             - ./acme:/acme
           environment:
             - NGINX_CONFIG=ssl
@@ -144,7 +147,7 @@ Additionally to the backend and frontend, the following instructions will also s
                    --email <YOUR EMAIL ADDRESS> --agree-tos --no-eff-email
                    -d <DOMAIN>
           volumes:
-            - ./project-W-data/sslCert:/etc/letsencrypt
+            - ./project-W-data/sslCert:/etc/letsencrypt/live/<DOMAIN>
             - ./acme:/var/www/certbot
 
 8. You may want to setup a systemd service or similar to start the containers automatically. Please be careful with where you store your JWT Secret Key and your SMTP Password, they should always stay secret!
@@ -166,14 +169,14 @@ If you want to bring your own ssl certificate (e.g. self-signed or using some ot
       mkdir -p project-W/project-W-data/sslCert/ && mkdir project-W/project-W-data/config && cd project-W
 
 3. Put your config.yml into ./project-W-data/config
-4. Put your ssl certificate files into ./project-W-data/sslCert. The following files should be in that directory: fullchain.pem (ssl certificate), privkey.pem (ssl certificate private key) and chain.pem (ssl trusted certificate for OCSP stapling).
+4. Put your ssl certificate files into ./project-W-data/sslCert. The following files should be in that directory: fullchain.pem (ssl certificate), privkey.pem (ssl certificate private key) and chain.pem (ssl trusted certificate for OCSP stapling). If you use self-signed certificates then chain.pem and fullchain.pem will be the same.
 5. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
 
    .. code-block:: yaml
 
       services:
         backend:
-          build: https://github.com/JulianFP/project-W.git
+          image: ghcr.io/julianfp/project-w_backend
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -181,13 +184,12 @@ If you want to bring your own ssl certificate (e.g. self-signed or using some ot
             - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
-          build: https://github.com/JulianFP/project-W-frontend.git
+          image: ghcr.io/julianfp/project-w_frontend
           ports:
             - 80:80
             - 443:443
           volumes:
-            - ./project-W-data/sslCert:/etc/letsencrypt/live/<DOMAIN>:ro
-            - ./acme:/acme
+            - ./project-W-data/sslCert:/ssl:ro
           environment:
             - NGINX_CONFIG=ssl
             - SERVER_NAME=<DOMAIN>
@@ -229,7 +231,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which takes car
 
       services:
         backend:
-          build: https://github.com/JulianFP/project-W.git
+          image: ghcr.io/julianfp/project-w_backend
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -237,7 +239,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which takes car
             - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
-          build: https://github.com/JulianFP/project-W-frontend.git
+          image: ghcr.io/julianfp/project-w_frontend
           ports:
             - 80:80
           environment:
