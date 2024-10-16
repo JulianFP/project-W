@@ -1,9 +1,5 @@
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.source=https://github.com/JulianFP/project-W
-LABEL org.opencontainers.image.description="Project-W backend production image"
-LABEL org.opencontainers.image.licenses=AGPL-3.0-only
-
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends git curl
