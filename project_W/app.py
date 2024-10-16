@@ -15,6 +15,7 @@ from flask_jwt_extended import (
 
 from project_W.utils import auth_token_from_req
 
+from ._version import __version__
 from .config import loadConfig
 from .logger import get_logger
 from .model import (
@@ -99,6 +100,24 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         # If the user doesn't exist then the token will fail anyways
         return JWT_SECRET_KEY
+
+    @app.get("/api/about")
+    def about():
+        """
+        Returns a brief description of Project-W, a link to the GitHub repository and the version currently running on the system.
+
+        .. :quickref: ; Returns description and version of the backend
+
+        :resjson string msg: Description of Project-W
+        :resjson string sourceCode: Link to the GitHub repository with the source code of the backend
+        :resjson string version: Version of the backend as set by setuptools-scm
+        :status 200: Responding with info
+        """
+        return jsonify(
+            msg="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
+            sourceCode="https://github.com/JulianFP/project-W",
+            version=__version__,
+        )
 
     @app.post("/api/users/signup")
     def signup():
