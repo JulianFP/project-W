@@ -2,10 +2,6 @@ FROM node:20-slim AS builder
 
 ARG BACKEND_BASE_URL=""
 
-LABEL org.opencontainers.image.source=https://github.com/JulianFP/project-W-frontend
-LABEL org.opencontainers.image.description="Project-W frontend production image"
-LABEL org.opencontainers.image.licenses=AGPL-3.0-only
-
 WORKDIR /app
 
 COPY . .
@@ -16,12 +12,21 @@ RUN pnpm install
 
 RUN VITE_BACKEND_BASE_URL=$BACKEND_BASE_URL pnpm build
 
-FROM nginx
+#to make container small
+FROM nginx:alpine-slim
 
-ENV NGINX_CONFIG "ssl"
+#for HEALTHCHECK
+RUN apk --no-cache add curl
+
+ENV NGINX_CONFIG="ssl"
+
+COPY Docker/ /DockerHelpers
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-COPY Docker/ /NginxConfigs
+ENTRYPOINT ["/DockerHelpers/entrypoint.sh"]
 
-CMD ln -s /etc/letsencrypt/live/${SERVER_NAME} /ssl && cp /NginxConfigs/nginx_${NGINX_CONFIG}.conf /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"
+CMD ["nginx", "-g", "daemon off;"]
+
+#-k needed for self-signed certificates
+HEALTHCHECK CMD if [ $NGINX_CONFIG == "ssl" ]; then curl -kf https://localhost/; else curl -f http://localhost/; fi || exit 1
