@@ -498,7 +498,7 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                           <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
                           <P class="inline" size="sm">{item.status.step}</P>
                         </div>
-                        {#if item.status.runner}
+                        {#if (["runnerAssigned", "runnerInProgress"].includes(item.status.step))}
                         <div>
                           <P class="inline" weight="extrabold" size="sm">ID of assigned runner: </P>
                           <P class="inline" size="sm">{item.status.runner}</P>
