@@ -785,7 +785,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             if jobStatus in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
                 return (
                     jsonify(
-                        msg=f"At least one of the provided jobs are currently not running",
+                        msg=f"At least one of the provided jobs is currently not running",
                         errorType="invalidRequest",
                     ),
                     400,

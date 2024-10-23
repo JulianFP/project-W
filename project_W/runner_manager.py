@@ -102,11 +102,14 @@ class OnlineRunner:
 @dataclass
 class HeartbeatResponse:
     error: Optional[str] = None
+    abort: Optional[bool] = None
     job_assigned: Optional[bool] = None
 
     def jsonify(self):
         if self.error is not None:
             return jsonify(error=self.error), 400
+        if self.abort:
+            return jsonify(abort=True), 200
         if self.job_assigned:
             return jsonify(jobAssigned=True), 200
         return jsonify(ack=True), 200
@@ -405,7 +408,7 @@ class RunnerManager:
         ):
             online_runner.in_process_job.progress = progress
             if online_runner.in_process_job.abort:
-                return HeartbeatResponse(error="Current job was aborted")
+                return HeartbeatResponse(abort=True)
         if online_runner.assigned_job_id:
             return HeartbeatResponse(job_assigned=True)
         return HeartbeatResponse()
