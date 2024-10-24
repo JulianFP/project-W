@@ -22,7 +22,9 @@ import {
 	CaretUpSolid,
 	ChevronLeftOutline,
 	ChevronRightOutline,
+	CloseOutline,
 	DownloadSolid,
+	EditSolid,
 	PlusOutline,
 	StopSolid,
 } from "flowbite-svelte-icons";
@@ -67,10 +69,15 @@ let jobDownloading: Record<number, boolean> = {};
 
 let submitModalOpen = false;
 let abortModalOpen = false;
-let abortModalJobs: itemObj[] = [];
+let abortModalJobs: number[] = [];
 let updatingJobList = 0; //0: not updating, 1: updating, 2: error while updating
 let updatingJobListError = "";
 let fetchedJobs = false;
+
+let tableEditMode = false;
+let itemsSelected: Record<number, boolean> = {};
+let headerCheckboxSelected = false;
+let selectedAbortButtonDisabled = true;
 
 let searchTerm = "";
 let searchTermEdited = false;
@@ -245,11 +252,11 @@ async function downloadTranscript(item: itemObj): Promise<void> {
 	jobDownloading[item.ID] = false;
 }
 
-async function abortJobs(itemsToAbort: itemObj[]): Promise<BackendResponse> {
+async function abortJobs(jobIdsToAbort: number[]): Promise<BackendResponse> {
 	//change step of these items to "aborting"
 	let originalItems: [itemObj, number][] = [];
 	for (let i = 0; i < items.length; i++) {
-		if (itemsToAbort.includes(items[i])) {
+		if (jobIdsToAbort.includes(items[i].ID)) {
 			originalItems.push([structuredClone(items[i]), i]);
 			//set item to internal status "aborting", adjusting sorting and delete runner id from it
 			items[i].status = {
@@ -260,8 +267,7 @@ async function abortJobs(itemsToAbort: itemObj[]): Promise<BackendResponse> {
 		}
 	}
 
-	const jobIds = itemsToAbort.map((item) => item.ID);
-	const JobIdsString = jobIds.toString();
+	const JobIdsString = jobIdsToAbort.toString();
 	const abortJobsResponse: BackendResponse = await postLoggedIn("jobs/abort", {
 		jobIds: JobIdsString,
 	});
@@ -275,6 +281,10 @@ async function abortJobs(itemsToAbort: itemObj[]): Promise<BackendResponse> {
 			items[tuple[1]] = tuple[0];
 		}
 	}
+
+	//after successfully performing action on item deselect them (only if performed through button in header)
+	if (jobIdsToAbort === selectedItems) itemsSelected = {};
+
 	return abortJobsResponse;
 }
 
@@ -284,9 +294,9 @@ function openSubmitModal() {
 	}
 }
 
-function openAbortModal(items: itemObj[]) {
-	if (!abortModalOpen && items.length > 0 && !submitModalOpen) {
-		abortModalJobs = items;
+function openAbortModal(jobIds: number[]) {
+	if (!abortModalOpen && jobIds.length > 0 && !submitModalOpen) {
+		abortModalJobs = jobIds;
 		abortModalOpen = true;
 	}
 }
@@ -332,6 +342,22 @@ function setHideOld(newVal: boolean): void {
 	hideOld = newVal;
 	if (newVal) routing.set({ params: { hideold: "1" } });
 	else routing.set({ params: { hideold: "0" } });
+}
+
+function updateHeaderCheckbox(item: itemObj | null = null) {
+	//update headerCheckbox
+	if (item == null || itemsSelected[item.ID]) {
+		let allSelected = true;
+		for (let item of displayItems) {
+			if (!itemsSelected[item.ID]) {
+				allSelected = false;
+				break;
+			}
+		}
+		headerCheckboxSelected = allSelected;
+	} else {
+		headerCheckboxSelected = false;
+	}
 }
 
 function paginationClickedHandler(): void {
@@ -464,7 +490,36 @@ $: {
 }
 
 //update displayItems when sortItems or page gets updated
-$: displayItems = sortItems.slice((page - 1) * 10, page * 10);
+$: {
+	displayItems = sortItems.slice((page - 1) * 10, page * 10);
+	updateHeaderCheckbox();
+}
+
+$: selectedItems = Object.entries(itemsSelected)
+	.filter(([_, v]) => v)
+	.map(([k, _]) => Number.parseInt(k));
+
+$: {
+	if (selectedItems.length === 0) selectedAbortButtonDisabled = true;
+	else {
+		let returnValue = false;
+		for (const item of items) {
+			if (
+				selectedItems.includes(item.ID) &&
+				![
+					"notQueued",
+					"pendingRunner",
+					"runnerAssigned",
+					"runnerInProgress",
+				].includes(item.status.step)
+			) {
+				returnValue = true;
+				break;
+			}
+		}
+		selectedAbortButtonDisabled = returnValue;
+	}
+}
 </script>
 
 <CenterPage title="Your transcription jobs">
@@ -487,6 +542,11 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
         {#if response.ok}
           <TableSearch shadow placeholder="Search by file name" hoverable={true} bind:inputValue={searchTerm}>
             <TableHead>
+              {#if tableEditMode}
+                <TableHeadCell class="!p-4">
+                  <Checkbox class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} on:change={() => {displayItems.forEach((item) => itemsSelected[item.ID] = headerCheckboxSelected)}}/>
+                </TableHeadCell>
+              {/if}
               {#each keys as key}
                 <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" on:click={() => sortTable(key)}>
                   <div class="flex">
@@ -503,7 +563,22 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                   </div>
                 </TableHeadCell>
               {/each}
-              <TableHeadCell/>
+              <TableHeadCell padding="py-1">
+                <ButtonGroup>
+                  {#if tableEditMode}
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
+                      <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
+                    </Button>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => tableEditMode = false}>
+                      <CloseOutline/>
+                    </Button>
+                  {:else}
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => {itemsSelected = {}; tableEditMode = true;}}>
+                      <EditSolid/>
+                    </Button>
+                  {/if}
+                </ButtonGroup>
+              </TableHeadCell>
             </TableHead>
             <TableBody>
               {#if items.length === 0}
@@ -517,6 +592,11 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
               {/if}
               {#each displayItems as item, i}
                 <TableBodyRow on:click={() => toggleRow(i)}>
+                  {#if tableEditMode}
+                    <TableBodyCell class="!p-4">
+                      <Checkbox class="hover:cursor-pointer" bind:checked={itemsSelected[item.ID]} on:change={() => updateHeaderCheckbox(item)} on:click={(e) => e.stopPropagation()}/>
+                    </TableBodyCell>
+                  {/if}
                   <TableBodyCell>{item.ID}</TableBodyCell>
                   <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : `${item.fileName.slice(0,30)}...`}</TableBodyCell>
                   <TableBodyCell tdClass="pl-6 pr-4 py-4 whitespace-nowrap font-medium" class="w-full">
@@ -539,7 +619,7 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                   <TableBodyCell tdClass="pr-4 py-4 whitespace-nowrap font-medium text-center">
                     <ButtonGroup>
                       {#if (["notQueued", "pendingRunner", "runnerAssigned", "runnerInProgress"].includes(item.status.step))}
-                        <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); openAbortModal([item]);}}>
+                        <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); openAbortModal([item.ID]);}}>
 
                           <StopSolid color="red"/>
                         </Button>
@@ -558,7 +638,7 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                 </TableBodyRow>
                 {#if openRow === i}
                   <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
-                    <TableBodyCell colspan="4">
+                    <TableBodyCell colspan={tableEditMode ? "5" : "4"}>
                       <div class="grid grid-cols-2 gap-x-8 gap-y-2">
                         <div class="col-span-full">
                           <P class="inline" weight="extrabold" size="sm">Filename: </P>
@@ -621,8 +701,8 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
 
 <ConfirmModal bind:open={abortModalOpen} action={() => abortJobs(abortModalJobs)}>
   {#if abortModalJobs.length === 1}
-  Job {abortModalJobs[0].ID.toString()} will be aborted and its current transcription progress will be lost.
+  Job {abortModalJobs[0].toString()} will be aborted and its current transcription progress will be lost.
   {:else}
-    The jobs {abortModalJobs.map((item) => item.ID.toString()).join(", ")} will be aborted and its current transcription progress will be lost.
+    The jobs {abortModalJobs.join(", ")} will be aborted and their current transcription progress will be lost.
   {/if}
 </ConfirmModal>
