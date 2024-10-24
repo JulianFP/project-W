@@ -39,7 +39,7 @@ from .model import (
     send_password_reset_email,
     submit_job,
 )
-from .runner_manager import RunnerManager
+from .runner_manager import JobStatus, RunnerManager
 
 
 def create_app(customConfigPath: Optional[str] = None) -> Flask:
@@ -717,6 +717,86 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                 }
             )
         return jsonify(msg="Returning requested jobs", jobs=result)
+
+    @app.post("/api/jobs/abort")
+    @jwt_required()
+    def abortJobs():
+        """
+        Abort all jobs with the corresponding job ids from the ``jobIds`` array. The backend will mark these jobs as to be aborted and notify the runner about that on the next heartbeat which will then cancel it and submit it as failed. The following conditions have to be met for this to succeed:
+
+        - Correct and valid JWT Token has to be supplied in Authorization header. No errorType field.
+        - `jobIds` has to have the correct format as described below. ErrorType: ``invalidRequest``
+        - The status of all jobs in ``jobs`` shouldn't be one of the following: SUCCESS, FAILED, DOWNLOADED. If one of the jobs in the array doesn't meet this then none of the jobs will be aborted. ErrorType: ``invalidRequest``
+        - If trying to abort the job of another user (e.g. if one of `jobIds` doesn't belong to this user): Currently logged in account has to be admin. ErrorType: ``permission``.
+        - If trying to abort the job of another user (e.g. if one of `jobIds` doesn't belong to this user): A job with the provided jobId has to exist. ErrorType: ``notInDatabase``.
+
+        .. :quickref: Jobs; abort all jobs associated with provided jobIds
+
+        :reqheader Authorization: Has to be string "Bearer {JWT}", where {JWT} is the JWT Token that the login route returned.
+        :form jobIds: List of Job-IDs as a string, separated by commas, e.g. `2,4,5,6`.
+        :resjson string msg: Human-readable response message designed to be directly shown to users
+        :resjson string errorType: One of ``invalidRequest``, ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
+
+        :status 200: All jobs aborted successfully.
+        :status 400: With errorType ``invalidRequest``.
+        :status 403: With errorType ``permission``.
+        :status 404: With errorType ``notInDatabase``.
+        """
+        user: User = current_user
+        try:
+            job_ids = [int(job_id) for job_id in request.form["jobIds"].split(",")]
+        except ValueError:
+            return (
+                jsonify(
+                    msg="`jobIds` must be comma-separated list of integers",
+                    errorType="invalidRequest",
+                ),
+                400,
+            )
+        toAbort = []
+        for job_id in job_ids:
+            job: Job = Job.query.where(Job.id == job_id).one_or_none()
+            # Technically, job IDs aren't secret, so leaking whether they exist
+            # isn't a big deal, but it still seems cleaner this way
+            if not job:
+                if user.is_admin:
+                    return (
+                        jsonify(
+                            msg=f"There exists no job with id {job_id}", errorType="notInDatabase"
+                        ),
+                        404,
+                    )
+                return (
+                    jsonify(
+                        msg=f"You don't have permission to access the job with id {job_id}",
+                        errorType="permission",
+                    ),
+                    403,
+                )
+            if job.user_id != user.id and not user.is_admin:
+                return (
+                    jsonify(
+                        msg=f"You don't have permission to access the job with id {job_id}",
+                        errorType="permission",
+                    ),
+                    403,
+                )
+            jobStatus = runner_manager.job_status(job)
+            if jobStatus in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
+                return (
+                    jsonify(
+                        msg=f"At least one of the provided jobs is currently not running",
+                        errorType="invalidRequest",
+                    ),
+                    400,
+                )
+            toAbort.append(job)
+
+        # second loop because first loop ensures that all jobs are valid first
+        for job in toAbort:
+            runner_manager.abort_job(job)
+
+        return jsonify(msg="Successfully requested to abort all provided jobs.")
 
     @app.get("/api/jobs/downloadTranscript")
     @jwt_required()
