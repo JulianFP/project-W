@@ -120,6 +120,9 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
             raise IndexError("peek on empty heap")
         return self._heap[0]
 
+    def __str__(self) -> str:
+        return f"{self._heap}"
+
     def __len__(self) -> int:
         return len(self._heap)
 
@@ -133,7 +136,9 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
         self._swap(index, len(self._heap) - 1)
         key, prio = self._heap.pop()
         del self._key_to_index[key]
-        if self._heap[index][1] > prio:
+        if len(self._heap) == 0:  # deleted element was last element
+            return
+        elif self._heap[index][1] > prio:
             self._sift_up(index)
         else:
             self._sift_down(index)

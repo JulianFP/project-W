@@ -112,3 +112,89 @@ def test_jobInfo_valid(client: Client, user, admin):
     assert res.status_code == 200
     assert res.json["msg"] == "Returning requested jobs"
     assert len(res.json["jobs"]) == 2
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_valid1(client: Client, user):
+    res = client.post("api/jobs/abort", headers=user, data={"jobIds": 2})
+    assert res.status_code == 200
+    assert res.json["msg"] == "Successfully requested to abort all provided jobs."
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_valid2(client: Client, user, audio):
+    res = client.post("/api/jobs/submit", headers=user, data={"file": audio})
+    assert res.status_code == 200
+
+    res = client.post("api/jobs/abort", headers=user, data={"jobIds": "2,3"})
+    assert res.status_code == 200
+    assert res.json["msg"] == "Successfully requested to abort all provided jobs."
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_valid3(client: Client, user, admin, audio):
+    res = client.post("/api/jobs/submit", headers=user, data={"file": audio})
+    assert res.status_code == 200
+
+    res = client.post("api/jobs/abort", headers=admin, data={"jobIds": res.json["jobId"]})
+    assert res.status_code == 200
+    assert res.json["msg"] == "Successfully requested to abort all provided jobs."
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_valid4(client: Client, user, admin, audio):
+    res1 = client.post("/api/jobs/submit", headers=user, data={"file": audio})
+    assert res1.status_code == 200
+
+    res = client.post("api/jobs/abort", headers=admin, data={"jobIds": "2,3"})
+    assert res.status_code == 200
+    assert res.json["msg"] == "Successfully requested to abort all provided jobs."
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_invalid_permission1(client: Client, user, admin, audio):
+    res = client.post("/api/jobs/submit", headers=admin, data={"file": audio})
+    assert res.status_code == 200
+
+    res2 = client.post("api/jobs/abort", headers=user, data={"jobIds": res.json["jobId"]})
+    assert res2.status_code == 403
+    assert (
+        res2.json["msg"]
+        == f"You don't have permission to access the job with id {res.json['jobId']}"
+    )
+    assert res2.json["errorType"] == "permission"
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_invalid_permission2(client: Client, user):
+    res = client.post("api/jobs/abort", headers=user, data={"jobIds": 3})
+    assert res.status_code == 403
+    assert res.json["msg"] == "You don't have permission to access the job with id 3"
+    assert res.json["errorType"] == "permission"
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_invalid_doesntExist(client: Client, admin):
+    res = client.post("api/jobs/abort", headers=admin, data={"jobIds": 3})
+    assert res.status_code == 404
+    assert res.json["msg"] == "There exists no job with id 3"
+    assert res.json["errorType"] == "notInDatabase"
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_invalid_notRunning(client: Client, user):
+    res = client.post("api/jobs/abort", headers=user, data={"jobIds": 2})
+    assert res.status_code == 200
+
+    res = client.post("api/jobs/abort", headers=user, data={"jobIds": 2})
+    assert res.status_code == 400
+    assert res.json["msg"] == "At least one of the provided jobs is currently not running"
+    assert res.json["errorType"] == "invalidRequest"
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_abort_invalid_invalidRequest(client: Client, user):
+    res = client.post("api/jobs/abort", headers=user, data={"jobIds": "abc"})
+    assert res.status_code == 400
+    assert res.json["msg"] == "`jobIds` must be comma-separated list of integers"
+    assert res.json["errorType"] == "invalidRequest"
