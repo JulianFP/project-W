@@ -1,6 +1,7 @@
 <script lang="ts">
 import {
 	Button,
+	ButtonGroup,
 	Checkbox,
 	P,
 	Pagination,
@@ -13,6 +14,7 @@ import {
 	TableHead,
 	TableHeadCell,
 	TableSearch,
+	Tooltip,
 } from "flowbite-svelte";
 import type { LinkType } from "flowbite-svelte";
 import {
@@ -21,11 +23,15 @@ import {
 	CaretUpSolid,
 	ChevronLeftOutline,
 	ChevronRightOutline,
+	CloseOutline,
 	DownloadSolid,
+	EditSolid,
 	PlusOutline,
+	StopSolid,
 } from "flowbite-svelte-icons";
 
 import CenterPage from "../components/centerPage.svelte";
+import ConfirmModal from "../components/confirmModal.svelte";
 import ErrorMsg from "../components/errorMsg.svelte";
 import SubmitJobsModal from "../components/submitJobsModal.svelte";
 import Waiting from "../components/waiting.svelte";
@@ -33,6 +39,7 @@ import {
 	type BackendResponse,
 	type JobStatus,
 	getLoggedIn,
+	postLoggedIn,
 } from "../utils/httpRequests";
 import { loginForward } from "../utils/navigation";
 import { alerts, loggedIn, routing } from "../utils/stores";
@@ -62,9 +69,16 @@ let items: itemObj[] = [];
 let jobDownloading: Record<number, boolean> = {};
 
 let submitModalOpen = false;
+let abortModalOpen = false;
+let abortModalJobs: number[] = [];
 let updatingJobList = 0; //0: not updating, 1: updating, 2: error while updating
 let updatingJobListError = "";
 let fetchedJobs = false;
+
+let tableEditMode = false;
+let itemsSelected: Record<number, boolean> = {};
+let headerCheckboxSelected = false;
+let selectedAbortButtonDisabled = true;
 
 let searchTerm = "";
 let searchTermEdited = false;
@@ -126,10 +140,25 @@ async function getJobInfo(
 		jobStatus.step = jobStatus.step != null ? jobStatus.step : "notReported";
 		jobStatus.runner = jobStatus.runner != null ? jobStatus.runner : -1;
 
+		//make sure that job status "aborted" stays the same until the backend updates it to "failed"
+		for (const item of items) {
+			if (item.ID === job.jobId) {
+				if (
+					item.status.step === "aborting" &&
+					!["failed", "success", "downloaded"].includes(jobStatus.step)
+				)
+					jobStatus.step = "aborting";
+				break;
+			}
+		}
+
 		//assign progress values. This is dependent on RUNNER_IN_PROGRESS so that if the user sorts after progress if will also respect the current step
 		if (jobStatus.progress == null) {
 			switch (jobStatus.step) {
 				case "failed":
+					jobStatus.progress = -6;
+					break;
+				case "aborting":
 					jobStatus.progress = -5;
 					break;
 				case "notQueued":
@@ -148,7 +177,7 @@ async function getJobInfo(
 				case "downloaded":
 					jobStatus.progress = 100;
 					break;
-				default: //if the step wasn't reported
+				default: //most notably also if step is notReported
 					jobStatus.progress = -4;
 			}
 		} else {
@@ -224,6 +253,55 @@ async function downloadTranscript(item: itemObj): Promise<void> {
 	jobDownloading[item.ID] = false;
 }
 
+async function abortJobs(jobIdsToAbort: number[]): Promise<BackendResponse> {
+	//change step of these items to "aborting"
+	let originalItems: [itemObj, number][] = [];
+	for (let i = 0; i < items.length; i++) {
+		if (jobIdsToAbort.includes(items[i].ID)) {
+			originalItems.push([structuredClone(items[i]), i]);
+			//set item to internal status "aborting", adjusting sorting and delete runner id from it
+			items[i].status = {
+				step: "aborting",
+				runner: -1,
+			};
+			items[i].progress = -5;
+		}
+	}
+
+	const JobIdsString = jobIdsToAbort.toString();
+	const abortJobsResponse: BackendResponse = await postLoggedIn("jobs/abort", {
+		jobIds: JobIdsString,
+	});
+	if (!abortJobsResponse.ok) {
+		alerts.add(
+			`Could not abort the jobs with the following IDs: ${JobIdsString}: ${abortJobsResponse.msg}`,
+			"red",
+		);
+		//reset state of items
+		for (const tuple of originalItems) {
+			items[tuple[1]] = tuple[0];
+		}
+	}
+
+	//after successfully performing action on item deselect them (only if performed through button in header)
+	if (jobIdsToAbort === selectedItems) itemsSelected = {};
+
+	return abortJobsResponse;
+}
+
+function openSubmitModal() {
+	if (!submitModalOpen && !abortModalOpen) {
+		submitModalOpen = true;
+	}
+}
+
+function openAbortModal(jobIds: number[]) {
+	if (!abortModalOpen && jobIds.length > 0 && !submitModalOpen) {
+		abortModalJobs = jobIds;
+		abortModalOpen = true;
+	}
+}
+
 function calcPages(): void {
 	pages = [];
 	let params = new URLSearchParams($routing.querystring); //copy because it will be modified down below
@@ -265,6 +343,22 @@ function setHideOld(newVal: boolean): void {
 	hideOld = newVal;
 	if (newVal) routing.set({ params: { hideold: "1" } });
 	else routing.set({ params: { hideold: "0" } });
+}
+
+function updateHeaderCheckbox(item: itemObj | null = null) {
+	//update headerCheckbox
+	if (item == null || itemsSelected[item.ID]) {
+		let allSelected = true;
+		for (let item of displayItems) {
+			if (!itemsSelected[item.ID]) {
+				allSelected = false;
+				break;
+			}
+		}
+		headerCheckboxSelected = allSelected;
+	} else {
+		headerCheckboxSelected = false;
+	}
 }
 
 function paginationClickedHandler(): void {
@@ -397,7 +491,36 @@ $: {
 }
 
 //update displayItems when sortItems or page gets updated
-$: displayItems = sortItems.slice((page - 1) * 10, page * 10);
+$: {
+	displayItems = sortItems.slice((page - 1) * 10, page * 10);
+	updateHeaderCheckbox();
+}
+
+$: selectedItems = Object.entries(itemsSelected)
+	.filter(([_, v]) => v)
+	.map(([k, _]) => Number.parseInt(k));
+
+$: {
+	if (selectedItems.length === 0) selectedAbortButtonDisabled = true;
+	else {
+		let returnValue = false;
+		for (const item of items) {
+			if (
+				selectedItems.includes(item.ID) &&
+				![
+					"notQueued",
+					"pendingRunner",
+					"runnerAssigned",
+					"runnerInProgress",
+				].includes(item.status.step)
+			) {
+				returnValue = true;
+				break;
+			}
+		}
+		selectedAbortButtonDisabled = returnValue;
+	}
+}
 </script>
 
 <CenterPage title="Your transcription jobs">
@@ -412,7 +535,7 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
       {:else if updatingJobList == 2}
         <P class="inline text-red-700 dark:text-red-500" size="sm" weight="medium">Error during update: {updatingJobListError}</P>
       {/if}
-      <Button pill on:click={() => submitModalOpen = true}><PlusOutline class="mr-2"/>New Job</Button>
+      <Button pill on:click={() => openSubmitModal()}><PlusOutline class="mr-2"/>New Job</Button>
     </div>
       {#await getJobs()}
         <Waiting/>
@@ -420,6 +543,11 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
         {#if response.ok}
           <TableSearch shadow placeholder="Search by file name" hoverable={true} bind:inputValue={searchTerm}>
             <TableHead>
+              {#if tableEditMode}
+                <TableHeadCell class="!p-4">
+                  <Checkbox class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} on:change={() => {displayItems.forEach((item) => itemsSelected[item.ID] = headerCheckboxSelected)}}/>
+                </TableHeadCell>
+              {/if}
               {#each keys as key}
                 <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" on:click={() => sortTable(key)}>
                   <div class="flex">
@@ -436,7 +564,23 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                   </div>
                 </TableHeadCell>
               {/each}
-              <TableHeadCell/>
+              <TableHeadCell padding="py-1">
+                <ButtonGroup>
+                  {#if tableEditMode}
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
+                      <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
+                    </Button>
+                    <Tooltip color="red">Abort selected jobs</Tooltip>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => tableEditMode = false}>
+                      <CloseOutline/>
+                    </Button>
+                  {:else}
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => {itemsSelected = {}; tableEditMode = true;}}>
+                      <EditSolid/>
+                    </Button>
+                  {/if}
+                </ButtonGroup>
+              </TableHeadCell>
             </TableHead>
             <TableBody>
               {#if items.length === 0}
@@ -449,11 +593,16 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                 </TableBodyRow>
               {/if}
               {#each displayItems as item, i}
-                <TableBodyRow on:click={() => toggleRow(i)} class="cursor-pointer">
+                <TableBodyRow on:click={() => toggleRow(i)}>
+                  {#if tableEditMode}
+                    <TableBodyCell class="!p-4">
+                      <Checkbox class="hover:cursor-pointer" bind:checked={itemsSelected[item.ID]} on:change={() => updateHeaderCheckbox(item)} on:click={(e) => e.stopPropagation()}/>
+                    </TableBodyCell>
+                  {/if}
                   <TableBodyCell>{item.ID}</TableBodyCell>
                   <TableBodyCell>{(item.fileName.length <= 30) ? item.fileName : `${item.fileName.slice(0,30)}...`}</TableBodyCell>
-                  <TableBodyCell class="w-full">
-                    {#if item.status.step === "runnerInProgress"}
+                  <TableBodyCell tdClass="pl-6 pr-4 py-4 whitespace-nowrap font-medium" class="w-full">
+                    {#if (["runnerAssigned", "runnerInProgress"].includes(item.status.step))}
                       <Progressbar precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside animate/>
                     {:else if item.status.step === "success"}
                       <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
@@ -462,25 +611,38 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
                       <Progressbar color="red" progress={100} size="h-4"/>
                     {:else if item.status.step === "downloaded"}
                       <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
+                    {:else if item.status.step === "aborting"}
+                      <P class="text-red-700 dark:text-red-500" size="sm">aborting...</P>
+                      <Progressbar color="yellow" progress={100} size="h-4"/>
                     {:else}
                       <Progressbar color="gray" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
                     {/if}
                   </TableBodyCell>
-                  <TableBodyCell tdClass="pr-6 py-4 whitespace-nowrap font-medium">
-                    <Button size="xs" color="alternative"
-                    disabled={!(item.status.step === "success" || item.status.step === "downloaded") || jobDownloading[item.ID]}
-                    on:click={() => downloadTranscript(item)}>
-                      {#if jobDownloading[item.ID]}
-                        <Spinner size="5"/>
-                      {:else}
-                        <DownloadSolid/>
+                  <TableBodyCell tdClass="pr-4 py-4 whitespace-nowrap font-medium text-center">
+                    <ButtonGroup>
+                      {#if (["notQueued", "pendingRunner", "runnerAssigned", "runnerInProgress"].includes(item.status.step))}
+                        <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); openAbortModal([item.ID]);}}>
+
+                          <StopSolid color="red"/>
+                        </Button>
+                        <Tooltip color="red">Abort this job</Tooltip>
                       {/if}
-                    </Button>
+                      {#if (["success", "downloaded"].includes(item.status.step))}
+                        <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); downloadTranscript(item);}} disabled={jobDownloading[item.ID]}>
+                          {#if jobDownloading[item.ID]}
+                            <Spinner size="5"/>
+                          {:else}
+                            <DownloadSolid/>
+                          {/if}
+                        </Button>
+                        <Tooltip color="green">Download finished transcript</Tooltip>
+                      {/if}
+                    </ButtonGroup>
                   </TableBodyCell>
                 </TableBodyRow>
                 {#if openRow === i}
                   <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
-                    <TableBodyCell colspan="4">
+                    <TableBodyCell colspan={tableEditMode ? "5" : "4"}>
                       <div class="grid grid-cols-2 gap-x-8 gap-y-2">
                         <div class="col-span-full">
                           <P class="inline" weight="extrabold" size="sm">Filename: </P>
@@ -540,3 +702,11 @@ $: displayItems = sortItems.slice((page - 1) * 10, page * 10);
 </CenterPage>
 
 <SubmitJobsModal bind:open={submitModalOpen} on:afterSubmit={(event) => {getJobInfo(event.detail.jobIds);}}/>
+
+<ConfirmModal bind:open={abortModalOpen} action={() => abortJobs(abortModalJobs)}>
+  {#if abortModalJobs.length === 1}
+  Job {abortModalJobs[0].toString()} will be aborted and its current transcription progress will be lost.
+  {:else}
+    The jobs {abortModalJobs.join(", ")} will be aborted and their current transcription progress will be lost.
+  {/if}
+</ConfirmModal>

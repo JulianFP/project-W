@@ -12,6 +12,7 @@ export type ErrorType =
 
 export type JobStep =
 	| "notReported" //this is not an actual step returned by the backend but a value that I internally assign if the backend doesn't return anything
+	| "aborting" //this also only exists internally and is used to show an animation while the backend aborts a job
 	| "failed"
 	| "notQueued"
 	| "pendingRunner"

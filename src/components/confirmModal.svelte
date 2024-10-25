@@ -8,7 +8,7 @@ let waitingForPromise = false;
 
 export let open = false;
 export let action: () => Promise<BackendResponse>;
-export let response: BackendResponse | null;
+export let response: BackendResponse | null = null;
 
 async function submitAction(): Promise<void> {
 	waitingForPromise = true;
