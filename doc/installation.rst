@@ -67,6 +67,7 @@ Additionally to the backend and frontend, the following instructions will also s
       services:
         backend:
           image: ghcr.io/julianfp/project-w_backend
+          restart: unless-stopped
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -75,6 +76,7 @@ Additionally to the backend and frontend, the following instructions will also s
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
           image: ghcr.io/julianfp/project-w_frontend
+          restart: unless-stopped
           ports:
             - 80:80
             - 443:443
@@ -102,7 +104,7 @@ Additionally to the backend and frontend, the following instructions will also s
 
       python -c 'import secrets; print(secrets.token_hex())'
 
-6. Build and run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
+6. Run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
 
    .. code-block:: console
 
@@ -121,6 +123,7 @@ Additionally to the backend and frontend, the following instructions will also s
       services:
         backend:
           image: ghcr.io/julianfp/project-w_backend
+          restart: unless-stopped
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -129,6 +132,7 @@ Additionally to the backend and frontend, the following instructions will also s
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
           image: ghcr.io/julianfp/project-w_frontend
+          restart: unless-stopped
           ports:
             - 80:80
             - 443:443
@@ -150,9 +154,8 @@ Additionally to the backend and frontend, the following instructions will also s
             - ./project-W-data/sslCert:/etc/letsencrypt/live/<DOMAIN>
             - ./acme:/var/www/certbot
 
-8. You may want to setup a systemd service or similar to start the containers automatically. Please be careful with where you store your JWT Secret Key and your SMTP Password, they should always stay secret!
-9. You may want to setup a cronjob or a systemd service with systemd timers to periodically restart the certbot container. Let's encrypt certificates are only valid for 90 days, so if you don't your certificate will expire!
-10. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
+8. You may want to setup a cronjob or a systemd service with systemd timers to periodically restart the certbot container. Let's encrypt certificates are only valid for 90 days, so if you don't your certificate will expire!
+9. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
 
 .. _standalone_byo-label:
 
@@ -177,6 +180,7 @@ If you want to bring your own ssl certificate (e.g. self-signed or using some ot
       services:
         backend:
           image: ghcr.io/julianfp/project-w_backend
+          restart: unless-stopped
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -185,6 +189,7 @@ If you want to bring your own ssl certificate (e.g. self-signed or using some ot
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
           image: ghcr.io/julianfp/project-w_frontend
+          restart: unless-stopped
           ports:
             - 80:80
             - 443:443
@@ -200,14 +205,13 @@ If you want to bring your own ssl certificate (e.g. self-signed or using some ot
 
       python -c 'import secrets; print(secrets.token_hex())'
 
-7. Build and run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
+7. Run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
 
    .. code-block:: console
 
       PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" docker compose up -d
 
-8. You may want to setup a systemd service or similar to start the containers automatically. Please be careful with where you store your JWT Secret Key and your SMTP Password, they should always stay secret!
-9. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
+8. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
 
 With Reverse Proxy
 ''''''''''''''''''
@@ -232,6 +236,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which takes car
       services:
         backend:
           image: ghcr.io/julianfp/project-w_backend
+          restart: unless-stopped
           volumes:
             - ./project-W-data/config:/etc/xdg/project-W/
             - ./project-W-data/database:/database
@@ -240,6 +245,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which takes car
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
         frontend:
           image: ghcr.io/julianfp/project-w_frontend
+          restart: unless-stopped
           ports:
             - 80:80
           environment:
@@ -252,65 +258,118 @@ Follow this guide if you want to run this behind a Reverse Proxy which takes car
 
       python -c 'import secrets; print(secrets.token_hex())'
 
-6. Build and run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
+6. Run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
 
    .. code-block:: console
 
       PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" docker compose up -d
 
-7. You may want to setup a systemd service or similar to start the containers automatically. Please be careful with where you store your JWT Secret Key and your SMTP Password, they should always stay secret!
-8. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
+7. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
 
 Runner
 ``````
 
-The runner currently doesn't use docker-compose for installation. Instead, you will have to clone the repository and build the docker image manually.
-
-.. note::
-   If you wish to run the container with cuda support, the installation may need some additional steps. Refer to the the user guide for `the NVIDIA container toolkit <https://github.com/NVIDIA/nvidia-container-toolkit>`_ for more information.
-
-1. Clone the repository and enter it:
-
-   .. code-block:: bash
-
-      git clone https://github.com/JulianFP/project-W-runner.git && cd project-W-runner
-
-2. Build the docker image:
-
-   .. code-block:: bash
-
-      docker build -t project-w-runner .
-
-  Note that by default, the runner ``config.yml`` doesn't get copied into the image. Instead, you should mount it as a volume when running the container. If you really want the config as part of the image, remove the relevant line from the ``.dockerignore``.
-
-3. Set the relevant config values:
-
-  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that.
+Like for the backend you also need a config.yml file for the runner. Prepare this file before following the installation steps below. You can use the following example as a base (don't forget to replace the <placeholder>!) and modify it to your needs if necessary. Refer to :ref:`description_runner_config-label` for more information about all the configuration options of the runner.
 
 .. warning::
-   The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
+   Please make sure to save 'runnerToken' in a secret way on your machine! Runner tokens are unique to each runner! With it a bad actor could log in to the backend as this runner and accept jobs of possibly any user including their audio files. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
 
-4. Run the container:
+In this setup, runnerToken is being read from the environment variable 'PROJECT_W_RUNNER_TOKEN'. If you want you can also choose to set it directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
-   .. code-block:: bash
+.. code-block:: yaml
 
-      docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml --detach project-w-runner
+   backendURL: https://<DOMAIN>
+   modelCacheDir: /models
+   runnerToken: !ENV ${RUNNER_TOKEN}
 
-  Note that the path to the config file should be an absolute path. The `--restart unless-stopped` option should make sure that the Runner will restart if it should crash and thus always stay online.
+The runner runs the whisper model and thus benefits greatly from running on a GPU, which we heavily recommend. This GPU should have at least 10GB of VRAM available, ideally a bit more. If you don't have a powerful enough GPU available though you can choose to also run it on CPU. Choose between the following instructions depending on your choice. Currently we have only instructions for NVIDIA GPUs using CUDA but it should also be possible to run this on an AMD GPU using ROCM (for this you are on your own though).
 
-5. If you wish to use a custom directory for the Whisper model cache, you should specify it in the ``config.yml`` file:
+NVIDIA GPU
+''''''''''
 
-  .. code-block:: yaml
+1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
 
-    modelCacheDir: /models
+2. Install the NVIDIA container toolkit. Refer to the `NVIDIA toolkit documentation <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>`_ for this. Don't forget to restart your docker daemon afterwards.
 
-  ... and mount it as a volume when running the container:
+3. Create initial directory structure and enter project-w directory:
 
-  .. code-block:: bash
+   .. code-block:: console
 
-    docker run --restart unless-stopped -v /path/to/config.yml:/app/config.yml -v /path/to/cache:/models --detach project-w-runner
+      mkdir -p project-W/runner-config && mkdir project-W/runner-models && cd project-W
 
-  This way, you can remove the container without losing the cache, and you can prepopulate the cache by copying the Whisper models into the directory on the host.
+4. Put your config.yml into ./runner-config
+
+5. Put docker-compose.yml in the current directory. Use the following config and make adjustments if needed
+
+   .. code-block:: yaml
+
+      services:
+        runner:
+          image: ghcr.io/julianfp/project-w_runner
+          restart: unless-stopped
+          volumes:
+            - ./runner-config:/etc/xdg/project-W-runner/
+            - ./runner-models:/models
+          environment:
+            - RUNNER_TOKEN=${PROJECT_W_RUNNER_TOKEN:-}
+          deploy:
+            resources:
+              reservations:
+                devices:
+                  - driver: nvidia
+                    count: 1
+                    capabilities: [gpu]
+
+   .. note::
+      Alternatively if you have a system with multiple GPUs and you want to have more control over which GPU gets allocated to the Runner, you can replace 'count: 1' above with 'count: all' and then select the GPU in the config.yml using the 'torchDevice' option. See :ref:`description_runner_config-label`.
+
+6. Create a new Runner and obtain its runner token. Refer to :doc:`connect_runner_backend` for how to do that.
+
+7. Run the container. Replace <Runner Token> with the runner token you obtained from the backend in the previous step:
+
+   .. code-block:: console
+
+      PROJECT_W_RUNNER_TOKEN="<Runner Token>" docker compose up -d
+
+8. You may want to back up the runners config file (in ./runner-config) and the docker-compose.yml file if you made any changes to them. The ./runner-models directory contains all the whisper models that the runner will fetch automatically. You don't need to backup this directory but you can keep this directory around, copy it to other machines and share it between runners so that the runner doesn't need to spend time fetching these models anymore and so that if you have multiple runners on the same machine the models don't take up storage space multiple times!
+
+CPU
+'''
+
+1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
+
+
+2. Create initial directory structure and enter project-w directory:
+
+   .. code-block:: console
+
+      mkdir -p project-W/runner-config && mkdir project-W/runner-models && cd project-W
+
+3. Put your config.yml into ./runner-config
+
+4. Put docker-compose.yml in the current directory. Use the following config and make adjustments if needed
+
+   .. code-block:: yaml
+
+      services:
+        runner:
+          image: ghcr.io/julianfp/project-w_runner
+          restart: unless-stopped
+          volumes:
+            - ./runner-config:/etc/xdg/project-W-runner/
+            - ./runner-models:/models
+          environment:
+            - RUNNER_TOKEN=${PROJECT_W_RUNNER_TOKEN:-}
+
+5. Create a new Runner and obtain its runner token. Refer to :doc:`connect_runner_backend` for how to do that.
+
+6. Run the container. Replace <Runner Token> with the runner token you obtained from the backend in the previous step:
+
+   .. code-block:: console
+
+      PROJECT_W_RUNNER_TOKEN="<Runner Token>" docker compose up -d
+
+7. You may want to back up the runners config file (in ./runner-config) and the docker-compose.yml file if you made any changes to them. The ./runner-models directory contains all the whisper models that the runner will fetch automatically. You don't need to backup this directory but you can keep this directory around, copy it to other machines and share it between runners so that the runner doesn't need to spend time fetching these models anymore and so that if you have multiple runners on the same machine the models don't take up storage space multiple times!
 
 NixOS
 -----
