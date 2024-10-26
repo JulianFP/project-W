@@ -12,7 +12,6 @@ export function loginForward(): void {
 
 export function destForward(): void {
 	const destination: string | null = get(routing).querystring.get("dest");
-	console.log(`destForward called with destination ${destination}`);
 
 	if (destination)
 		routing.set({ destination: destination, removeParams: ["dest"] });
