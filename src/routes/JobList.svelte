@@ -599,7 +599,7 @@ $: {
             <TableHead>
               {#if tableEditMode}
                 <TableHeadCell class="!p-4">
-                  <Checkbox class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} on:change={() => {displayItems.forEach((item) => itemsSelected[item.ID] = headerCheckboxSelected)}}/>
+                  <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} on:change={() => {displayItems.forEach((item) => itemsSelected[item.ID] = headerCheckboxSelected)}}/>
                 </TableHeadCell>
               {/if}
               {#each keys as key}
@@ -632,7 +632,7 @@ $: {
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => tableEditMode = false}>
                       <CloseOutline/>
                     </Button>
-                  {:else}
+                  {:else if sortItems.length > 0}
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => {itemsSelected = {}; updateHeaderCheckbox(); tableEditMode = true;}}>
                       <EditSolid/>
                     </Button>
@@ -643,18 +643,18 @@ $: {
             <TableBody>
               {#if items.length === 0}
                 <TableBodyRow>
-                  <TableBodyCell colspan="4">You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+                  <TableBodyCell colspan={tableEditMode ? "5" : "4"}>You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {:else if sortItems.length === 0}
                 <TableBodyRow>
-                  <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+                  <TableBodyCell colspan={tableEditMode ? "5" : "4"}>You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {/if}
               {#each displayItems as item, i}
                 <TableBodyRow on:click={() => toggleRow(i)}>
                   {#if tableEditMode}
                     <TableBodyCell class="!p-4">
-                      <Checkbox class="hover:cursor-pointer" bind:checked={itemsSelected[item.ID]} on:change={() => updateHeaderCheckbox(item)} on:click={(e) => e.stopPropagation()}/>
+                      <Checkbox id="select_job_{item.ID}" class="hover:cursor-pointer" bind:checked={itemsSelected[item.ID]} on:change={() => updateHeaderCheckbox(item)} on:click={(e) => e.stopPropagation()}/>
                     </TableBodyCell>
                   {/if}
                   <TableBodyCell>{item.ID}</TableBodyCell>
@@ -750,7 +750,7 @@ $: {
 
   <div class="flex flex-col items-center justify-center gap-2">
     <div class="text-sm text-gray-700 dark:text-gray-400">
-      Showing <span class="font-semibold text-gray-900 dark:text-white">{(page-1)*10+1}</span>
+      Showing <span class="font-semibold text-gray-900 dark:text-white">{(page-1)*10+(sortItems.length === 0 ? 0 : 1)}</span>
       to
       <span class="font-semibold text-gray-900 dark:text-white">{Math.min(page*10, sortItems.length)}</span>
       of
