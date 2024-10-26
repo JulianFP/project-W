@@ -632,7 +632,7 @@ $: {
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => tableEditMode = false}>
                       <CloseOutline/>
                     </Button>
-                  {:else}
+                  {:else if sortItems.length > 0}
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => {itemsSelected = {}; updateHeaderCheckbox(); tableEditMode = true;}}>
                       <EditSolid/>
                     </Button>
@@ -643,11 +643,11 @@ $: {
             <TableBody>
               {#if items.length === 0}
                 <TableBodyRow>
-                  <TableBodyCell colspan="4">You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+                  <TableBodyCell colspan={tableEditMode ? "5" : "4"}>You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {:else if sortItems.length === 0}
                 <TableBodyRow>
-                  <TableBodyCell colspan="4">You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+                  <TableBodyCell colspan={tableEditMode ? "5" : "4"}>You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide old jobs</P> or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
                 </TableBodyRow>
               {/if}
               {#each displayItems as item, i}
