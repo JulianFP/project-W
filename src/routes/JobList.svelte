@@ -28,6 +28,7 @@ import {
 	EditSolid,
 	PlusOutline,
 	StopSolid,
+	TrashBinSolid,
 } from "flowbite-svelte-icons";
 
 import CenterPage from "../components/centerPage.svelte";
@@ -72,6 +73,8 @@ let jobDownloading: Record<number, boolean> = {};
 let submitModalOpen = false;
 let abortModalOpen = false;
 let abortModalJobs: number[] = [];
+let deleteModalOpen = false;
+let deleteModalJobs: number[] = [];
 let updatingJobList = 0; //0: not updating, 1: updating, 2: error while updating
 let updatingJobListError = "";
 let fetchedJobs = false;
@@ -80,6 +83,7 @@ let tableEditMode = false;
 let itemsSelected: Record<number, boolean> = {};
 let headerCheckboxSelected = false;
 let selectedAbortButtonDisabled = true;
+let selectedDeleteButtonDisabled = true;
 
 let searchTerm = "";
 let searchTermEdited = false;
@@ -270,13 +274,16 @@ async function abortJobs(jobIdsToAbort: number[]): Promise<BackendResponse> {
 		}
 	}
 
-	const JobIdsString = jobIdsToAbort.toString();
+	const jobIdsString = jobIdsToAbort.toString();
 	const abortJobsResponse: BackendResponse = await postLoggedIn("jobs/abort", {
-		jobIds: JobIdsString,
+		jobIds: jobIdsString,
 	});
-	if (!abortJobsResponse.ok) {
+	if (abortJobsResponse.ok) {
+		//after successfully performing action on item exit edit mode
+		tableEditMode = false;
+	} else {
 		alerts.add(
-			`Could not abort the jobs with the following IDs: ${JobIdsString}: ${abortJobsResponse.msg}`,
+			`Could not abort the jobs with the following IDs: ${jobIdsString}: ${abortJobsResponse.msg}`,
 			"red",
 		);
 		//reset state of items
@@ -285,22 +292,61 @@ async function abortJobs(jobIdsToAbort: number[]): Promise<BackendResponse> {
 		}
 	}
 
-	//after successfully performing action on item deselect them (only if performed through button in header)
-	if (jobIdsToAbort === selectedItems) itemsSelected = {};
-
 	return abortJobsResponse;
 }
 
+async function deleteJobs(jobIdsToDelete: number[]): Promise<BackendResponse> {
+	const jobIdsString = jobIdsToDelete.toString();
+	const deleteJobsResponse: BackendResponse = await postLoggedIn(
+		"jobs/delete",
+		{
+			jobIds: jobIdsString,
+		},
+	);
+	if (deleteJobsResponse.ok) {
+		//if successful also update local items array
+		items = items.filter((item) => {
+			return !jobIdsToDelete.includes(item.ID);
+		});
+		//also deselect items (only if performed through button in header)
+		tableEditMode = false;
+	} else {
+		alerts.add(
+			`Could not delete the jobs with the following IDs: ${jobIdsString}: ${deleteJobsResponse.msg}`,
+			"red",
+		);
+	}
+
+	return deleteJobsResponse;
+}
+
 function openSubmitModal() {
-	if (!submitModalOpen && !abortModalOpen) {
+	if (!submitModalOpen && !abortModalOpen && !deleteModalOpen) {
 		submitModalOpen = true;
 	}
 }
 
 function openAbortModal(jobIds: number[]) {
-	if (!abortModalOpen && jobIds.length > 0 && !submitModalOpen) {
+	if (
+		!abortModalOpen &&
+		jobIds.length > 0 &&
+		!deleteModalOpen &&
+		!submitModalOpen
+	) {
 		abortModalJobs = jobIds;
 		abortModalOpen = true;
+	}
+}
+
+function openDeleteModal(jobIds: number[]) {
+	if (
+		!deleteModalOpen &&
+		jobIds.length > 0 &&
+		!abortModalOpen &&
+		!submitModalOpen
+	) {
+		deleteModalJobs = jobIds;
+		deleteModalOpen = true;
 	}
 }
 
@@ -329,7 +375,7 @@ function sortTable(key: itemKey): void {
 		sortDirection = -sortDirection;
 	} else {
 		sortKey = key;
-		sortDirection = -1; //default sort direction when clicking on table (ascending)
+		sortDirection = -1; //default sort direction when clicking on table (ascending)sosreport
 	}
 	routing.set({ params: { sortkey: key, sortdir: sortDirection.toString() } });
 }
@@ -503,24 +549,30 @@ $: selectedItems = Object.entries(itemsSelected)
 	.map(([k, _]) => Number.parseInt(k));
 
 $: {
-	if (selectedItems.length === 0) selectedAbortButtonDisabled = true;
-	else {
-		let returnValue = false;
+	if (selectedItems.length === 0) {
+		selectedAbortButtonDisabled = true;
+		selectedDeleteButtonDisabled = true;
+	} else {
+		let includesNotRunning = false;
+		let includesNotDone = false;
 		for (const item of items) {
-			if (
-				selectedItems.includes(item.ID) &&
-				![
-					"notQueued",
-					"pendingRunner",
-					"runnerAssigned",
-					"runnerInProgress",
-				].includes(item.status.step)
-			) {
-				returnValue = true;
-				break;
+			if (selectedItems.includes(item.ID)) {
+				if (
+					![
+						"notQueued",
+						"pendingRunner",
+						"runnerAssigned",
+						"runnerInProgress",
+					].includes(item.status.step)
+				)
+					includesNotRunning = true;
+				if (!["success", "downloaded", "failed"].includes(item.status.step))
+					includesNotDone = true;
 			}
+			if (includesNotRunning && includesNotDone) break;
 		}
-		selectedAbortButtonDisabled = returnValue;
+		selectedAbortButtonDisabled = includesNotRunning;
+		selectedDeleteButtonDisabled = includesNotDone;
 	}
 }
 </script>
@@ -566,18 +618,22 @@ $: {
                   </div>
                 </TableHeadCell>
               {/each}
-              <TableHeadCell padding="py-1">
+              <TableHeadCell class="text-center" padding="py-1 pr-4">
                 <ButtonGroup class="normal-case">
                   {#if tableEditMode}
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
                       <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
                     </Button>
                     <Tooltip color="red">Abort selected jobs</Tooltip>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => openDeleteModal(selectedItems)} disabled={selectedDeleteButtonDisabled}>
+                      <TrashBinSolid class="inline mr-1" color="red"/> {selectedItems.length}
+                    </Button>
+                    <Tooltip color="red">Delete selected jobs</Tooltip>
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => tableEditMode = false}>
                       <CloseOutline/>
                     </Button>
                   {:else}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => {itemsSelected = {}; tableEditMode = true;}}>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => {itemsSelected = {}; updateHeaderCheckbox(); tableEditMode = true;}}>
                       <EditSolid/>
                     </Button>
                   {/if}
@@ -628,6 +684,12 @@ $: {
                           <StopSolid color="red"/>
                         </Button>
                         <Tooltip color="red">Abort this job</Tooltip>
+                      {:else if (["success", "downloaded", "failed"].includes(item.status.step))}
+                        <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); openDeleteModal([item.ID]);}}>
+
+                          <TrashBinSolid color="red"/>
+                        </Button>
+                        <Tooltip color="red">Delete this job</Tooltip>
                       {/if}
                       {#if (["success", "downloaded"].includes(item.status.step))}
                         <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); downloadTranscript(item);}} disabled={jobDownloading[item.ID]}>
@@ -712,8 +774,16 @@ $: {
 
 <ConfirmModal bind:open={abortModalOpen} action={() => abortJobs(abortModalJobs)}>
   {#if abortModalJobs.length === 1}
-  Job {abortModalJobs[0].toString()} will be aborted and its current transcription progress will be lost.
+    Job {abortModalJobs[0].toString()} will be aborted and its current transcription progress will be lost.
   {:else}
     The jobs {abortModalJobs.join(", ")} will be aborted and their current transcription progress will be lost.
+  {/if}
+</ConfirmModal>
+
+<ConfirmModal bind:open={deleteModalOpen} action={() => deleteJobs(deleteModalJobs)}>
+  {#if deleteModalJobs.length === 1}
+    Job {deleteModalJobs[0].toString()} including its audio file and transcription file will be deleted.
+  {:else}
+    The jobs {deleteModalJobs.join(", ")} including their audio files and transcription files will be deleted.
   {/if}
 </ConfirmModal>
