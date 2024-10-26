@@ -661,7 +661,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         :qparam jobIds: List of Job-IDs as a string, separated by commas, e.g. `2,4,5,6`.
         :resjson string msg: Human-readable response message designed to be directly shown to users
         :resjson string errorType: One of ``invalidRequest``, ``permission``, ``notInDatabase`` for this route. Refer to :ref:`error_types-label`
-        :resjson list_of_objects jobs: Info of all requested jobs. Each object can (but doesn't have to) contain the following fields: `jobId: integer`, `fileName: string`, `model: string`, `language: string`, `status: object that can contain the fields 'step: string', 'runner: integer', 'progress: float'`.
+        :resjson list_of_objects jobs: Info of all requested jobs. Each object can (but doesn't have to) contain the following fields: `jobId: integer`, `fileName: string`, `model: string`, `language: string`, `error_msg: string, only exists if this job is in failed state (and even then not always)`, `status: object that can contain the fields 'step: string', 'runner: integer', 'progress: float'`.
 
         :status 200: Returning the requested job infos.
         :status 400: With errorType ``invalidRequest``.
@@ -707,15 +707,18 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
                     ),
                     403,
                 )
-            result.append(
-                {
-                    "jobId": job.id,
-                    "fileName": job.file_name,
-                    "model": job.model,
-                    "language": job.language,
-                    "status": runner_manager.status_dict(job),
-                }
-            )
+            jobDict = {
+                "jobId": job.id,
+                "fileName": job.file_name,
+                "model": job.model,
+                "language": job.language,
+                "status": runner_manager.status_dict(job),
+            }
+            if job.error_msg is not None:
+                # ffmpeg exceptions are really long, only return last line
+                seperatedMsg = job.error_msg.strip().rsplit("\n", 1)
+                jobDict["error_msg"] = seperatedMsg[len(seperatedMsg) - 1]
+            result.append(jobDict)
         return jsonify(msg="Returning requested jobs", jobs=result)
 
     @app.post("/api/jobs/abort")

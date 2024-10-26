@@ -115,6 +115,22 @@ def test_jobInfo_valid(client: Client, user, admin):
 
 
 @pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
+def test_jobInfo_valid_failedJob(client: Client, user, admin):
+    res = client.post("api/jobs/abort", headers=user, data={"jobIds": 2})
+    assert res.status_code == 200
+
+    res = client.get("/api/jobs/info", headers=user, query_string={"jobIds": 2})
+    assert res.status_code == 200
+    assert res.json["msg"] == "Returning requested jobs"
+    assert res.json["jobs"][0]["error_msg"] == "job was aborted"
+
+    res = client.get("/api/jobs/info", headers=admin, query_string={"jobIds": 2})
+    assert res.status_code == 200
+    assert res.json["msg"] == "Returning requested jobs"
+    assert res.json["jobs"][0]["error_msg"] == "job was aborted"
+
+
+@pytest.mark.parametrize("client", [("[]", "false")], indirect=True)
 def test_abort_valid1(client: Client, user):
     res = client.post("api/jobs/abort", headers=user, data={"jobIds": 2})
     assert res.status_code == 200
