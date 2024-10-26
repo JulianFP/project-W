@@ -136,7 +136,9 @@ class AddressablePriorityQueue(Generic[TKey, TPrio]):
         self._swap(index, len(self._heap) - 1)
         key, prio = self._heap.pop()
         del self._key_to_index[key]
-        if len(self._heap) == 0:  # deleted element was last element
+        if len(self._heap) < (
+            index + 1
+        ):  # deleted element was at end of list (swapped with itself previously)
             return
         elif self._heap[index][1] > prio:
             self._sift_up(index)
