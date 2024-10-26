@@ -54,6 +54,7 @@ type itemObj = {
 	language: string;
 	progress: number;
 	status: { step: string; runner: number };
+	error_msg: string;
 };
 type itemKey = "ID" | "fileName" | "model" | "language" | "progress" | "status";
 //type guard to check if an arbitrary string is an itemKey
@@ -196,6 +197,7 @@ async function getJobInfo(
 				step: jobStatus.step,
 				runner: jobStatus.runner,
 			},
+			error_msg: job.error_msg != null ? job.error_msg : "",
 		};
 
 		//insert new job into tempItems
@@ -607,7 +609,7 @@ $: {
                     {:else if item.status.step === "success"}
                       <Progressbar color="green" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
                     {:else if item.status.step === "failed"}
-                      <P class="text-red-700 dark:text-red-500" size="sm">failed</P>
+                      <P class="text-red-700 dark:text-red-500" size="sm">failed - {(item.error_msg.length <= 21) ? item.error_msg : `${item.error_msg.slice(0,21)}...`}</P>
                       <Progressbar color="red" progress={100} size="h-4"/>
                     {:else if item.status.step === "downloaded"}
                       <Progressbar color="indigo" precision={2} progress={(item.progress < 0) ? 0 : item.progress} size="h-4" labelInside/>
@@ -661,10 +663,15 @@ $: {
                           <P class="inline" size="sm">{item.status.step}</P>
                         </div>
                         {#if (["runnerAssigned", "runnerInProgress"].includes(item.status.step))}
-                        <div>
-                          <P class="inline" weight="extrabold" size="sm">ID of assigned runner: </P>
-                          <P class="inline" size="sm">{item.status.runner}</P>
-                        </div>
+                          <div>
+                            <P class="inline" weight="extrabold" size="sm">ID of assigned runner: </P>
+                            <P class="inline" size="sm">{item.status.runner}</P>
+                          </div>
+                        {:else if (item.status.step === "failed")}
+                          <div>
+                            <P class="inline" weight="extrabold" size="sm">Error message: </P>
+                            <P class="inline" size="sm">{item.error_msg}</P>
+                          </div>
                         {/if}
                       </div>
                     </TableBodyCell>
