@@ -316,6 +316,16 @@ def submit_job(
     return job
 
 
+def delete_jobs(jobs: list[Job]) -> Tuple[Response, int]:
+    jobIdList = ""
+    for job in jobs:
+        jobIdList = f"{jobIdList},{job.id}"
+        db.session.delete(job)
+    db.session.commit()
+    logger.info(f" -> Deleted the following jobs: {jobIdList}")
+    return jsonify(msg=f"Successfully deleted all provided jobs"), 200
+
+
 def get_job_by_id(id: int) -> Optional[Job]:
     return db.session.query(Job).where(Job.id == id).one_or_none()
 
