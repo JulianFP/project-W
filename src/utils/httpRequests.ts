@@ -32,6 +32,7 @@ export type Job = {
 	fileName?: string;
 	model?: string;
 	language?: string;
+	error_msg?: string;
 	status?: JobStatus;
 };
 
