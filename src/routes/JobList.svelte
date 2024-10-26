@@ -599,7 +599,7 @@ $: {
             <TableHead>
               {#if tableEditMode}
                 <TableHeadCell class="!p-4">
-                  <Checkbox class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} on:change={() => {displayItems.forEach((item) => itemsSelected[item.ID] = headerCheckboxSelected)}}/>
+                  <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} on:change={() => {displayItems.forEach((item) => itemsSelected[item.ID] = headerCheckboxSelected)}}/>
                 </TableHeadCell>
               {/if}
               {#each keys as key}
@@ -654,7 +654,7 @@ $: {
                 <TableBodyRow on:click={() => toggleRow(i)}>
                   {#if tableEditMode}
                     <TableBodyCell class="!p-4">
-                      <Checkbox class="hover:cursor-pointer" bind:checked={itemsSelected[item.ID]} on:change={() => updateHeaderCheckbox(item)} on:click={(e) => e.stopPropagation()}/>
+                      <Checkbox id="select_job_{item.ID}" class="hover:cursor-pointer" bind:checked={itemsSelected[item.ID]} on:change={() => updateHeaderCheckbox(item)} on:click={(e) => e.stopPropagation()}/>
                     </TableBodyCell>
                   {/if}
                   <TableBodyCell>{item.ID}</TableBodyCell>
