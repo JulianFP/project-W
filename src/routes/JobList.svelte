@@ -565,7 +565,7 @@ $: {
                 </TableHeadCell>
               {/each}
               <TableHeadCell padding="py-1">
-                <ButtonGroup>
+                <ButtonGroup class="normal-case">
                   {#if tableEditMode}
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
                       <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
