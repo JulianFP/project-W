@@ -316,7 +316,7 @@ def submit_job(
     return job
 
 
-def delete_jobs(jobs: list[Job]) -> Tuple[Response, int]:
+def delete_jobs(jobs: List[Job]) -> Tuple[Response, int]:
     jobIdList = ""
     for job in jobs:
         jobIdList = f"{jobIdList},{job.id}"
