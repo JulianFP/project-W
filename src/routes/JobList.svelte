@@ -14,7 +14,6 @@ import {
 	TableHead,
 	TableHeadCell,
 	TableSearch,
-	Tooltip,
 } from "flowbite-svelte";
 import type { LinkType } from "flowbite-svelte";
 import {
@@ -624,11 +623,9 @@ $: {
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
                       <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
                     </Button>
-                    <Tooltip color="red">Abort selected jobs</Tooltip>
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => openDeleteModal(selectedItems)} disabled={selectedDeleteButtonDisabled}>
                       <TrashBinSolid class="inline mr-1" color="red"/> {selectedItems.length}
                     </Button>
-                    <Tooltip color="red">Delete selected jobs</Tooltip>
                     <Button pill outline class="!p-2" size="xs" color="alternative" on:click={() => tableEditMode = false}>
                       <CloseOutline/>
                     </Button>
@@ -683,13 +680,11 @@ $: {
 
                           <StopSolid color="red"/>
                         </Button>
-                        <Tooltip color="red">Abort this job</Tooltip>
                       {:else if (["success", "downloaded", "failed"].includes(item.status.step))}
                         <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); openDeleteModal([item.ID]);}}>
 
                           <TrashBinSolid color="red"/>
                         </Button>
-                        <Tooltip color="red">Delete this job</Tooltip>
                       {/if}
                       {#if (["success", "downloaded"].includes(item.status.step))}
                         <Button pill outline class="!p-2" size="xs" color="alternative" on:click={(e) => {e.stopPropagation(); downloadTranscript(item);}} disabled={jobDownloading[item.ID]}>
@@ -699,7 +694,6 @@ $: {
                             <DownloadSolid/>
                           {/if}
                         </Button>
-                        <Tooltip color="green">Download finished transcript</Tooltip>
                       {/if}
                     </ButtonGroup>
                   </TableBodyCell>
