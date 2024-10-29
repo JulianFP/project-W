@@ -1015,13 +1015,12 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
         - There has to be a job assigned to the runner associated with the given Runner Token.
 
-        .. :quickref: Runners; Runner retrieves the job that got assigned to it.
+        .. :quickref: Runners; Runner retrieves audio data of the job that got assigned to it.
 
         :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
         :resjson string error: Human-readable error message that tells you why the request failed.
-        if successful then returns just the binary audio data. In this case the Content-Type is audio/basic instaed of application/json.
 
-        :status 200: Returning assigned job.
+        :status 200: Just returning the binary audio data. In this case the Content-Type is audio/basic instead of application/json.
         :status 400: Failed. Refer to ``error`` field for the reason.
         """
         online_runner, error = runner_manager.get_online_runner_for_req(request)
@@ -1043,7 +1042,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
         - There has to be a job assigned to the runner associated with the given Runner Token.
 
-        .. :quickref: Runners; Runner retrieves the job that got assigned to it.
+        .. :quickref: Runners; Runner retrieves information about the job that got assigned to it.
 
         :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
         :resjson string error: Human-readable error message that tells you why the request failed.
@@ -1051,7 +1050,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         :resjson string model: Whisper model that should be used for the job. May be null.
         :resjson string language: Language of the audio. May be null.
 
-        :status 200: Returning assigned job.
+        :status 200: Returning information of the assigned job.
         :status 400: Failed. Refer to ``error`` field for the reason.
         """
         online_runner, error = runner_manager.get_online_runner_for_req(request)
