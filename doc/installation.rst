@@ -585,7 +585,7 @@ You can also run Project-W barebones. This can be a bit more difficult and the f
 Backend
 ```````
 
-1. Install Python (3.8 - 3.11 are tested to work) and pip
+1. Install Python (3.8 or newer, we have tested 3.8 to 3.12) and pip
 2. Clone this repository and enter it:
 
    .. code-block:: console
@@ -645,7 +645,7 @@ The frontend is written in Svelte and needs to be compiled into native Javascrip
 Runner
 ``````
 
-1. Install Python (3.9 or newer), pip, and ffmpeg.
+1. Install Python (3.11 or newer, we have tested 3.11 to 3.12), pip, and ffmpeg.
 2. Clone this repository and enter it:
 
    .. code-block:: bash

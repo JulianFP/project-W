@@ -1,10 +1,9 @@
-import base64
 import datetime
 import secrets
 from pathlib import Path
 from typing import Optional
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, make_response, request
 from flask_cors import CORS
 from flask_jwt_extended import (
     JWTManager,
@@ -962,6 +961,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
         :resjson string msg: Human-readable success message.
+        :resjson integer runnerID: ID under which the runner is registered at the backend
         :resjson string error: Human-readable error message that tells you why the request failed.
 
         :status 200: Runner successfully registered.
@@ -975,7 +975,10 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(error="No runner with that token exists!"), 400
         if runner_manager.register_runner(runner):
             logger.info(f"Runner {runner.id} successfully registered!")
-            return jsonify(msg="Runner successfully registered!")
+            return jsonify(
+                msg="Runner successfully registered!",
+                runnerID=runner.id,
+            )
         return jsonify(error="Runner is already registered!"), 400
 
     @app.post("/api/runners/unregister")
@@ -1003,10 +1006,10 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
             return jsonify(msg="Runner successfully unregistered!")
         return jsonify(error="Runner is not registered!"), 400
 
-    @app.post("/api/runners/retrieveJob")
-    def retrieveJob():
+    @app.get("/api/runners/retrieveJobAudio")
+    def retrieveJobAudio():
         """
-        The runner retrieves its job after it learned from the heartbeat response that the Backend assigned a job to it. The following conditions have to be met for this to succeed:
+        The runner retrieves the binary audio data of its job after it learned from the heartbeat response that the Backend assigned a job to it. Use /api/runners/retrieveJobInfo to get all the other data of the job. The following conditions have to be met for this to succeed:
 
         - Correct and valid Runner Token (that is known to the Backend) has to be supplied in Authorization header.
         - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
@@ -1016,7 +1019,35 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
 
         :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
         :resjson string error: Human-readable error message that tells you why the request failed.
-        :resjson string audio: Content of audio-file encoded into base64.
+        if successful then returns just the binary audio data. In this case the Content-Type is audio/basic instaed of application/json.
+
+        :status 200: Returning assigned job.
+        :status 400: Failed. Refer to ``error`` field for the reason.
+        """
+        online_runner, error = runner_manager.get_online_runner_for_req(request)
+        if error:
+            return jsonify(error=error), 400
+        job = runner_manager.retrieve_job(online_runner)
+        if not job:
+            return jsonify(error="No job available!"), 400
+        response = make_response(job.file.audio_data)
+        response.headers.set("Content-Type", "audio/basic")
+        return response
+
+    @app.post("/api/runners/retrieveJobInfo")
+    def retrieveJobInfo():
+        """
+        The runner retrieves the infos about its job after it learned from the heartbeat response that the Backend assigned a job to it. Use /api/runners/retrieveJobAudio to get the audio data. The following conditions have to be met for this to succeed:
+
+        - Correct and valid Runner Token (that is known to the Backend) has to be supplied in Authorization header.
+        - The runner has to currently be registered. All runners will be unregistered automatically after 60-70 seconds since the last heartbeat.
+        - There has to be a job assigned to the runner associated with the given Runner Token.
+
+        .. :quickref: Runners; Runner retrieves the job that got assigned to it.
+
+        :reqheader Authorization: Has to be string "Bearer {Token}", where {Token} is the Runner Token that the /runners/create route returned.
+        :resjson string error: Human-readable error message that tells you why the request failed.
+        :resjson integer jobID: ID of the assigned job
         :resjson string model: Whisper model that should be used for the job. May be null.
         :resjson string language: Language of the audio. May be null.
 
@@ -1030,7 +1061,7 @@ def create_app(customConfigPath: Optional[str] = None) -> Flask:
         if not job:
             return jsonify(error="No job available!"), 400
         return jsonify(
-            audio=base64.b64encode(job.file.audio_data).decode("ascii"),
+            jobID=job.id,
             model=job.model,
             language=job.language,
         )

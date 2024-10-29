@@ -16,7 +16,6 @@ logger = get_logger("project-W")
 # every 15 seconds, and if they don't send a heartbeat
 # for 60 seconds they may be automatically unregistered.
 # TODO: Should we make these configurable?
-DEFAULT_HEARTBEAT_INTERVAL = 15
 DEFAULT_HEARTBEAT_TIMEOUT = 60
 
 
