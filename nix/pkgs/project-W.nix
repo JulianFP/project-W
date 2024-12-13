@@ -13,8 +13,9 @@ python3Packages.buildPythonPackage rec {
     click
     flask
     flask-jwt-extended
-    flask-sqlalchemy
     flask-cors
+    psycopg
+    psycopg-pool
     platformdirs
     pyaml-env
     jsonschema
