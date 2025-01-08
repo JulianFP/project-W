@@ -14,11 +14,16 @@ python3Packages.buildPythonPackage rec {
     flask
     flask-jwt-extended
     flask-cors
-    psycopg
-    psycopg-pool
+    flask-sqlalchemy
     platformdirs
     pyaml-env
     jsonschema
+
+    psycopg
+    psycopg-pool
+    fastapi
+    uvicorn
+    python-multipart
   ];
 
   nativeCheckInputs = with python3Packages; [

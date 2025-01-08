@@ -1,28 +1,19 @@
-import asyncio
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from datetime import datetime
 from typing import LiteralString
 
-from _version import version, version_tuple
 from argon2 import PasswordHasher
-from logger import get_logger
+from argon2.exceptions import VerificationError
 from psycopg import pq
 from psycopg.connection_async import AsyncConnection
 from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
-from utils import parse_version_tuple
 
-
-# data classes for the functions below
-@dataclass
-class User:
-    id: int
-    email: str
-    password_hash: str
-    is_admin: bool
-    activated: bool
+from ._version import version, version_tuple
+from .logger import get_logger
+from .model import UserInDb
+from .utils import parse_version_tuple
 
 
 class database_adapter(ABC):
@@ -70,11 +61,40 @@ class database_adapter(ABC):
         return await self._add_new_user_hashed(email, hashed_password, is_admin, activated)
 
     @abstractmethod
-    async def get_user_by_email(self, email: str) -> User | None:
+    async def get_user_by_email(self, email: str) -> UserInDb | None:
         """
         Return a user with the matching email, or None if the email doesn't match any user
         """
         pass
+
+    @abstractmethod
+    async def _update_password_hash(self, user_id: int, new_password_hash: str):
+        """
+        Sometimes passwords need rehashing. This function implements that.
+        It gets called every time a password for a user is checked in 'get_user_by_email_checked_password'
+        """
+        pass
+
+    async def get_user_by_email_checked_password(
+        self, email: str, password: str
+    ) -> UserInDb | None:
+        """
+        Return a user with the matching email if the provided password is also correct, or None if the email doesn't match any user or the password is incorrect
+        Basically 'get_user_by_email' with builtin password checker
+        """
+        user = await self.get_user_by_email(email)
+        if user is None:
+            return None
+
+        try:
+            self.hasher.verify(user.password_hash, password)
+        except VerificationError:
+            return None
+
+        if self.hasher.check_needs_rehash(user.password_hash):
+            await self._update_password_hash(user.id, self.hasher.hash(password))
+
+        return user
 
 
 class postgres_adapter(database_adapter):
@@ -466,9 +486,9 @@ class postgres_adapter(database_adapter):
                 )
         return True
 
-    async def get_user_by_email(self, email: str) -> User | None:
+    async def get_user_by_email(self, email: str) -> UserInDb | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(User)) as cur:
+            async with conn.cursor(row_factory=class_row(UserInDb)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
@@ -478,6 +498,18 @@ class postgres_adapter(database_adapter):
                     (email,),
                 )
                 return await cur.fetchone()
+
+    async def _update_password_hash(self, user_id: int, new_password_hash: str):
+        async with self.apool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                        UPDATE {self.schema}.users
+                        SET password_hash = %s
+                        WHERE id = %s
+                    """,
+                    (new_password_hash, user_id),
+                )
 
 
 async def test_database_conn():
@@ -492,6 +524,3 @@ async def test_database_conn():
             print(f"Succeeded, my user has id {my_user.id}")
     finally:
         await db_conn.close()
-
-
-asyncio.run(test_database_conn())
