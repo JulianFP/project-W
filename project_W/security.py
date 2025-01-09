@@ -12,7 +12,7 @@ from .logger import get_logger
 from .model import TokenData, UserInDb
 
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="token",
+    tokenUrl="users/login",
     scopes={"admin": "Has full admin privileges, can read all users data and more!"},
 )
 

@@ -22,3 +22,9 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: str
     scopes: list[str] = []
+
+
+class AboutResponse(BaseModel):
+    description: str
+    source_code: str
+    version: str

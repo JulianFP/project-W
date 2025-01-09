@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from jsonschema import Draft202012Validator, ValidationError, validators
-from platformdirs import site_config_path, user_config_path, user_data_dir
+from platformdirs import site_config_path, user_config_path
 from pyaml_env import parse_config
 
 from project_W.logger import get_logger
@@ -59,10 +59,10 @@ schema = {
                 "http://192.168.1.100:5173/#",
             ],
         },
-        "databasePath": {
+        "postgresConnectionString": {
             "type": "string",
-            "default": user_data_dir(appname=programName),
-            "description": "Path under which the sqlite 'database.db' file will be stored. This database contains all backend data, so make sure to backup this directory. Changing this option for an existing installation without moving the file manually will result in the creation of a new empty database. The default value is the users data dir which under Linux is `$XDG_DATA_HOME/project-W` (most of the time this is `~/.local/share/project-W`)",
+            "default": "host=/var/run/postgresql dbname=postgres user=postgres",
+            "description": "PostgreSQL connection string to connect to the database that should be used by Project-W. See https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING for the syntax.",
         },
         "loginSecurity": {
             "type": "object",
@@ -152,7 +152,7 @@ def findConfigFile(additionalPaths: List[Path] = []) -> Path:
     for dir in searchDirs:
         configDir = dir / "config.yml"
         if configDir.is_file():
-            logger.info("Trying to load config from: " + str(configDir))
+            logger.info(f"Trying to load config from path '{str(configDir)}'...")
             return configDir
     raise findConfigFileException(
         "couldn't find a config.yml file in any search directory. Please add one"
@@ -203,5 +203,5 @@ def loadConfig(additionalPaths: List[Path] = []) -> Dict:
                 "Your config is invalid, some parts of this program will not work properly! Set 'disableOptionValidation' to false to learn more"
             )
 
-    logger.info("successfully loaded config from: " + str(configPath))
+    logger.info(f"Successfully loaded config from path '{str(configPath)}'")
     return config

@@ -28,6 +28,10 @@ class database_adapter(ABC):
     logger = get_logger("project-W")
 
     @abstractmethod
+    def __init__(self, connection_string: str) -> None:
+        pass
+
+    @abstractmethod
     async def open(self):
         """
         This method should initiate the databse connection(s), make sure the schema, tables and metadata exist and are valid by creating them if missing or migrating them from an older version. All of that should be part of a single transaction. This method will be called before any other of this class.
@@ -59,6 +63,13 @@ class database_adapter(ABC):
         """
         hashed_password = self.hasher.hash(password)
         return await self._add_new_user_hashed(email, hashed_password, is_admin, activated)
+
+    @abstractmethod
+    async def delete_user(self, user_id: int):
+        """
+        Delete the user with id user_id.
+        """
+        pass
 
     @abstractmethod
     async def get_user_by_email(self, email: str) -> UserInDb | None:
@@ -98,20 +109,26 @@ class database_adapter(ABC):
 
 
 class postgres_adapter(database_adapter):
-    apool = AsyncConnectionPool(
-        conninfo="host=/var/run/postgresql dbname=postgres user=postgres",
-        open=False,
-        check=AsyncConnectionPool.check_connection,
-    )  # TODO
+    apool: AsyncConnectionPool
     schema: LiteralString = "project_w"
     minimal_required_postgres_version = 14  # for both postgres and libpq
 
+    def __init__(self, connection_string: str) -> None:
+        self.apool = AsyncConnectionPool(
+            conninfo=connection_string,
+            open=False,
+            check=AsyncConnectionPool.check_connection,
+        )
+
     async def open(self):
+        self.logger.info("Trying to connect to PostgreSQL database...")
+
         # make sure libpq version is at least the minimal supported one. Do this first because it doesn't even require connecting to the database
         self.__ensure_psycopg_libpq_version()
 
         await self.apool.open()
         await self.apool.wait()  # this waits until all connections are established. This makes sure that the backend can properly talk to the database before it accepts clients
+        self.logger.info("Successfully connected to database. Preparing database now...")
 
         async with self.apool.connection() as conn:
             # ensure that the postgresql database version is at least the minimal supported one
@@ -157,8 +174,10 @@ class postgres_adapter(database_adapter):
                     await self.__create_runners_table(conn)
                 if not await self.__check_jobs_table_exists(conn):
                     await self.__create_jobs_table(conn)
+        self.logger.info("Database is ready to use")
 
     async def close(self):
+        self.logger.info("Closing database connections...")
         await self.apool.close()
 
     async def __ensure_postgresql_version(self, conn: AsyncConnection):
@@ -175,6 +194,7 @@ class postgres_adapter(database_adapter):
                 raise Exception(
                     f"The version of the specified PostgreSQL database is {version_string} while the minimal required version is {self.minimal_required_postgres_version}"
                 )
+            self.logger.info(f"PostgreSQL database is on version {version_string}")
 
     def __ensure_psycopg_libpq_version(self):
         version_string = pq.version()
@@ -184,6 +204,7 @@ class postgres_adapter(database_adapter):
             )
 
     async def __check_schema_exists(self, conn: AsyncConnection) -> bool:
+        self.logger.info("Checking if schema exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -202,6 +223,7 @@ class postgres_adapter(database_adapter):
                 return False
 
     async def __check_metadata_table_exists(self, conn: AsyncConnection) -> bool:
+        self.logger.info("Checking if metadata table exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -222,6 +244,7 @@ class postgres_adapter(database_adapter):
                 return False
 
     async def __check_users_table_exists(self, conn: AsyncConnection) -> bool:
+        self.logger.info("Checking if users table exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -242,6 +265,7 @@ class postgres_adapter(database_adapter):
                 return False
 
     async def __check_runners_table_exists(self, conn: AsyncConnection) -> bool:
+        self.logger.info("Checking if runners table exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -262,6 +286,7 @@ class postgres_adapter(database_adapter):
                 return False
 
     async def __check_jobs_table_exists(self, conn: AsyncConnection) -> bool:
+        self.logger.info("Checking if jobs table exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -282,7 +307,7 @@ class postgres_adapter(database_adapter):
                 return False
 
     async def __create_schema(self, conn: AsyncConnection):
-        self.logger.info("schema was missing. Creating it now...")
+        self.logger.info("Schema was missing. Creating it now...")
         async with conn.cursor() as cur:
             await cur.execute(
                 f"""
@@ -291,7 +316,7 @@ class postgres_adapter(database_adapter):
             )
 
     async def __create_metadata_table(self, conn: AsyncConnection):
-        self.logger.info("metadata table was missing. Creating it now...")
+        self.logger.info("Metadata table was missing. Creating it now...")
         async with conn.cursor() as cur:
             await cur.execute(
                 f"""
@@ -384,8 +409,11 @@ class postgres_adapter(database_adapter):
                             f"The database has been converted to application version {db_version} while this application only runs on version {version}. Downgrading between major versions is not supported!"
                         )
 
+                else:
+                    self.logger.info("No database schema migration required")
+
     async def __create_users_table(self, conn: AsyncConnection):
-        self.logger.info("users table was missing. Creating it now...")
+        self.logger.info("Users table was missing. Creating it now...")
         async with conn.cursor() as cur:
             # according to https://www.rfc-editor.org/errata/eid1003 the upper limit for mail address forward paths is 256 octets (2 of which are angle brackets and thus not part of the address itself). When using UTF-8 this might translate in even less characters, but is still a good upper limit
             await cur.execute(
@@ -402,7 +430,7 @@ class postgres_adapter(database_adapter):
             )
 
     async def __create_runners_table(self, conn: AsyncConnection):
-        self.logger.info("runners table was missing. Creating it now...")
+        self.logger.info("Runners table was missing. Creating it now...")
         async with conn.cursor() as cur:
             await cur.execute(
                 f"""
@@ -415,7 +443,7 @@ class postgres_adapter(database_adapter):
             )
 
     async def __create_jobs_table(self, conn: AsyncConnection):
-        self.logger.info("jobs table was missing. Creating it now...")
+        self.logger.info("Jobs table was missing. Creating it now...")
         async with conn.cursor() as cur:
             await cur.execute(
                 f"""
@@ -436,7 +464,7 @@ class postgres_adapter(database_adapter):
                     transcript text,
                     error_msg text,
                     PRIMARY KEY (id),
-                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id),
+                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE,
                     FOREIGN KEY (runner_id) REFERENCES {self.schema}.runners (id),
                     CONSTRAINT only_finished_job_has_runner CHECK (
                         (finish_timestamp IS NOT NULL AND runner_id IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
@@ -486,6 +514,18 @@ class postgres_adapter(database_adapter):
                 )
         return True
 
+    async def delete_user(self, user_id):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                # jobs of that user get automatically deleted because of the 'ON DELETE CASCADE' specified during table creation
+                await cur.execute(
+                    f"""
+                        DELETE FROM {self.schema}.users
+                        WHERE id = %s
+                    """,
+                    (user_id,),
+                )
+
     async def get_user_by_email(self, email: str) -> UserInDb | None:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(UserInDb)) as cur:
@@ -510,17 +550,3 @@ class postgres_adapter(database_adapter):
                     """,
                     (new_password_hash, user_id),
                 )
-
-
-async def test_database_conn():
-    db_conn = postgres_adapter()
-    try:
-        await db_conn.open()
-        result = await db_conn.add_new_user("julian@partanengroup.de", "password1234")
-        if not result:
-            print(f"failed to create user")
-        my_user = await db_conn.get_user_by_email("julian@partanengroup.de")
-        if my_user:
-            print(f"Succeeded, my user has id {my_user.id}")
-    finally:
-        await db_conn.close()
