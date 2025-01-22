@@ -17,13 +17,14 @@ python3Packages.buildPythonPackage rec {
     flask-sqlalchemy
     platformdirs
     pyaml-env
-    jsonschema
 
     psycopg
     psycopg-pool
+    redis
     fastapi
     uvicorn
     python-multipart
+    aiohttp
   ];
 
   nativeCheckInputs = with python3Packages; [

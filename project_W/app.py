@@ -1,18 +1,20 @@
 import os
-import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 import project_W.dependencies as dp
-from project_W.database import postgres_adapter
+from project_W.caching import RedisAdapter
+from project_W.database import PostgresAdapter
 from project_W.logger import get_logger
 
 from ._version import __version__
 from .config import loadConfig
-from .model import AboutResponse
+from .model import AboutResponse, AuthRequestForm, Token
 from .routers import admins, users
+from .security import authenticate_user
 
 
 # startup database connections before spinning up application
@@ -34,22 +36,16 @@ async def lifespan(_):
         dp.config = loadConfig()
 
     # connect to database
-    dp.db = postgres_adapter(dp.config["postgresConnectionString"])
+    dp.db = PostgresAdapter(dp.config.postgres_connection_string)
     await dp.db.open()
 
-    # check jwt secret key and setup jwt_handler
-    secret_key = dp.config["loginSecurity"]["sessionSecretKey"]
-    if secret_key is not None and len(secret_key) > 16:
-        logger.info("Setting sessionSecretKey from supplied config or env var")
-    else:
-        logger.warning("sessionSecretKey not set or too short: generating random secret key")
-        # new secret key -> invalidates any existing tokens
-        secret_key = secrets.token_urlsafe(64)
-    dp.jwt_handler.setup(dp.db, secret_key)
+    # connect to caching server
+    dp.ch = RedisAdapter()
+    await dp.ch.open(unix_socket_path="/run/redis-project-W/redis.sock")
 
     yield
 
-    # close database applications before application exit
+    # close database connections before application exit
     await dp.db.close()
 
 
@@ -57,6 +53,11 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(users.router)
 app.include_router(admins.router)
+
+
+@app.post("/auth")
+async def login(form_data: Annotated[AuthRequestForm, Depends()]) -> Token:
+    return await authenticate_user(form_data)
 
 
 @app.get("/about")

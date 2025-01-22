@@ -1,19 +1,35 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Security
+from fastapi import APIRouter, Depends, HTTPException
 
-import project_W.dependencies as dp
-
-from ..model import UserInDb
+from ..model import ErrorResponse, UserInDb
+from ..security import validate_admin_user
 
 router = APIRouter(
-    prefix="/admins",
+    prefix="/api/admins",
     tags=["admins"],
+    # all routes handled by this routes are authenticated
+    responses={
+        401: {
+            "model": ErrorResponse,
+            "headers": {
+                "WWW-Authenticate": {
+                    "type": "string",
+                }
+            },
+        },
+        403: {
+            "model": ErrorResponse,
+            "headers": {
+                "WWW-Authenticate": {
+                    "type": "string",
+                }
+            },
+        },
+    },
 )
 
 
 @router.get("/test")
-async def admin_test(
-    _: Annotated[UserInDb, Security(dp.jwt_handler.get_current_user, scopes=["admin"])]
-):
+async def admin_test(_: Annotated[UserInDb, Depends(validate_admin_user)]):
     return "Only an admin is allowed to see this"

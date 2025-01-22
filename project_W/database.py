@@ -16,7 +16,7 @@ from .model import UserInDb
 from .utils import parse_version_tuple
 
 
-class database_adapter(ABC):
+class DatabaseAdapter(ABC):
     """
     Important semantics:
     This class is designed to be used together with startup/shutdown hooks of a web framework, specifically the lifespan function in FastAPI
@@ -108,7 +108,7 @@ class database_adapter(ABC):
         return user
 
 
-class postgres_adapter(database_adapter):
+class PostgresAdapter(DatabaseAdapter):
     apool: AsyncConnectionPool
     schema: LiteralString = "project_w"
     minimal_required_postgres_version = 14  # for both postgres and libpq
@@ -194,7 +194,7 @@ class postgres_adapter(database_adapter):
                 raise Exception(
                     f"The version of the specified PostgreSQL database is {version_string} while the minimal required version is {self.minimal_required_postgres_version}"
                 )
-            self.logger.info(f"PostgreSQL database is on version {version_string}")
+            self.logger.info(f"PostgreSQL server is on version {version_string}")
 
     def __ensure_psycopg_libpq_version(self):
         version_string = pq.version()
@@ -202,6 +202,7 @@ class postgres_adapter(database_adapter):
             raise Exception(
                 f"The version of libpq loaded by psycopg is {version_string} while the minimal required version is {self.minimal_required_postgres_version}"
             )
+        self.logger.info(f"PostgreSQL libpq is on version {version_string}")
 
     async def __check_schema_exists(self, conn: AsyncConnection) -> bool:
         self.logger.info("Checking if schema exists...")

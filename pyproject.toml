@@ -41,12 +41,12 @@ dependencies = [
     # Postgres client library
     "psycopg",
     "psycopg_pool",
+    "redis",
+    "aiohttp",
     # getting platform-independent directories for config and data (follows xdg standard on Linux)
     "platformdirs",
     # parsing config from yaml file and env vars
     "pyaml_env",
-    #validating config files and filling out defaults
-    "jsonschema"
 ]
 
 [project.optional-dependencies]
