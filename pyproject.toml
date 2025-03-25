@@ -42,7 +42,12 @@ dependencies = [
     "psycopg",
     "psycopg_pool",
     "redis",
-    "aiohttp",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
+    "httpx",
+    "authlib",
+    "pyjwt",
     # getting platform-independent directories for config and data (follows xdg standard on Linux)
     "platformdirs",
     # parsing config from yaml file and env vars

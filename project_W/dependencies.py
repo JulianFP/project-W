@@ -1,7 +1,7 @@
 from .caching import CachingAdapter
 from .database import DatabaseAdapter
-from .model import LoginSecuritySettings
+from .models.settings import Settings
 
 db: DatabaseAdapter
 ch: CachingAdapter
-config: LoginSecuritySettings
+config: Settings

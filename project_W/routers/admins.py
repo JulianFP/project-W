@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
-from ..model import ErrorResponse, UserInDb
-from ..security import validate_admin_user
+from ..models.internal import DecodedTokenData
+from ..models.response_data import ErrorResponse
+from ..security.auth import validate_user
 
 router = APIRouter(
     prefix="/api/admins",
@@ -31,5 +32,5 @@ router = APIRouter(
 
 
 @router.get("/test")
-async def admin_test(_: Annotated[UserInDb, Depends(validate_admin_user)]):
+async def admin_test(_: Annotated[DecodedTokenData, Depends(validate_user(require_admin=True))]):
     return "Only an admin is allowed to see this"

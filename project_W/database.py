@@ -12,7 +12,7 @@ from psycopg_pool.pool_async import AsyncConnectionPool
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .model import UserInDb
+from .models.internal import LocalUserInDb, OidcUserInDb
 from .utils import parse_version_tuple
 
 
@@ -46,8 +46,8 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def _add_new_user_hashed(
-        self, email: str, hashed_password: str, is_admin: bool = False, activated: bool = False
+    async def _add_new_local_user_hashed(
+        self, email: str, hashed_password: str, is_admin: bool = False, is_verified: bool = False
     ) -> bool:
         """
         This method creates a new user. The password is already hashed here which is the reason why this method is protected. It should not be used outside of this base class, use add_new_user instead!
@@ -55,14 +55,21 @@ class DatabaseAdapter(ABC):
         """
         pass
 
-    async def add_new_user(
-        self, email: str, password: str, is_admin: bool = False, activated: bool = False
-    ) -> int:
+    async def add_new_local_user(
+        self, email: str, password: str, is_admin: bool = False, is_verified: bool = False
+    ) -> bool:
         """
         Create a new user. The password will be hashed in this function before writing it in the database.
         """
         hashed_password = self.hasher.hash(password)
-        return await self._add_new_user_hashed(email, hashed_password, is_admin, activated)
+        return await self._add_new_local_user_hashed(email, hashed_password, is_admin, is_verified)
+
+    @abstractmethod
+    async def add_new_oidc_user(self, iss: str, sub: str, email: str) -> bool:
+        """
+        Add a database entry for an oidc user. Will be called at first login of this user.
+        """
+        pass
 
     @abstractmethod
     async def delete_user(self, user_id: int):
@@ -72,9 +79,16 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_user_by_email(self, email: str) -> UserInDb | None:
+    async def get_local_user_by_email(self, email: str) -> LocalUserInDb | None:
         """
-        Return a user with the matching email, or None if the email doesn't match any user
+        Return a local user with the matching email, or None if the email doesn't match any user
+        """
+        pass
+
+    @abstractmethod
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
+        """
+        Return an oidc user with the matching iss/sub pair, or None if iss/sub doesn't match any user
         """
         pass
 
@@ -86,14 +100,14 @@ class DatabaseAdapter(ABC):
         """
         pass
 
-    async def get_user_by_email_checked_password(
+    async def get_local_user_by_email_checked_password(
         self, email: str, password: str
-    ) -> UserInDb | None:
+    ) -> LocalUserInDb | None:
         """
         Return a user with the matching email if the provided password is also correct, or None if the email doesn't match any user or the password is incorrect
-        Basically 'get_user_by_email' with builtin password checker
+        Basically 'get_local_user_by_email' with builtin password checker
         """
-        user = await self.get_user_by_email(email)
+        user = await self.get_local_user_by_email(email)
         if user is None:
             return None
 
@@ -134,46 +148,41 @@ class PostgresAdapter(DatabaseAdapter):
             # ensure that the postgresql database version is at least the minimal supported one
             await self.__ensure_postgresql_version(conn)
 
-            if not await self.__check_schema_exists(conn):
-                await self.__create_schema(conn)
+            if not await self.__check_schema_exists(conn, self.schema):
+                await self.__create_schema(conn, self.schema)
 
                 # also create all other tables to skip their existence checks and migration code since there can't be any tables in a newly created schema anyway
-                await self.__create_metadata_table(conn)
-                await self.__create_users_table(conn)
-                await self.__create_runners_table(conn)
-                await self.__create_jobs_table(conn)
-            elif not await self.__check_metadata_table_exists(conn):
+                await self.__create_all_tables(conn)
+            elif not await self.__check_table_exists(conn, "metadata"):
                 # if the metadata is missing we can't know whether and how to do a migration on the other table. Because of this we throw an exception if the metadata table is missing but any other table exists to be safe
-                if await self.__check_users_table_exists(conn):
-                    raise Exception(
-                        "Critical: The metadata table is missing but the users table still exists. Either restore the metadata table with its previous contents or drop the users table!"
-                    )
-                if await self.__check_runners_table_exists(conn):
-                    raise Exception(
-                        "Critical: The metadata table is missing but the runners table still exists. Either restore the metadata table with its previous contents or drop the runners table!"
-                    )
-                if await self.__check_jobs_table_exists(conn):
-                    raise Exception(
-                        "Critical: The metadata table is missing but the jobs table still exists. Either restore the metadata table with its previous contents or drop the jobs table!"
-                    )
+                for table_name in "users" "local_accounts" "oidc_accounts" "runners" "jobs":
+                    if await self.__check_table_exists(conn, table_name):
+                        raise Exception(
+                            f"Critical: The metadata table is missing but the {table_name} table still exists. Either restore the metadata table with its previous contents or drop the {table_name} table!"
+                        )
 
                 # if all tables where missing but the schema existed for some reason then ignore that and just create all the tables in that schema
-                await self.__create_metadata_table(conn)
-                await self.__create_users_table(conn)
-                await self.__create_runners_table(conn)
-                await self.__create_jobs_table(conn)
+                await self.__create_all_tables(conn)
             else:
                 # if schema and metadata table already existed we still have to check if all the other tables still exist
-                # this way the application doesn't get bricked by the sysadmin dropping whole tables to get rid of data
+                # the only table that is allowed to be dropped on its own is the jobs table, so we throw an error if any of the other tables don't exist
                 # do database migration before creating any missing tables because those created tables would have the new format which would brick the migration code
                 await self.__update_database_schema_if_needed(conn)
 
-                if not await self.__check_users_table_exists(conn):
-                    await self.__create_users_table(conn)
-                if not await self.__check_runners_table_exists(conn):
-                    await self.__create_runners_table(conn)
-                if not await self.__check_jobs_table_exists(conn):
+                table_names: list[LiteralString] = [
+                    "users",
+                    "local_accounts",
+                    "oidc_accounts",
+                    "runners",
+                ]
+                for table_name in table_names:
+                    if not await self.__check_table_exists(conn, table_name):
+                        raise Exception(
+                            f"Critical: The metadata table exists but the {table_name} table is missing. Either restore the {table_name} table with its previous contents or drop the metadata table as well!"
+                        )
+                if not await self.__check_table_exists(conn, "jobs"):
                     await self.__create_jobs_table(conn)
+
         self.logger.info("Database is ready to use")
 
     async def close(self):
@@ -204,8 +213,10 @@ class PostgresAdapter(DatabaseAdapter):
             )
         self.logger.info(f"PostgreSQL libpq is on version {version_string}")
 
-    async def __check_schema_exists(self, conn: AsyncConnection) -> bool:
-        self.logger.info("Checking if schema exists...")
+    async def __check_schema_exists(
+        self, conn: AsyncConnection, schema_name: LiteralString
+    ) -> bool:
+        self.logger.info(f"Checking if schema {schema_name} exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -213,7 +224,7 @@ class PostgresAdapter(DatabaseAdapter):
                     SELECT *
                     FROM information_schema.schemata
                     WHERE
-                        schema_name = '{self.schema}'
+                        schema_name = '{schema_name}'
                 )
             """
             )
@@ -223,8 +234,8 @@ class PostgresAdapter(DatabaseAdapter):
             else:
                 return False
 
-    async def __check_metadata_table_exists(self, conn: AsyncConnection) -> bool:
-        self.logger.info("Checking if metadata table exists...")
+    async def __check_table_exists(self, conn: AsyncConnection, table_name: LiteralString):
+        self.logger.info(f"Checking if {table_name} table exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -234,7 +245,7 @@ class PostgresAdapter(DatabaseAdapter):
                     WHERE
                         table_schema = '{self.schema}' AND
                         table_type = 'BASE TABLE' AND
-                        table_name = 'metadata'
+                        table_name = '{table_name}'
                 )
             """
             )
@@ -244,81 +255,22 @@ class PostgresAdapter(DatabaseAdapter):
             else:
                 return False
 
-    async def __check_users_table_exists(self, conn: AsyncConnection) -> bool:
-        self.logger.info("Checking if users table exists...")
-        async with conn.cursor(row_factory=scalar_row) as cur:
-            await cur.execute(
-                f"""
-                SELECT EXISTS (
-                    SELECT *
-                    FROM information_schema.tables
-                    WHERE
-                        table_schema = '{self.schema}' AND
-                        table_type = 'BASE TABLE' AND
-                        table_name = 'users'
-                )
-            """
-            )
-            exists = await cur.fetchone()
-            if exists is not None:
-                return exists
-            else:
-                return False
-
-    async def __check_runners_table_exists(self, conn: AsyncConnection) -> bool:
-        self.logger.info("Checking if runners table exists...")
-        async with conn.cursor(row_factory=scalar_row) as cur:
-            await cur.execute(
-                f"""
-                SELECT EXISTS (
-                    SELECT *
-                    FROM information_schema.tables
-                    WHERE
-                        table_schema = '{self.schema}' AND
-                        table_type = 'BASE TABLE' AND
-                        table_name = 'runners'
-                )
-            """
-            )
-            exists = await cur.fetchone()
-            if exists is not None:
-                return exists
-            else:
-                return False
-
-    async def __check_jobs_table_exists(self, conn: AsyncConnection) -> bool:
-        self.logger.info("Checking if jobs table exists...")
-        async with conn.cursor(row_factory=scalar_row) as cur:
-            await cur.execute(
-                f"""
-                SELECT EXISTS (
-                    SELECT *
-                    FROM information_schema.tables
-                    WHERE
-                        table_schema = '{self.schema}' AND
-                        table_type = 'BASE TABLE' AND
-                        table_name = 'jobs'
-                )
-            """
-            )
-            exists = await cur.fetchone()
-            if exists is not None:
-                return exists
-            else:
-                return False
-
-    async def __create_schema(self, conn: AsyncConnection):
-        self.logger.info("Schema was missing. Creating it now...")
+    async def __create_schema(self, conn: AsyncConnection, schema_name: LiteralString):
+        self.logger.info(f"Schema {schema_name} was missing. Creating it now...")
         async with conn.cursor() as cur:
             await cur.execute(
                 f"""
-                CREATE SCHEMA {self.schema}
+                CREATE SCHEMA {schema_name}
             """
             )
 
-    async def __create_metadata_table(self, conn: AsyncConnection):
-        self.logger.info("Metadata table was missing. Creating it now...")
+    async def __create_all_tables(self, conn: AsyncConnection):
+        """
+        All tables (except for the jobs table, see its creation function) need to created at the same time because of foreign key constraints
+        Nothing references the metadata table however we cannot support tables existing without it because the application gets the used schema version from the metadata table
+        """
         async with conn.cursor() as cur:
+            self.logger.info("Creating metadata table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.metadata (
@@ -328,7 +280,6 @@ class PostgresAdapter(DatabaseAdapter):
                 )
             """
             )
-
             # also init all used topics in table so that they are always defined
             application_metadata = {
                 "last_used_version": version,
@@ -341,7 +292,6 @@ class PostgresAdapter(DatabaseAdapter):
             """,
                 [Jsonb(application_metadata)],
             )
-
             cleanup_metadata = {
                 "jobs_last_cleanup": datetime.min.isoformat(),
                 "users_last_cleanup": datetime.min.isoformat(),
@@ -354,6 +304,107 @@ class PostgresAdapter(DatabaseAdapter):
                 VALUES ('cleanup', %s)
             """,
                 [Jsonb(cleanup_metadata)],
+            )
+            self.logger.info("Creating users table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.users (
+                    id serial,
+                    PRIMARY KEY (id)
+                )
+            """
+            )
+
+            self.logger.info("Creating local_accounts table...")
+            # according to https://www.rfc-editor.org/errata/eid1003 the upper limit for mail address forward paths is 256 octets (2 of which are angle brackets and thus not part of the address itself). When using UTF-8 this might translate in even less characters, but is still a good upper limit
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.local_accounts (
+                    email varchar(254) NOT NULL,
+                    id integer NOT NULL,
+                    password_hash char(97) NOT NULL,
+                    is_admin boolean NOT NULL DEFAULT false,
+                    is_verified boolean NOT NULL DEFAULT false,
+                    PRIMARY KEY (email),
+                    FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
+                )
+            """
+            )
+
+            self.logger.info("Creating oidc_accounts table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.oidc_accounts (
+                    iss text NOT NULL,
+                    sub text NOT NULL,
+                    id integer NOT NULL,
+                    email varchar(254) NOT NULL,
+                    PRIMARY KEY (iss, sub),
+                    FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
+                )
+            """
+            )
+
+            self.logger.info("Creating runners table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.runners (
+                    id serial,
+                    token_hash char(24) UNIQUE,
+                    PRIMARY KEY (id)
+                )
+            """
+            )
+
+        await self.__create_jobs_table(conn)
+
+    async def __create_jobs_table(self, conn: AsyncConnection):
+        """
+        Since nothing references the jobs table we allow lazy deletion of all jobs by dropping the whole jobs table.
+        This is why it gets its own function.
+        """
+        self.logger.info("Creating jobs table")
+        async with conn.cursor() as cur:
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.jobs (
+                    id serial,
+                    user_id integer NOT NULL,
+                    creation_timestamp timestamp NOT NULL DEFAULT now(),
+                    file_name text NOT NULL,
+                    model text,
+                    language char(2),
+                    audio_oid oid,
+                    finish_timestamp timestamp,
+                    runner_name varchar(40),
+                    runner_id integer,
+                    runner_version text,
+                    runner_git_hash char(40),
+                    runner_source_code_url text,
+                    downloaded boolean,
+                    transcript text,
+                    error_msg text,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE,
+                    FOREIGN KEY (runner_id) REFERENCES {self.schema}.runners (id) ON DELETE SET NULL,
+                    CONSTRAINT only_finished_job_has_runner CHECK (
+                        (finish_timestamp IS NOT NULL AND runner_name IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
+                        OR (finish_timestamp IS NULL AND runner_id IS NULL AND runner_name IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
+                    ),
+                    CONSTRAINT only_finished_job_is_succeeded_or_failed CHECK (
+                        (finish_timestamp IS NOT NULL AND downloaded IS NOT NULL AND transcript IS NOT NULL AND error_msg IS NULL and audio_oid IS NULL)
+                        OR (finish_timestamp IS NOT NULL AND error_msg IS NOT NULL AND audio_oid IS NOT NULL AND downloaded IS NULL AND transcript IS NULL)
+                        OR (finish_timestamp IS NULL AND downloaded IS NULL AND transcript IS NULL AND error_msg IS NULL)
+                    )
+                )
+            """
+            )
+            # user_id is neither primary key nor unique, so we have to create an index for it manually.
+            # this makes sense since queries where we want to get jobs of a user are very common, and because else the ON DELETE CASCADE would be very expensive
+            await cur.execute(
+                f"""
+                CREATE INDEX ON {self.schema}.jobs (user_id)
+            """
             )
 
     async def __update_database_schema_if_needed(self, conn: AsyncConnection):
@@ -413,82 +464,8 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     self.logger.info("No database schema migration required")
 
-    async def __create_users_table(self, conn: AsyncConnection):
-        self.logger.info("Users table was missing. Creating it now...")
-        async with conn.cursor() as cur:
-            # according to https://www.rfc-editor.org/errata/eid1003 the upper limit for mail address forward paths is 256 octets (2 of which are angle brackets and thus not part of the address itself). When using UTF-8 this might translate in even less characters, but is still a good upper limit
-            await cur.execute(
-                f"""
-                CREATE TABLE {self.schema}.users (
-                    id serial,
-                    email varchar(254) NOT NULL UNIQUE,
-                    password_hash char(97) NOT NULL,
-                    is_admin boolean NOT NULL DEFAULT false,
-                    activated boolean NOT NULL DEFAULT false,
-                    PRIMARY KEY (id)
-                )
-            """
-            )
-
-    async def __create_runners_table(self, conn: AsyncConnection):
-        self.logger.info("Runners table was missing. Creating it now...")
-        async with conn.cursor() as cur:
-            await cur.execute(
-                f"""
-                CREATE TABLE {self.schema}.runners (
-                    id serial,
-                    token_hash char(24) UNIQUE,
-                    PRIMARY KEY (id)
-                )
-            """
-            )
-
-    async def __create_jobs_table(self, conn: AsyncConnection):
-        self.logger.info("Jobs table was missing. Creating it now...")
-        async with conn.cursor() as cur:
-            await cur.execute(
-                f"""
-                CREATE TABLE {self.schema}.jobs (
-                    id serial,
-                    user_id integer NOT NULL,
-                    creation_timestamp timestamp NOT NULL DEFAULT now(),
-                    file_name text NOT NULL,
-                    model text,
-                    language char(2),
-                    audio_oid oid,
-                    finish_timestamp timestamp,
-                    runner_id integer,
-                    runner_version text,
-                    runner_git_hash char(40),
-                    runner_source_code_url text,
-                    downloaded boolean,
-                    transcript text,
-                    error_msg text,
-                    PRIMARY KEY (id),
-                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE,
-                    FOREIGN KEY (runner_id) REFERENCES {self.schema}.runners (id),
-                    CONSTRAINT only_finished_job_has_runner CHECK (
-                        (finish_timestamp IS NOT NULL AND runner_id IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
-                        OR (finish_timestamp IS NULL AND runner_id IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
-                    ),
-                    CONSTRAINT only_finished_job_is_succeeded_or_failed CHECK (
-                        (finish_timestamp IS NOT NULL AND downloaded IS NOT NULL AND transcript IS NOT NULL AND error_msg IS NULL and audio_oid IS NULL)
-                        OR (finish_timestamp IS NOT NULL AND error_msg IS NOT NULL AND audio_oid IS NOT NULL AND downloaded IS NULL AND transcript IS NULL)
-                        OR (finish_timestamp IS NULL AND downloaded IS NULL AND transcript IS NULL AND error_msg IS NULL)
-                    )
-                )
-            """
-            )
-            # user_id is neither primary key nor unique, so we have to create an index for it manually.
-            # this makes sense since queries where we want to get jobs of a user are very common
-            await cur.execute(
-                f"""
-                CREATE INDEX ON {self.schema}.jobs (user_id)
-            """
-            )
-
-    async def _add_new_user_hashed(
-        self, email: str, hashed_password: str, is_admin: bool = False, activated: bool = False
+    async def _add_new_local_user_hashed(
+        self, email: str, hashed_password: str, is_admin: bool = False, is_verified: bool = False
     ) -> bool:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -496,7 +473,7 @@ class PostgresAdapter(DatabaseAdapter):
                     f"""
                     SELECT EXISTS (
                         SELECT *
-                        FROM {self.schema}.users
+                        FROM {self.schema}.local_accounts
                         WHERE email = %s
                     )
                 """,
@@ -508,10 +485,52 @@ class PostgresAdapter(DatabaseAdapter):
 
                 await cur.execute(
                     f"""
-                    INSERT INTO {self.schema}.users (email, password_hash, is_admin, activated)
+                    INSERT INTO {self.schema}.users (id)
+                    VALUES (DEFAULT)
+                    RETURNING id
+                    """,
+                )
+                user_id = await cur.fetchone()
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.local_accounts (email, id, password_hash, is_admin, is_verified)
+                    VALUES (%s, %s, %s, %s, %s)
+                """,
+                    (email, user_id, hashed_password, is_admin, is_verified),
+                )
+        return True
+
+    async def add_new_oidc_user(self, iss: str, sub: str, email: str) -> bool:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT EXISTS (
+                        SELECT *
+                        FROM {self.schema}.oidc_accounts
+                        WHERE iss = %s AND sub = %s
+                    )
+                """,
+                    (iss, sub),
+                )
+                oidc_account_already_exists: bool | None = await cur.fetchone()
+                if oidc_account_already_exists:
+                    return False
+
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.users (id)
+                    VALUES (DEFAULT)
+                    RETURNING id
+                    """,
+                )
+                user_id = await cur.fetchone()
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.oidc_accounts (iss, sub, id, email)
                     VALUES (%s, %s, %s, %s)
                 """,
-                    (email, hashed_password, is_admin, activated),
+                    (iss, sub, user_id, email),
                 )
         return True
 
@@ -527,25 +546,40 @@ class PostgresAdapter(DatabaseAdapter):
                     (user_id,),
                 )
 
-    async def get_user_by_email(self, email: str) -> UserInDb | None:
+    async def get_local_user_by_email(self, email: str) -> LocalUserInDb | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(UserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
-                    FROM {self.schema}.users
+                    FROM {self.schema}.local_accounts
                     WHERE email = %s
                 """,
                     (email,),
                 )
-                return await cur.fetchone()
+                return_val = await cur.fetchone()
+                return LocalUserInDb.model_validate(return_val)
+
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.oidc_accounts
+                        WHERE iss = %s AND sub = %s
+                    """,
+                    (iss, sub),
+                )
+                return_val = await cur.fetchone()
+                return OidcUserInDb.model_validate(return_val)
 
     async def _update_password_hash(self, user_id: int, new_password_hash: str):
         async with self.apool.connection() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                        UPDATE {self.schema}.users
+                        UPDATE {self.schema}.local_accounts
                         SET password_hash = %s
                         WHERE id = %s
                     """,

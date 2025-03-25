@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from project_W.logger import get_logger
 
-from .model import Settings
+from .models.settings import Settings
 
 programName = "project-W"
 logger = get_logger(programName)
