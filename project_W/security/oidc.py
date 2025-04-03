@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from httpx import AsyncClient
 
 import project_W.dependencies as dp
-from project_W.models.settings import Settings
+from project_W.models.settings import OidcRoleSettings, Settings
 
 from ..models.internal import DecodedTokenData
 from ..models.response_data import User
@@ -61,7 +61,13 @@ async def login(idp_name: str, request: Request) -> RedirectResponse:
 @router.get("/auth/{idp_name}", name="oidc-auth")
 async def auth(idp_name: str, request: Request) -> JSONResponse:
     idp_name = idp_name.lower()
-    oidc_response = await getattr(oauth, idp_name).authorize_access_token(request)
+    try:
+        oidc_response = await getattr(oauth, idp_name).authorize_access_token(request)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to authorize IdP access token. Try again from the beginning of the login flow",
+        )
 
     if not (userinfo := oidc_response.get("userinfo")):
         raise HTTPException(
@@ -83,16 +89,16 @@ async def auth(idp_name: str, request: Request) -> JSONResponse:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get your email address from the identity provider. Please make sure that the IdP supports the email claim and that your account has an email address associated with it",
         )
-    if not userinfo.get("email_verified"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"The email address of this OIDC {iss} account is not verified, or the identity provider didn't provide the email_verified claim",
-        )
     if not (id_token := oidc_response.get("id_token")):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get an id_token from the identity provider",
         )
+
+    # validate id_token before creating user so that possible errors are already displayed here to the user
+    # and we don't create accounts in the database for nothing
+    # this also verifies email_verified and user_role/admin_role claims
+    await validate_oidc_token(dp.config, id_token, iss)
 
     user_created = await dp.db.add_new_oidc_user(
         iss,
@@ -105,6 +111,14 @@ async def auth(idp_name: str, request: Request) -> JSONResponse:
             "created": user_created,
         }
     )
+
+
+def has_role(role_conf: OidcRoleSettings, user) -> bool:
+    role_name = user.get(role_conf.field_name)
+    if isinstance(role_name, list):
+        return role_conf.name in role_name
+    else:
+        return role_name == role_conf.name
 
 
 async def validate_oidc_token(config: Settings, token: str, iss: str) -> DecodedTokenData:
@@ -141,17 +155,17 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
 
     # check if user is admin
     admin_role_conf = oidc_prov[name].admin_role
-    if admin_role_conf is not None and user[admin_role_conf.field_name] == admin_role_conf.name:
+    if admin_role_conf is not None and has_role(admin_role_conf, user):
         user["is_admin"] = True
     else:
         user["is_admin"] = False
 
         # check if non-admin user even has permission to access project-W
         user_role_conf = oidc_prov[name].user_role
-        if user_role_conf is not None and user[user_role_conf.field_name] != user_role_conf.name:
+        if user_role_conf is not None and not has_role(user_role_conf, user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions",
+                detail=f"Insufficient permissions: Your user lacks the required value for the {user_role_conf.field_name} claim",
                 # can't put scope here because if the issuer is unknown we also don't know which scope might be required
                 headers={"WWW-Authenticate": "Bearer"},
             )
