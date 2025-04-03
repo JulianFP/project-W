@@ -1,3 +1,6 @@
+import ssl
+
+import certifi
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -16,10 +19,15 @@ oauth_iss_to_name = {}
 
 async def register_with_oidc_providers(config: Settings):
     oidc_prov = config.security.oidc_providers
-    async with AsyncClient() as client:
-        if oidc_prov is {}:
-            raise Exception("Tried to use oidc router even though oidc is disabled in config!")
-        for name, idp in oidc_prov.items():
+    if oidc_prov is {}:
+        raise Exception("Tried to use oidc router even though oidc is disabled in config!")
+    for name, idp in oidc_prov.items():
+        if idp.ca_pem_file_path:
+            cafile = idp.ca_pem_file_path
+        else:
+            cafile = certifi.where()
+        ctx = ssl.create_default_context(cafile=cafile)
+        async with AsyncClient(verify=ctx) as client:
             name = name.lower()
             metadata_uri = f"{idp.base_url}/.well-known/openid-configuration"
             oauth.register(
@@ -27,7 +35,10 @@ async def register_with_oidc_providers(config: Settings):
                 client_id=idp.client_id,
                 client_secret=idp.client_secret,
                 server_metadata_url=metadata_uri,
-                client_kwargs={"scope": "openid email"},
+                client_kwargs={
+                    "scope": "openid email",
+                    "verify": ctx,
+                },
             )
 
             oidc_config = (await client.get(metadata_uri)).json()

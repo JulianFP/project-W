@@ -93,6 +93,10 @@ class OidcProviderSettings(BaseModel):
         default=None,
         description="Configure the role that users should have to be have admin permissions on Project-W. Only users with this role can do things like create new runners and see all user data. Use carefully! Set to None if no users of this IdP should be admins",
     )
+    ca_pem_file_path: str = Field(
+        default=None,
+        description="Path to the pem certs file that includes the certificates that should be trusted for this provider (alternative certificate verification). Useful if the identity provider uses a self-signed certificate",
+    )
 
 
 # modeling the config file (descriptions and examples are used for documentation)
