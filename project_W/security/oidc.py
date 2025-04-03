@@ -51,14 +51,46 @@ async def login(idp_name: str, request: Request) -> RedirectResponse:
 async def auth(idp_name: str, request: Request) -> JSONResponse:
     idp_name = idp_name.lower()
     oidc_response = await getattr(oauth, idp_name).authorize_access_token(request)
+
+    if not (userinfo := oidc_response.get("userinfo")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get any user information from the identity provider",
+        )
+    if not (iss := userinfo.get("iss")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get iss from the identity provider. Please make sure that the IdP supports the iss claim",
+        )
+    if not (sub := userinfo.get("sub")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get sub from the identity provider. Please make sure that the IdP supports the sub claim",
+        )
+    if not (email := userinfo.get("email")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get your email address from the identity provider. Please make sure that the IdP supports the email claim and that your account has an email address associated with it",
+        )
+    if not userinfo.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"The email address of this OIDC {iss} account is not verified, or the identity provider didn't provide the email_verified claim",
+        )
+    if not (id_token := oidc_response.get("id_token")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get an id_token from the identity provider",
+        )
+
     user_created = await dp.db.add_new_oidc_user(
-        oidc_response["userinfo"]["iss"],
-        oidc_response["userinfo"]["sub"],
-        oidc_response["userinfo"]["email"],
+        iss,
+        sub,
+        email,
     )
     return JSONResponse(
         {
-            "token": oidc_response["id_token"],
+            "token": id_token,
             "created": user_created,
         }
     )
