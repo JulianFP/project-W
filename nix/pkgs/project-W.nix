@@ -28,6 +28,7 @@ python3Packages.buildPythonPackage rec {
     python-multipart
     httpx
     pyjwt
+    bonsai
   ];
 
   nativeCheckInputs = with python3Packages; [

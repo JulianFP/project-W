@@ -66,7 +66,7 @@ class OidcProviderSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     icon_url: str | None = Field(
         default=None,
-        description="URL to an square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
+        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
         examples=[
             "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
         ],
@@ -93,9 +93,79 @@ class OidcProviderSettings(BaseModel):
         default=None,
         description="Configure the role that users should have to be have admin permissions on Project-W. Only users with this role can do things like create new runners and see all user data. Use carefully! Set to None if no users of this IdP should be admins",
     )
-    ca_pem_file_path: str = Field(
+    ca_pem_file_path: str | None = Field(
         default=None,
         description="Path to the pem certs file that includes the certificates that should be trusted for this provider (alternative certificate verification). Useful if the identity provider uses a self-signed certificate",
+    )
+
+
+class LdapQuerySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    base_dn: str = Field(
+        description="The base DN under which should be searched",
+        examples=["dc=example,dc=org"],
+    )
+    filter: str = Field(
+        description="Ldap filter expression that should return only one user with a specific username that has the required permissions. Use %s as a placeholder for the username as the user enters it into on the login form.",
+        examples=[
+            "(&(class=person)(person=%s))"
+            "(&(class=person)(memberof=spn=project-W-users@localhost)(name=%s))"
+            "(&(class=person)(memberof=spn=project-W-admins@localhost)(mail=%s))"
+        ],
+    )
+    mail_attribute_name: str = Field(
+        description="The attribute/field name that contains the email address of a user. Every user that should be able to authenticate with Project-W should have this attribute.",
+        examples=[
+            "mail",
+            "email",
+            "mail1",
+        ],
+    )
+
+
+class LdapAuthSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mechanism: str = Field(
+        pattern=r"^SIMPLE|DIGEST-MD5|NTLM$",
+        default="SIMPLE",
+        description="Authentication mechanism that should be used. Can be one of 'SIMPLE', 'DIGEST-MD5' or 'NTLM'",
+    )
+    user: str = Field(description="Identification of binding user.")
+    password: str = Field(description="Password of binding user.")
+
+
+class LdapProviderSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    icon_url: str | None = Field(
+        default=None,
+        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
+        examples=[
+            "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
+        ],
+    )
+    server_address: str = Field(
+        pattern=r"^(ldap|ldaps|ldapi):\/\/.+$",
+        description="Address of the ldap server. Should start with either ldap://, ldaps:// or ldapi:// depending on whether the connection should be unencrypted, ssl/tls encrypted or if it's an URL-encoded filesocket connection",
+        examples=[
+            "ldap://example.org",
+            "ldaps://example.org",
+            "ldapi://%2Frun%2Fslapd%2Fldapi",
+        ],
+    )
+    user_query: LdapQuerySettings | None = Field(
+        default=None,
+        description="Settings that define how normal users should be queried from the ldap server. If left to None then no normal user will be able to sign in using this provider",
+    )
+    admin_query: LdapQuerySettings | None = Field(
+        default=None,
+        description="Settings that define how admin users should be queried from the ldap server. If left to None then no admin user will be able to sign in (with admin privileges) using this provider",
+    )
+    service_account_auth: LdapAuthSettings = Field(
+        description=" This user should be a service account with read permissions on all other users and their mail (and any other attributes used in the query, e.g. memberof)."
+    )
+    ca_pem_file_path: str | None = Field(
+        default=None,
+        description="Path to the pem certs file that includes the certificates that should be trusted for this ldap server (alternative certificate verification). Useful if the ldap server uses a self-signed certificate",
     )
 
 
@@ -106,6 +176,13 @@ class SecuritySettings(BaseModel):
     local_token: LocalTokenSettings
     oidc_providers: Annotated[
         dict[str, OidcProviderSettings],
+        Field(
+            description="Attribute set of identity providers. The name of the set will be shown to users in a form like this: 'Login with <provider name>'.",
+            examples=["Google: {<ProviderSettings>}", "Apple: {<ProviderSettings>}"],
+        ),
+    ] = {}
+    ldap_providers: Annotated[
+        dict[str, LdapProviderSettings],
         Field(
             description="Attribute set of identity providers. The name of the set will be shown to users in a form like this: 'Login with <provider name>'.",
             examples=["Google: {<ProviderSettings>}", "Apple: {<ProviderSettings>}"],

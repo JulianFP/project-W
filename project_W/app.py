@@ -15,7 +15,7 @@ from ._version import __version__
 from .config import loadConfig
 from .models.response_data import AboutResponse
 from .routers import admins, users
-from .security import local_account, oidc
+from .security import ldap, local_account, oidc
 
 
 # startup database connections before spinning up application
@@ -40,6 +40,10 @@ async def lifespan(app: FastAPI):
     if dp.config.security.oidc_providers is not {}:
         app.include_router(oidc.router)
         await oidc.register_with_oidc_providers(dp.config)
+    if dp.config.security.ldap_providers is not {}:
+        app.include_router(ldap.router)
+        ldap.ldap_adapter = ldap.LdapAdapter()
+        await ldap.ldap_adapter.open(dp.config.security.ldap_providers)
     if not dp.config.security.local_account.disable:
         app.include_router(local_account.router)
 
