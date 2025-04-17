@@ -18,6 +18,11 @@ class OidcUserInDb(UserInDb):
     sub: str
 
 
+class LdapUserInDb(UserInDb):
+    provider_name: str
+    dn: str
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -55,6 +60,12 @@ class OidcAuthServerInfo(BaseModel):
     id_token_signing_alg_values_supported: list[str]
     scopes_supported: list[str]
     claims_supported: list[str]
+
+
+class LdapUserInfo(BaseModel):
+    dn: str
+    is_admin: bool
+    email: str
 
 
 class JwksUriResponse(BaseModel):

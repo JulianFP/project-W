@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     dp.ch = RedisAdapter()
     await dp.ch.open(unix_socket_path="/run/redis-project-W/redis.sock")
 
-    await dp.db.add_new_local_user("julian@partanengroup.de", "Password-1234", False, True)
+    await dp.db.ensure_local_user_exists("julian@partanengroup.de", "Password-1234", False, True)
 
     yield
 

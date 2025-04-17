@@ -3,7 +3,7 @@ import ssl
 import certifi
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from httpx import AsyncClient
 
 import project_W.dependencies as dp
@@ -59,7 +59,7 @@ async def login(idp_name: str, request: Request) -> RedirectResponse:
 
 
 @router.get("/auth/{idp_name}", name="oidc-auth")
-async def auth(idp_name: str, request: Request) -> JSONResponse:
+async def auth(idp_name: str, request: Request):
     idp_name = idp_name.lower()
     try:
         oidc_response = await getattr(oauth, idp_name).authorize_access_token(request)
@@ -100,17 +100,12 @@ async def auth(idp_name: str, request: Request) -> JSONResponse:
     # this also verifies email_verified and user_role/admin_role claims
     await validate_oidc_token(dp.config, id_token, iss)
 
-    user_created = await dp.db.add_new_oidc_user(
+    await dp.db.ensure_oidc_user_exists(
         iss,
         sub,
         email,
     )
-    return JSONResponse(
-        {
-            "token": id_token,
-            "created": user_created,
-        }
-    )
+    return id_token
 
 
 def has_role(role_conf: OidcRoleSettings, user) -> bool:

@@ -12,7 +12,7 @@ from psycopg_pool.pool_async import AsyncConnectionPool
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .models.internal import LocalUserInDb, OidcUserInDb
+from .models.internal import LdapUserInDb, LocalUserInDb, OidcUserInDb
 from .utils import parse_version_tuple
 
 
@@ -46,28 +46,40 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def _add_new_local_user_hashed(
+    async def _ensure_local_user_exists_hashed(
         self, email: str, hashed_password: str, is_admin: bool = False, is_verified: bool = False
-    ) -> bool:
+    ) -> int:
         """
-        This method creates a new user. The password is already hashed here which is the reason why this method is protected. It should not be used outside of this base class, use add_new_user instead!
-        Returns True if successful, False if not (in which case no change has been made to the database since the transaction would have been rolled back)
+        This method creates a new user if it doesn't exist yet. The password is already hashed here which is the reason why this method is protected. It should not be used outside of this base class, use add_new_user instead!
+        Returns the user id of the user
         """
         pass
 
-    async def add_new_local_user(
+    async def ensure_local_user_exists(
         self, email: str, password: str, is_admin: bool = False, is_verified: bool = False
-    ) -> bool:
+    ) -> int:
         """
-        Create a new user. The password will be hashed in this function before writing it in the database.
+        Create a new user if it doesn't exist yet. The password will be hashed in this function before writing it in the database.
+        Returns the user id of the user
         """
         hashed_password = self.hasher.hash(password)
-        return await self._add_new_local_user_hashed(email, hashed_password, is_admin, is_verified)
+        return await self._ensure_local_user_exists_hashed(
+            email, hashed_password, is_admin, is_verified
+        )
 
     @abstractmethod
-    async def add_new_oidc_user(self, iss: str, sub: str, email: str) -> bool:
+    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
         """
-        Add a database entry for an oidc user. Will be called at first login of this user.
+        Add a database entry for an oidc user if it doesn't exist yet. Will be called at first login of this user.
+        Returns the user id of the created user
+        """
+        pass
+
+    @abstractmethod
+    async def ensure_ldap_user_exists(self, provider_name: str, dn: str, email: str) -> int:
+        """
+        Add a database entry for an ldap user if it doesn't exist yet. Will be called at first login of this user.
+        Returns the user id of the user
         """
         pass
 
@@ -89,6 +101,15 @@ class DatabaseAdapter(ABC):
     async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
         """
         Return an oidc user with the matching iss/sub pair, or None if iss/sub doesn't match any user
+        """
+        pass
+
+    @abstractmethod
+    async def get_ldap_user_by_provider_dn(
+        self, provider_name: str, dn: str
+    ) -> LdapUserInDb | None:
+        """
+        Return an ldap user with the matching provider_name/dn pair, or None if provider_name/dn doesn't match any user
         """
         pass
 
@@ -155,7 +176,9 @@ class PostgresAdapter(DatabaseAdapter):
                 await self.__create_all_tables(conn)
             elif not await self.__check_table_exists(conn, "metadata"):
                 # if the metadata is missing we can't know whether and how to do a migration on the other table. Because of this we throw an exception if the metadata table is missing but any other table exists to be safe
-                for table_name in "users" "local_accounts" "oidc_accounts" "runners" "jobs":
+                for table_name in (
+                    "users" "local_accounts" "oidc_accounts" "ldap_accounts" "runners" "jobs"
+                ):
                     if await self.__check_table_exists(conn, table_name):
                         raise Exception(
                             f"Critical: The metadata table is missing but the {table_name} table still exists. Either restore the metadata table with its previous contents or drop the {table_name} table!"
@@ -173,6 +196,7 @@ class PostgresAdapter(DatabaseAdapter):
                     "users",
                     "local_accounts",
                     "oidc_accounts",
+                    "ldap_accounts",
                     "runners",
                 ]
                 for table_name in table_names:
@@ -345,6 +369,20 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
+            self.logger.info("Creating ldap_accounts table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.ldap_accounts (
+                    provider_name text NOT NULL,
+                    dn text NOT NULL,
+                    id integer NOT NULL,
+                    email varchar(254) NOT NULL,
+                    PRIMARY KEY (provider_name, dn),
+                    FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
+                )
+            """
+            )
+
             self.logger.info("Creating runners table...")
             await cur.execute(
                 f"""
@@ -464,24 +502,21 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     self.logger.info("No database schema migration required")
 
-    async def _add_new_local_user_hashed(
+    async def _ensure_local_user_exists_hashed(
         self, email: str, hashed_password: str, is_admin: bool = False, is_verified: bool = False
-    ) -> bool:
+    ) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
-                    SELECT EXISTS (
-                        SELECT *
-                        FROM {self.schema}.local_accounts
-                        WHERE email = %s
-                    )
+                    SELECT id
+                    FROM {self.schema}.local_accounts
+                    WHERE email = %s
                 """,
                     (email,),
                 )
-                email_already_in_use: bool | None = await cur.fetchone()
-                if email_already_in_use:
-                    return False
+                if user_id := await cur.fetchone():
+                    return user_id
 
                 await cur.execute(
                     f"""
@@ -490,32 +525,33 @@ class PostgresAdapter(DatabaseAdapter):
                     RETURNING id
                     """,
                 )
-                user_id = await cur.fetchone()
-                await cur.execute(
-                    f"""
-                    INSERT INTO {self.schema}.local_accounts (email, id, password_hash, is_admin, is_verified)
-                    VALUES (%s, %s, %s, %s, %s)
-                """,
-                    (email, user_id, hashed_password, is_admin, is_verified),
-                )
-        return True
+                if user_id := await cur.fetchone():
+                    await cur.execute(
+                        f"""
+                        INSERT INTO {self.schema}.local_accounts (email, id, password_hash, is_admin, is_verified)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """,
+                        (email, user_id, hashed_password, is_admin, is_verified),
+                    )
+                    return user_id
+                else:
+                    raise Exception(
+                        f"Error occurred while creating local user {email}: No user id returned!"
+                    )
 
-    async def add_new_oidc_user(self, iss: str, sub: str, email: str) -> bool:
+    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
-                    SELECT EXISTS (
-                        SELECT *
-                        FROM {self.schema}.oidc_accounts
-                        WHERE iss = %s AND sub = %s
-                    )
+                    SELECT id
+                    FROM {self.schema}.oidc_accounts
+                    WHERE iss = %s AND sub = %s
                 """,
                     (iss, sub),
                 )
-                oidc_account_already_exists: bool | None = await cur.fetchone()
-                if oidc_account_already_exists:
-                    return False
+                if user_id := await cur.fetchone():
+                    return user_id
 
                 await cur.execute(
                     f"""
@@ -524,15 +560,54 @@ class PostgresAdapter(DatabaseAdapter):
                     RETURNING id
                     """,
                 )
-                user_id = await cur.fetchone()
+                if user_id := await cur.fetchone():
+                    await cur.execute(
+                        f"""
+                        INSERT INTO {self.schema}.oidc_accounts (iss, sub, id, email)
+                        VALUES (%s, %s, %s, %s)
+                    """,
+                        (iss, sub, user_id, email),
+                    )
+                    return user_id
+                else:
+                    raise Exception(
+                        f"Error occurred while creating oidc user {email}: No user id returned!"
+                    )
+
+    async def ensure_ldap_user_exists(self, provider_name: str, dn: str, email: str) -> int:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
-                    INSERT INTO {self.schema}.oidc_accounts (iss, sub, id, email)
-                    VALUES (%s, %s, %s, %s)
+                    SELECT id
+                    FROM {self.schema}.ldap_accounts
+                    WHERE provider_name = %s AND dn = %s
                 """,
-                    (iss, sub, user_id, email),
+                    (provider_name, dn),
                 )
-        return True
+                if user_id := await cur.fetchone():
+                    return user_id
+
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.users (id)
+                    VALUES (DEFAULT)
+                    RETURNING id
+                    """,
+                )
+                if user_id := await cur.fetchone():
+                    await cur.execute(
+                        f"""
+                        INSERT INTO {self.schema}.ldap_accounts (provider_name, dn, id, email)
+                        VALUES (%s, %s, %s, %s)
+                    """,
+                        (provider_name, dn, user_id, email),
+                    )
+                    return user_id
+                else:
+                    raise Exception(
+                        f"Error occurred while creating ldap user {email}: No user id returned!"
+                    )
 
     async def delete_user(self, user_id):
         async with self.apool.connection() as conn:
@@ -573,6 +648,22 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return_val = await cur.fetchone()
                 return OidcUserInDb.model_validate(return_val)
+
+    async def get_ldap_user_by_provider_dn(
+        self, provider_name: str, dn: str
+    ) -> LdapUserInDb | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.ldap_accounts
+                        WHERE provider_name = %s AND dn = %s
+                    """,
+                    (provider_name, dn),
+                )
+                return_val = await cur.fetchone()
+                return LdapUserInDb.model_validate(return_val)
 
     async def _update_password_hash(self, user_id: int, new_password_hash: str):
         async with self.apool.connection() as conn:
