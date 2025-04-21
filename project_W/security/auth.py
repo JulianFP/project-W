@@ -2,7 +2,8 @@ import json
 from base64 import urlsafe_b64decode
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 import project_W.dependencies as dp
 from project_W.models.response_data import User
@@ -16,18 +17,18 @@ from .oidc import lookup_oidc_user_in_db_from_token, validate_oidc_token
 
 logger = get_logger("project-W")
 
-
-async def get_jwt_token(request: Request) -> str:
-    if not (token := request.headers.get("authorization")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate credentials",
-            # can't put scope here because if the issuer is unknown we also don't know which scope might be required
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    else:
-        # strip out 'Bearer ' from token string
-        return token.split(" ")[1]
+get_token = HTTPBearer(
+    bearerFormat="Bearer",
+    scheme_name="JWT token (from local account, oidc or ldap auth)",
+    description="""
+    A valid JWT token returned by one of the following login routes:
+    - local account: /local-account/login
+    - oidc: /oidc/login/{idp_name}
+    - ldap: /ldap/login/{idp_name}
+    Which of these are available with what idp's depends on the server configuration
+    Should be provided in this format: "Bearer {token}"
+    """,
+)
 
 
 def get_payload_from_token(token: str) -> dict:
@@ -39,10 +40,10 @@ def get_payload_from_token(token: str) -> dict:
 
 def validate_user(require_admin: bool):
     async def user_validation_dep(
-        token: Annotated[str, Depends(get_jwt_token)]
+        token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)]
     ) -> DecodedTokenData:
         # first check how this token was generated without verifying the signature
-        token_payload = get_payload_from_token(token)
+        token_payload = get_payload_from_token(token.credentials)
         if token_payload.get("iss") is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,9 +53,11 @@ def validate_user(require_admin: bool):
             )
 
         if token_payload.get("iss") == jwt_issuer:
-            token_data = await validate_local_token(dp.config, token)
+            token_data = await validate_local_token(dp.config, token.credentials)
         else:
-            token_data = await validate_oidc_token(dp.config, token, token_payload["iss"])
+            token_data = await validate_oidc_token(
+                dp.config, token.credentials, token_payload["iss"]
+            )
 
         if require_admin and not token_data.is_admin:
             raise HTTPException(
