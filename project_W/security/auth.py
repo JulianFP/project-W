@@ -48,7 +48,6 @@ get_token = HTTPBearer(
     - oidc: /oidc/login/{idp_name}
     - ldap: /ldap/login/{idp_name}
     Which of these are available with what idp's depends on the server configuration
-    Should be provided in this format: "Bearer {token}"
     """,
 )
 

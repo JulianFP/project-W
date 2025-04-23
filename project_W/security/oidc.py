@@ -1,10 +1,11 @@
 import ssl
+from json.decoder import JSONDecodeError
 
 import certifi
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from httpx import AsyncClient
+from httpx import AsyncClient, HTTPError, HTTPStatusError
 
 import project_W.dependencies as dp
 from project_W.models.settings import OidcRoleSettings, Settings
@@ -41,7 +42,12 @@ async def register_with_oidc_providers(config: Settings):
                 },
             )
 
-            oidc_config = (await client.get(metadata_uri)).json()
+            try:
+                oidc_config = (await client.get(metadata_uri)).raise_for_status().json()
+            except (HTTPError, HTTPStatusError, JSONDecodeError) as e:
+                raise Exception(
+                    f"Error occured while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
+                )
             oauth_iss_to_name[oidc_config["issuer"]] = name
 
 
@@ -51,7 +57,7 @@ router = APIRouter(
 )
 
 
-@router.get("/login/{idp_name}", name="Oidc redirect")
+@router.get("/login/{idp_name}", name="oidc-redirect")
 async def login(idp_name: str, request: Request) -> RedirectResponse:
     redirect_uri = request.url_for("oidc-auth", idp_name=idp_name)
     idp_name = idp_name.lower()
@@ -60,7 +66,7 @@ async def login(idp_name: str, request: Request) -> RedirectResponse:
 
 @router.get(
     "/auth/{idp_name}",
-    name="Oidc auth",
+    name="oidc-auth",
     responses={
         400: {
             "model": ErrorResponse,
@@ -156,7 +162,7 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate token for oidc provider {iss}",
+            detail=f"Could not validate token for oidc provider '{name}'",
             # can't put scope here because if the issuer is unknown we also don't know which scope might be required
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -164,7 +170,7 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
     if not user.get("email_verified"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"The email address of this OIDC {iss} account is not verified",
+            detail=f"The email address of this OIDC '{name}' account is not verified",
             # can't put scope here because if the issuer is unknown we also don't know which scope might be required
             headers={"WWW-Authenticate": "Bearer"},
         )

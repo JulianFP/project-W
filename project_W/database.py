@@ -632,8 +632,7 @@ class PostgresAdapter(DatabaseAdapter):
                 """,
                     (email,),
                 )
-                return_val = await cur.fetchone()
-                return LocalUserInDb.model_validate(return_val)
+                return await cur.fetchone()
 
     async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
         async with self.apool.connection() as conn:
@@ -646,14 +645,13 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                     (iss, sub),
                 )
-                return_val = await cur.fetchone()
-                return OidcUserInDb.model_validate(return_val)
+                return await cur.fetchone()
 
     async def get_ldap_user_by_provider_dn(
         self, provider_name: str, dn: str
     ) -> LdapUserInDb | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -662,8 +660,7 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                     (provider_name, dn),
                 )
-                return_val = await cur.fetchone()
-                return LdapUserInDb.model_validate(return_val)
+                return await cur.fetchone()
 
     async def _update_password_hash(self, user_id: int, new_password_hash: str):
         async with self.apool.connection() as conn:
