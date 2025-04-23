@@ -10,9 +10,14 @@ class User(UserInDb):
     is_verified: bool
 
 
-# every error response should have a detail attached
+# error response, is also being used when HTTPException is raised
 class ErrorResponse(BaseModel):
     detail: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {"detail": "error message"},
+        }
 
 
 class AboutResponse(BaseModel):

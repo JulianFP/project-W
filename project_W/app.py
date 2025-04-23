@@ -63,7 +63,44 @@ async def lifespan(app: FastAPI):
     await dp.db.close()
 
 
-app = FastAPI(lifespan=lifespan)
+# this can be in Markdown
+app_description = """
+## About Project-W
+
+Project-W is a platform for creating transcripts of audio files (speech-to-text). It leverages OpenAIs Whisper models for the transcription while providing an API and easy-to-use interface for users to create and manage transcription jobs.
+
+Refer to the [full documentation](https://project-w.readthedocs.io) for more information. You can also find the source code all of it's components on GitHub:
+- [Backend](https://github.com/julianFP/project-w)
+- [Frontend](https://github.com/julianFP/project-w-frontend)
+- [Runner](https://github.com/julianFP/project-w-runner)
+
+The API is split into the following sections:
+
+### users
+For regular users to manage their accounts
+
+### admins
+For admin users to manage the server and all users on it
+
+### oidc, ldap and local_account
+Different authentication (login, signup, etc.) routes for different authentication backends
+
+### jobs
+Submit new transcription jobs, manage existing ones
+"""
+
+app = FastAPI(
+    title="Project-W",
+    description=app_description,
+    summary="Create transcripts of audio files (speech-to-text)!",
+    version=__version__,
+    license_info={
+        "name": "GNU Affero General Public License Version 3",
+        "identifier": "AGPL-3.0-only",
+        "url": "https://www.gnu.org/licenses/agpl-3.0.txt",
+    },
+    lifespan=lifespan,
+)
 
 app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))  # for oidc
 

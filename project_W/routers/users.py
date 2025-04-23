@@ -6,11 +6,16 @@ import project_W.dependencies as dp
 from project_W.models.response_data import User
 
 from ..models.internal import DecodedTokenData
-from ..security.auth import validate_user, validate_user_and_get_from_db
+from ..security.auth import (
+    auth_dependency_responses,
+    validate_user,
+    validate_user_and_get_from_db,
+)
 
 router = APIRouter(
     prefix="/users",
     tags=["users"],
+    responses=auth_dependency_responses,
 )
 
 

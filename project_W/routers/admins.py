@@ -3,31 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from ..models.internal import DecodedTokenData
-from ..models.response_data import ErrorResponse
-from ..security.auth import validate_user
+from ..security.auth import auth_dependency_responses, validate_user
 
 router = APIRouter(
-    prefix="/api/admins",
+    prefix="/admins",
     tags=["admins"],
     # all routes handled by this routes are authenticated
-    responses={
-        401: {
-            "model": ErrorResponse,
-            "headers": {
-                "WWW-Authenticate": {
-                    "type": "string",
-                }
-            },
-        },
-        403: {
-            "model": ErrorResponse,
-            "headers": {
-                "WWW-Authenticate": {
-                    "type": "string",
-                }
-            },
-        },
-    },
+    responses=auth_dependency_responses,
 )
 
 

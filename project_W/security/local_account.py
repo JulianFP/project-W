@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from .. import dependencies as dp
 from ..models.internal import DecodedTokenData, TokenData
-from ..models.response_data import User
+from ..models.response_data import ErrorResponse, User
 from .local_token import create_jwt_token
 
 router = APIRouter(
@@ -14,14 +14,17 @@ router = APIRouter(
 )
 
 
-@router.post("/login")
+@router.post(
+    "/login",
+    responses={401: {"model": ErrorResponse, "description": "Authentication was unsuccessful"}},
+)
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user = await dp.db.get_local_user_by_email_checked_password(
         form_data.username, form_data.password
     )
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
 

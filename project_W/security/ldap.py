@@ -9,6 +9,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 import project_W.dependencies as dp
 from project_W.logger import get_logger
 from project_W.models.internal import LdapUserInfo, TokenData
+from project_W.models.response_data import ErrorResponse
 from project_W.models.settings import LdapProviderSettings
 
 from .local_token import create_jwt_token
@@ -20,7 +21,7 @@ router = APIRouter(
 
 
 http_exc = HTTPException(
-    status_code=status.HTTP_400_BAD_REQUEST,
+    status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Incorrect username or password",
 )
 
@@ -179,7 +180,16 @@ class LdapAdapter:
 ldap_adapter: LdapAdapter
 
 
-@router.post("/login/{idp_name}")
+@router.post(
+    "/login/{idp_name}",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "idp_name is invalid",
+        },
+        401: {"model": ErrorResponse, "description": "Authentication was unsuccessful"},
+    },
+)
 async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
 
     if not ldap_adapter.check_idp_name(idp_name):

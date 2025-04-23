@@ -10,7 +10,7 @@ import project_W.dependencies as dp
 from project_W.models.settings import OidcRoleSettings, Settings
 
 from ..models.internal import DecodedTokenData
-from ..models.response_data import User
+from ..models.response_data import ErrorResponse, User
 
 oauth = OAuth()
 
@@ -51,14 +51,36 @@ router = APIRouter(
 )
 
 
-@router.get("/login/{idp_name}")
+@router.get("/login/{idp_name}", name="Oidc redirect")
 async def login(idp_name: str, request: Request) -> RedirectResponse:
     redirect_uri = request.url_for("oidc-auth", idp_name=idp_name)
     idp_name = idp_name.lower()
     return await getattr(oauth, idp_name).authorize_redirect(request, redirect_uri)
 
 
-@router.get("/auth/{idp_name}", name="oidc-auth")
+@router.get(
+    "/auth/{idp_name}",
+    name="Oidc auth",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Could not authorize IdP access token",
+        },
+        401: {
+            "model": ErrorResponse,
+            "headers": {
+                "WWW-Authenticate": {
+                    "type": "string",
+                }
+            },
+            "description": "Validation error of id_token",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "Not enough information or missing scope",
+        },
+    },
+)
 async def auth(idp_name: str, request: Request):
     idp_name = idp_name.lower()
     try:
@@ -124,7 +146,7 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
     if name is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate credentials, iss {iss} not known",
+            detail=f"Could not validate token, iss {iss} not known",
             # can't put scope here because if the issuer is unknown we also don't know which scope might be required
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -134,7 +156,7 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate credentials for oidc provider {iss}",
+            detail=f"Could not validate token for oidc provider {iss}",
             # can't put scope here because if the issuer is unknown we also don't know which scope might be required
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -178,7 +200,7 @@ async def lookup_oidc_user_in_db_from_token(user_token_data: DecodedTokenData) -
     provider_name = oauth_iss_to_name.get(oidc_user.iss)
     if not provider_name:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Authentication successful, but the user was not found in database",
         )
     return User(

@@ -1,6 +1,6 @@
 import json
 from base64 import urlsafe_b64decode
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -10,12 +10,34 @@ from project_W.models.response_data import User
 
 from ..logger import get_logger
 from ..models.internal import DecodedTokenData
-from ..models.response_data import User
+from ..models.response_data import ErrorResponse, User
 from .local_account import lookup_local_user_in_db_from_token
 from .local_token import jwt_issuer, validate_local_token
 from .oidc import lookup_oidc_user_in_db_from_token, validate_oidc_token
 
 logger = get_logger("project-W")
+
+# define all possible HTTP responses here so that they can be included together with the dependency for the docs
+auth_dependency_responses: dict[int | str, dict[str, Any]] = {
+    401: {
+        "model": ErrorResponse,
+        "headers": {
+            "WWW-Authenticate": {
+                "type": "string",
+            }
+        },
+        "description": "Validation error of JWT token",
+    },
+    403: {
+        "model": ErrorResponse,
+        "headers": {
+            "WWW-Authenticate": {
+                "type": "string",
+            }
+        },
+        "description": "Token doesn't grand enough permissions",
+    },
+}
 
 get_token = HTTPBearer(
     bearerFormat="Bearer",
@@ -47,7 +69,7 @@ def validate_user(require_admin: bool):
         if token_payload.get("iss") is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
+                detail="Could not validate token",
                 # can't put scope here because if the issuer is unknown we also don't know which scope might be required
                 headers={"WWW-Authenticate": "Bearer"},
             )
