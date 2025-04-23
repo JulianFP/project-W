@@ -20,10 +20,17 @@ router = APIRouter(
 
 
 @router.get("/info")
-async def user_info(
+async def token_info(
     current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))]
 ) -> DecodedTokenData:
     return current_token
+
+
+@router.get("/info_db")
+async def user_info(
+    current_user: Annotated[User, Depends(validate_user_and_get_from_db(require_admin=False))]
+) -> User:
+    return current_user
 
 
 @router.delete("/delete")

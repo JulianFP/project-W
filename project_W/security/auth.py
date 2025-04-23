@@ -9,8 +9,9 @@ import project_W.dependencies as dp
 from project_W.models.response_data import User
 
 from ..logger import get_logger
-from ..models.internal import DecodedTokenData
+from ..models.internal import DecodedTokenData, TokenTypeEnum
 from ..models.response_data import ErrorResponse, User
+from .ldap import lookup_ldap_user_in_db_from_token
 from .local_account import lookup_local_user_in_db_from_token
 from .local_token import jwt_issuer, validate_local_token
 from .oidc import lookup_oidc_user_in_db_from_token, validate_oidc_token
@@ -98,9 +99,13 @@ def validate_user_and_get_from_db(require_admin: bool):
             DecodedTokenData, Depends(validate_user(require_admin=require_admin))
         ]
     ) -> User:
-        if user_token_data.iss == jwt_issuer:
+        if user_token_data.token_type == TokenTypeEnum.local:
             return await lookup_local_user_in_db_from_token(user_token_data)
-        else:
+        elif user_token_data.token_type == TokenTypeEnum.ldap:
+            return await lookup_ldap_user_in_db_from_token(user_token_data)
+        elif user_token_data.token_type == TokenTypeEnum.oidc:
             return await lookup_oidc_user_in_db_from_token(user_token_data)
+        else:
+            raise Exception("Invalid token type encountered!")
 
     return user_lookup_dep

@@ -10,7 +10,7 @@ from httpx import AsyncClient, HTTPError, HTTPStatusError
 import project_W.dependencies as dp
 from project_W.models.settings import OidcRoleSettings, Settings
 
-from ..models.internal import DecodedTokenData
+from ..models.internal import DecodedTokenData, TokenTypeEnum
 from ..models.response_data import ErrorResponse, User
 
 oauth = OAuth()
@@ -175,6 +175,7 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
             headers={"WWW-Authenticate": "Bearer"},
         )
     user["is_verified"] = True
+    user["token_type"] = TokenTypeEnum.oidc
 
     # check if user is admin
     admin_role_conf = oidc_prov[name].admin_role

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from .. import dependencies as dp
-from ..models.internal import DecodedTokenData, TokenData
+from ..models.internal import DecodedTokenData, TokenData, TokenTypeEnum
 from ..models.response_data import ErrorResponse, User
 from .local_token import create_jwt_token
 
@@ -28,7 +28,12 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             detail="Incorrect username or password",
         )
 
-    data = TokenData(sub=str(user.id), email=user.email, is_verified=user.is_verified)
+    data = TokenData(
+        token_type=TokenTypeEnum.local,
+        sub=str(user.id),
+        email=user.email,
+        is_verified=user.is_verified,
+    )
 
     return create_jwt_token(dp.config, data)
 

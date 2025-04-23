@@ -105,11 +105,9 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_ldap_user_by_provider_dn(
-        self, provider_name: str, dn: str
-    ) -> LdapUserInDb | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
         """
-        Return an ldap user with the matching provider_name/dn pair, or None if provider_name/dn doesn't match any user
+        Return an ldap user with the matching user id, or None if user_id doesn't match any user
         """
         pass
 
@@ -647,18 +645,16 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
-    async def get_ldap_user_by_provider_dn(
-        self, provider_name: str, dn: str
-    ) -> LdapUserInDb | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
                         FROM {self.schema}.ldap_accounts
-                        WHERE provider_name = %s AND dn = %s
+                        WHERE id = %s
                     """,
-                    (provider_name, dn),
+                    (str(user_id),),
                 )
                 return await cur.fetchone()
 

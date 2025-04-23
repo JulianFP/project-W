@@ -1,3 +1,5 @@
+from enum import Enum
+
 from pydantic import BaseModel
 
 
@@ -28,7 +30,14 @@ class Token(BaseModel):
     token_type: str
 
 
+class TokenTypeEnum(str, Enum):
+    local = "local"
+    ldap = "ldap"
+    oidc = "oidc"
+
+
 class TokenData(BaseModel):
+    token_type: TokenTypeEnum
     sub: str
     email: str
     is_verified: bool
@@ -37,7 +46,6 @@ class TokenData(BaseModel):
 class DecodedTokenData(TokenData):
     is_admin: bool
     iss: str
-    sub: str
 
 
 # we only include the fields relevant for our application here. There are many more: https://openid.net/specs/openid-connect-discovery-1_0.html
