@@ -8,13 +8,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 import project_W.dependencies as dp
 from project_W.logger import get_logger
-from project_W.models.internal import (
-    DecodedTokenData,
-    LdapUserInfo,
-    TokenData,
-    TokenTypeEnum,
-)
-from project_W.models.response_data import ErrorResponse, User
+from project_W.models.internal import DecodedTokenData, LdapUserInfo, TokenData
+from project_W.models.response_data import ErrorResponse, User, UserTypeEnum
 from project_W.models.settings import LdapProviderSettings
 
 from .local_token import create_jwt_token
@@ -208,9 +203,9 @@ async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, D
     if await ldap_adapter.authenticate_user(idp_name, user.dn, form_data.password):
         user_id = await dp.db.ensure_ldap_user_exists(idp_name, user.dn, user.email)
         data = TokenData(
-            token_type=TokenTypeEnum.ldap, sub=str(user_id), email=user.email, is_verified=True
+            user_type=UserTypeEnum.ldap, sub=str(user_id), email=user.email, is_verified=True
         )
-        token = create_jwt_token(dp.config, data)
+        token = await create_jwt_token(dp.config, data, user_id)
         return token
     else:
         raise http_exc
@@ -225,6 +220,7 @@ async def lookup_ldap_user_in_db_from_token(user_token_data: DecodedTokenData) -
         )
     return User(
         id=ldap_user.id,
+        user_type=UserTypeEnum.ldap,
         email=ldap_user.email,
         provider_name=ldap_user.provider_name,
         is_admin=user_token_data.is_admin,

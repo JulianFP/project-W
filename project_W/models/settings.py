@@ -30,7 +30,9 @@ class LocalAccountSettings(BaseModel):
 class LocalTokenSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_secret_key: str = Field(
-        min_length=64,  # enforce at least 256-Bit secret keys (32 Byte = 64 characters in hex)
+        # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, half of it is supplied here, the other half comes from per user token secrets stored in database)
+        min_length=32,
+        max_length=32,
         pattern=r"^[a-f0-9]*$",  # hex
         description="The secret key used to generate JWT Tokens. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
     )
@@ -39,6 +41,24 @@ class LocalTokenSettings(BaseModel):
         default=60,
         description="Time for which a users/clients JWT Tokens stay valid (in minutes). After this time the user will be logged out automatically and has to authenticate again using their username and password.",
         validate_default=True,
+    )
+
+
+class ProviderSettings(BaseModel):
+    allow_creation_of_api_tokens: bool = Field(
+        default=False,
+        description="If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will not be automatically invalidated if the user gets deleted or looses permissions in the identity provider. This means that with this setting enabled, users that ones have access to Project-W can retain that access possibly forever. Consider if this is a problem for you before enabling this!",
+    )
+    icon_url: str | None = Field(
+        default=None,
+        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
+        examples=[
+            "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
+        ],
+    )
+    ca_pem_file_path: str | None = Field(
+        default=None,
+        description="Path to the pem certs file that includes the certificates that should be trusted for this provider (alternative certificate verification). Useful if the identity provider uses a self-signed certificate",
     )
 
 
@@ -62,15 +82,8 @@ class OidcRoleSettings(BaseModel):
     )
 
 
-class OidcProviderSettings(BaseModel):
+class OidcProviderSettings(ProviderSettings):
     model_config = ConfigDict(extra="forbid")
-    icon_url: str | None = Field(
-        default=None,
-        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
-        examples=[
-            "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
-        ],
-    )
     base_url: str = Field(
         pattern=r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?$",
         description="Base url of the OIDC provider. If '/.well-known/openid-configuration' is appended to it it should return its metadata",
@@ -92,10 +105,6 @@ class OidcProviderSettings(BaseModel):
     admin_role: OidcRoleSettings | None = Field(
         default=None,
         description="Configure the role that users should have to be have admin permissions on Project-W. Only users with this role can do things like create new runners and see all user data. Use carefully! Set to None if no users of this IdP should be admins",
-    )
-    ca_pem_file_path: str | None = Field(
-        default=None,
-        description="Path to the pem certs file that includes the certificates that should be trusted for this provider (alternative certificate verification). Useful if the identity provider uses a self-signed certificate",
     )
 
 
@@ -134,15 +143,8 @@ class LdapAuthSettings(BaseModel):
     password: str = Field(description="Password of binding user.")
 
 
-class LdapProviderSettings(BaseModel):
+class LdapProviderSettings(ProviderSettings):
     model_config = ConfigDict(extra="forbid")
-    icon_url: str | None = Field(
-        default=None,
-        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
-        examples=[
-            "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
-        ],
-    )
     server_address: str = Field(
         pattern=r"^(ldap|ldaps|ldapi):\/\/.+$",
         description="Address of the ldap server. Should start with either ldap://, ldaps:// or ldapi:// depending on whether the connection should be unencrypted, ssl/tls encrypted or if it's an URL-encoded filesocket connection",
@@ -162,10 +164,6 @@ class LdapProviderSettings(BaseModel):
     )
     service_account_auth: LdapAuthSettings = Field(
         description=" This user should be a service account with read permissions on all other users and their mail (and any other attributes used in the query, e.g. memberof)."
-    )
-    ca_pem_file_path: str | None = Field(
-        default=None,
-        description="Path to the pem certs file that includes the certificates that should be trusted for this ldap server (alternative certificate verification). Useful if the ldap server uses a self-signed certificate",
     )
 
 

@@ -1,14 +1,10 @@
-from enum import Enum
+from pydantic import BaseModel, Field
 
-from pydantic import BaseModel
+from .base import UserInDb
+from .response_data import TokenSecretInfo, UserTypeEnum
 
 
 # user models for the database
-class UserInDb(BaseModel):
-    id: int
-    email: str
-
-
 class LocalUserInDb(UserInDb):
     password_hash: str
     is_admin: bool
@@ -25,56 +21,25 @@ class LdapUserInDb(UserInDb):
     dn: str
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-
-class TokenTypeEnum(str, Enum):
-    local = "local"
-    ldap = "ldap"
-    oidc = "oidc"
-
-
 class TokenData(BaseModel):
-    token_type: TokenTypeEnum
+    user_type: UserTypeEnum
     sub: str
     email: str
     is_verified: bool
 
 
 class DecodedTokenData(TokenData):
+    token_id: int | None
     is_admin: bool
     iss: str
 
 
-# we only include the fields relevant for our application here. There are many more: https://openid.net/specs/openid-connect-discovery-1_0.html
-class OpenIdConfiguration(BaseModel):
-    jwks_uri: str
-    id_token_signing_alg_values_supported: list[str]
-
-
-class OidcPublicKey(BaseModel):
-    e: str
-    n: str
-    kty: str
-    kid: str
-    use: str
-    alg: str
-
-
-class OidcAuthServerInfo(BaseModel):
-    jwks_uri: str
-    id_token_signing_alg_values_supported: list[str]
-    scopes_supported: list[str]
-    claims_supported: list[str]
+class TokenSecret(TokenSecretInfo):
+    user_id: int
+    secret: str = Field(min_length=32, max_length=32)
 
 
 class LdapUserInfo(BaseModel):
     dn: str
     is_admin: bool
     email: str
-
-
-class JwksUriResponse(BaseModel):
-    keys: list[OidcPublicKey]

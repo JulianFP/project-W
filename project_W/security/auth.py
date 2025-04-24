@@ -9,8 +9,8 @@ import project_W.dependencies as dp
 from project_W.models.response_data import User
 
 from ..logger import get_logger
-from ..models.internal import DecodedTokenData, TokenTypeEnum
-from ..models.response_data import ErrorResponse, User
+from ..models.internal import DecodedTokenData
+from ..models.response_data import ErrorResponse, User, UserTypeEnum
 from .ldap import lookup_ldap_user_in_db_from_token
 from .local_account import lookup_local_user_in_db_from_token
 from .local_token import jwt_issuer, validate_local_token
@@ -75,11 +75,9 @@ def validate_user(require_admin: bool):
             )
 
         if token_payload.get("iss") == jwt_issuer:
-            token_data = await validate_local_token(dp.config, token.credentials)
+            token_data = await validate_local_token(dp.config, token.credentials, token_payload)
         else:
-            token_data = await validate_oidc_token(
-                dp.config, token.credentials, token_payload["iss"]
-            )
+            token_data = await validate_oidc_token(dp.config, token.credentials, token_payload)
 
         if require_admin and not token_data.is_admin:
             raise HTTPException(
@@ -99,11 +97,11 @@ def validate_user_and_get_from_db(require_admin: bool):
             DecodedTokenData, Depends(validate_user(require_admin=require_admin))
         ]
     ) -> User:
-        if user_token_data.token_type == TokenTypeEnum.local:
+        if user_token_data.user_type == UserTypeEnum.local:
             return await lookup_local_user_in_db_from_token(user_token_data)
-        elif user_token_data.token_type == TokenTypeEnum.ldap:
+        elif user_token_data.user_type == UserTypeEnum.ldap:
             return await lookup_ldap_user_in_db_from_token(user_token_data)
-        elif user_token_data.token_type == TokenTypeEnum.oidc:
+        elif user_token_data.user_type == UserTypeEnum.oidc:
             return await lookup_oidc_user_in_db_from_token(user_token_data)
         else:
             raise Exception("Invalid token type encountered!")

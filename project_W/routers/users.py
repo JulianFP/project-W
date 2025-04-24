@@ -1,22 +1,90 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 import project_W.dependencies as dp
-from project_W.models.response_data import User
+from project_W.models.response_data import ErrorResponse, User
 
-from ..models.internal import DecodedTokenData
+from ..models.internal import DecodedTokenData, TokenData
+from ..models.response_data import TokenSecretInfo, UserTypeEnum
 from ..security.auth import (
     auth_dependency_responses,
     validate_user,
     validate_user_and_get_from_db,
 )
+from ..security.local_token import create_jwt_token
 
 router = APIRouter(
     prefix="/users",
     tags=["users"],
     responses=auth_dependency_responses,
 )
+
+
+@router.post("/invalidate_token")
+async def invalidate_token(
+    current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))],
+    token_id: int,
+):
+    await dp.db.delete_token_secret_of_user(int(current_token.sub), token_id)
+
+
+@router.post("/invalidate_all_tokens")
+async def invalidate_all_tokens(
+    current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))],
+):
+    await dp.db.delete_all_token_secrets_of_user(int(current_token.sub))
+
+
+@router.post(
+    "/get_new_api_token",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Creation of api tokens is disabled for your identity provider",
+        }
+    },
+)
+async def get_new_api_token(
+    current_user: Annotated[User, Depends(validate_user_and_get_from_db(require_admin=False))],
+    name: str,
+):
+    # check if current user is from a provider which allows creation of api tokens
+    disabled_exc = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Creation of api tokens is disabled for your identity provider {current_user.provider_name}. Login using a different provider or ask the administrator to enable this.",
+    )
+    if (
+        current_user.user_type == UserTypeEnum.oidc
+        and not dp.config.security.oidc_providers[
+            current_user.provider_name
+        ].allow_creation_of_api_tokens
+    ):
+        raise disabled_exc
+    if (
+        current_user.user_type == UserTypeEnum.ldap
+        and not dp.config.security.ldap_providers[
+            current_user.provider_name
+        ].allow_creation_of_api_tokens
+    ):
+        raise disabled_exc
+
+    data = TokenData(
+        user_type=current_user.user_type,
+        sub=str(current_user.id),
+        email=current_user.email,
+        is_verified=current_user.is_verified,
+    )
+    return await create_jwt_token(
+        dp.config, data, current_user.id, current_user.is_admin, infinite_lifetime=True, name=name
+    )
+
+
+@router.get("/get_all_token_info")
+async def get_all_token_info(
+    current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))]
+) -> list[TokenSecretInfo]:
+    return await dp.db.get_info_of_all_tokens_of_user(int(current_token.sub))
 
 
 @router.get("/info")

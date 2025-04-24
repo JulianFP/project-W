@@ -10,8 +10,8 @@ from httpx import AsyncClient, HTTPError, HTTPStatusError
 import project_W.dependencies as dp
 from project_W.models.settings import OidcRoleSettings, Settings
 
-from ..models.internal import DecodedTokenData, TokenTypeEnum
-from ..models.response_data import ErrorResponse, User
+from ..models.internal import DecodedTokenData
+from ..models.response_data import ErrorResponse, User, UserTypeEnum
 
 oauth = OAuth()
 
@@ -144,10 +144,20 @@ def has_role(role_conf: OidcRoleSettings, user) -> bool:
         return role_name == role_conf.name
 
 
-async def validate_oidc_token(config: Settings, token: str, iss: str) -> DecodedTokenData:
+async def validate_oidc_token(
+    config: Settings, token: str, token_payload: dict
+) -> DecodedTokenData:
     oidc_prov = config.security.oidc_providers
     assert oidc_prov is not {}
     # get current oidc config name
+    iss = token_payload.get("iss")
+    if iss is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Could not validate token, 'iss' field missing in token",
+            # can't put scope here because if the issuer is unknown we also don't know which scope might be required
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     name = oauth_iss_to_name.get(iss)
     if name is None:
         raise HTTPException(
@@ -175,7 +185,7 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
             headers={"WWW-Authenticate": "Bearer"},
         )
     user["is_verified"] = True
-    user["token_type"] = TokenTypeEnum.oidc
+    user["user_type"] = UserTypeEnum.oidc
 
     # check if user is admin
     admin_role_conf = oidc_prov[name].admin_role
@@ -212,6 +222,7 @@ async def lookup_oidc_user_in_db_from_token(user_token_data: DecodedTokenData) -
         )
     return User(
         id=oidc_user.id,
+        user_type=UserTypeEnum.oidc,
         email=oidc_user.email,
         provider_name=provider_name,
         is_admin=user_token_data.is_admin,

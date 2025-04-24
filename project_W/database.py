@@ -12,7 +12,8 @@ from psycopg_pool.pool_async import AsyncConnectionPool
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .models.internal import LdapUserInDb, LocalUserInDb, OidcUserInDb
+from .models.internal import LdapUserInDb, LocalUserInDb, OidcUserInDb, TokenSecret
+from .models.response_data import TokenSecretInfo
 from .utils import parse_version_tuple
 
 
@@ -84,9 +85,30 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    async def get_new_token_for_user(self, user_id: int, name: str) -> TokenSecret:
+        """
+        Create a new api token and return it
+        """
+        pass
+
+    @abstractmethod
     async def delete_user(self, user_id: int):
         """
         Delete the user with id user_id.
+        """
+        pass
+
+    @abstractmethod
+    async def delete_token_secret_of_user(self, user_id: int, token_id: int):
+        """
+        Delete the token secret with id token_id if it belongs to user with id user_id.
+        """
+        pass
+
+    @abstractmethod
+    async def delete_all_token_secrets_of_user(self, user_id: int):
+        """
+        Delete all token secrets of user with id user_id
         """
         pass
 
@@ -108,6 +130,27 @@ class DatabaseAdapter(ABC):
     async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
         """
         Return an ldap user with the matching user id, or None if user_id doesn't match any user
+        """
+        pass
+
+    @abstractmethod
+    async def get_token_secret_of_user(self, user_id: int, token_id: int) -> TokenSecret | None:
+        """
+        Return the token secret object that matches both the token id and user id, or None if there are no matches
+        """
+        pass
+
+    @abstractmethod
+    async def get_temp_session_token_secret_of_user(self, user_id: int) -> TokenSecret | None:
+        """
+        Return the token secret object that is used to sign temporary session tokens of a user, or None if there are no matches
+        """
+        pass
+
+    @abstractmethod
+    async def get_info_of_all_tokens_of_user(self, user_id: int) -> list[TokenSecretInfo]:
+        """
+        Return a list of all stripped token secret objects a user has
         """
         pass
 
@@ -175,7 +218,13 @@ class PostgresAdapter(DatabaseAdapter):
             elif not await self.__check_table_exists(conn, "metadata"):
                 # if the metadata is missing we can't know whether and how to do a migration on the other table. Because of this we throw an exception if the metadata table is missing but any other table exists to be safe
                 for table_name in (
-                    "users" "local_accounts" "oidc_accounts" "ldap_accounts" "runners" "jobs"
+                    "users"
+                    "local_accounts"
+                    "oidc_accounts"
+                    "ldap_accounts"
+                    "runners"
+                    "jobs"
+                    "token_secrets"
                 ):
                     if await self.__check_table_exists(conn, table_name):
                         raise Exception(
@@ -196,6 +245,7 @@ class PostgresAdapter(DatabaseAdapter):
                     "oidc_accounts",
                     "ldap_accounts",
                     "runners",
+                    "token_secrets",
                 ]
                 for table_name in table_names:
                     if not await self.__check_table_exists(conn, table_name):
@@ -327,14 +377,50 @@ class PostgresAdapter(DatabaseAdapter):
             """,
                 [Jsonb(cleanup_metadata)],
             )
+
             self.logger.info("Creating users table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.users (
-                    id serial,
+                    id int GENERATED ALWAYS AS IDENTITY,
                     PRIMARY KEY (id)
                 )
             """
+            )
+
+            self.logger.info("Creating token_secrets table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.token_secrets (
+                    id int GENERATED ALWAYS AS IDENTITY,
+                    name varchar(64) NOT NULL,
+                    user_id integer NOT NULL,
+                    secret char(32) NOT NULL DEFAULT MD5(random()::text),
+                    temp_token_secret boolean NOT NULL DEFAULT false,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
+                )
+            """
+            )
+            await cur.execute(
+                f"""
+                CREATE OR REPLACE FUNCTION rotatesecret() RETURNS TRIGGER AS $$
+                BEGIN
+                    INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
+                    VALUES (DEFAULT, 'Temporary sessions', OLD.user_id, DEFAULT, true);
+                    RETURN NULL;
+                END;
+                $$ LANGUAGE plpgsql
+                """
+            )
+            await cur.execute(
+                f"""
+                CREATE TRIGGER rotate_temp_token_secret
+                AFTER DELETE ON {self.schema}.token_secrets
+                FOR EACH ROW
+                WHEN (OLD.temp_token_secret)
+                EXECUTE FUNCTION rotatesecret()
+                """
             )
 
             self.logger.info("Creating local_accounts table...")
@@ -385,7 +471,7 @@ class PostgresAdapter(DatabaseAdapter):
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.runners (
-                    id serial,
+                    id int GENERATED ALWAYS AS IDENTITY,
                     token_hash char(24) UNIQUE,
                     PRIMARY KEY (id)
                 )
@@ -404,14 +490,14 @@ class PostgresAdapter(DatabaseAdapter):
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.jobs (
-                    id serial,
+                    id int GENERATED ALWAYS AS IDENTITY,
                     user_id integer NOT NULL,
-                    creation_timestamp timestamp NOT NULL DEFAULT now(),
+                    creation_timestamp timestamptz NOT NULL DEFAULT now(),
                     file_name text NOT NULL,
                     model text,
                     language char(2),
                     audio_oid oid,
-                    finish_timestamp timestamp,
+                    finish_timestamp timestamptz,
                     runner_name varchar(40),
                     runner_id integer,
                     runner_version text,
@@ -531,6 +617,13 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                         (email, user_id, hashed_password, is_admin, is_verified),
                     )
+                    await cur.execute(
+                        f"""
+                        INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
+                        VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
+                    """,
+                        (user_id,),
+                    )
                     return user_id
                 else:
                     raise Exception(
@@ -601,11 +694,34 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                         (provider_name, dn, user_id, email),
                     )
+                    await cur.execute(
+                        f"""
+                        INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
+                        VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
+                    """,
+                        (user_id,),
+                    )
                     return user_id
                 else:
                     raise Exception(
                         f"Error occurred while creating ldap user {email}: No user id returned!"
                     )
+
+    async def get_new_token_for_user(self, user_id: int, name: str) -> TokenSecret:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(TokenSecret)) as cur:
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
+                    VALUES (DEFAULT, %s, %s, DEFAULT, false)
+                    RETURNING *
+                    """,
+                    (name, user_id),
+                )
+                token_secret = await cur.fetchone()
+                if token_secret is None:
+                    raise Exception("Creation of a new token secret failed")
+                return token_secret
 
     async def delete_user(self, user_id):
         async with self.apool.connection() as conn:
@@ -615,6 +731,28 @@ class PostgresAdapter(DatabaseAdapter):
                     f"""
                         DELETE FROM {self.schema}.users
                         WHERE id = %s
+                    """,
+                    (user_id,),
+                )
+
+    async def delete_token_secret_of_user(self, user_id: int, token_id: int):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        DELETE FROM {self.schema}.token_secrets
+                        WHERE id = %s AND user_id = %s
+                    """,
+                    (token_id, user_id),
+                )
+
+    async def delete_all_token_secrets_of_user(self, user_id: int):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        DELETE FROM {self.schema}.token_secrets
+                        WHERE user_id = %s
                     """,
                     (user_id,),
                 )
@@ -657,6 +795,49 @@ class PostgresAdapter(DatabaseAdapter):
                     (str(user_id),),
                 )
                 return await cur.fetchone()
+
+    async def get_token_secret_of_user(self, user_id: int, token_id: int) -> TokenSecret | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(TokenSecret)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.token_secrets
+                        WHERE id = %s AND user_id = %s
+                    """,
+                    (str(token_id), str(user_id)),
+                )
+                return await cur.fetchone()
+
+    async def get_temp_session_token_secret_of_user(self, user_id: int) -> TokenSecret | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(TokenSecret)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.token_secrets
+                        WHERE user_id = %s AND temp_token_secret = true
+                    """,
+                    (str(user_id),),
+                )
+                return await cur.fetchone()
+
+    async def get_info_of_all_tokens_of_user(self, user_id: int) -> list[TokenSecretInfo]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                        SELECT (id, name, temp_token_secret)
+                        FROM {self.schema}.token_secrets
+                        WHERE user_id = %s
+                    """,
+                    (str(user_id),),
+                )
+                rows = []
+                for row_tup in await cur.fetchall():
+                    row = row_tup[0]
+                    rows.append(TokenSecretInfo(id=row[0], name=row[1], temp_token_secret=row[2]))
+                return rows
 
     async def _update_password_hash(self, user_id: int, new_password_hash: str):
         async with self.apool.connection() as conn:

@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import ValidationError
 
+import project_W.dependencies as dp
 from project_W.models.settings import Settings
 
 from ..logger import get_logger
@@ -25,19 +26,21 @@ logger = get_logger("project-W")
 
 
 # this function generates JWT tokens for local as well as LDAP accounts
-def create_jwt_token(
+async def create_jwt_token(
     config: Settings,
     data: TokenData,
+    user_id: int,
     is_admin: bool = False,
     scopes: list[str] = [],
-    expires_delta: timedelta | None = None,
+    infinite_lifetime: bool = False,  # also determines which token secret is used
+    name: str | None = None,
 ) -> str:
-    # calculate expiration date
-    if expires_delta is None:
-        expires_delta = timedelta(
-            minutes=config.security.local_token.session_expiration_time_minutes
-        )
-    expire = datetime.now(timezone.utc) + expires_delta
+
+    to_encode = {
+        **data.model_dump(),
+        "scopes": scopes,
+        "iss": jwt_issuer,
+    }
 
     # make sure that we only assign scopes that the user has permissions for (currently only is_admin, can be replaced with attribute set in the future)
     for scope in scopes:
@@ -53,22 +56,30 @@ def create_jwt_token(
                 detail="We don't support that token permission scope",
             )
 
-    to_encode = {
-        **data.model_dump(),
-        "scopes": scopes,
-        "iss": jwt_issuer,
-        "exp": expire,
-    }
+    if not infinite_lifetime:
+        # get token secret
+        second_half_secret = await dp.db.get_temp_session_token_secret_of_user(user_id)
+        if second_half_secret is None:
+            raise Exception(f"User with id {user_id} doesn't have a temp session token secret")
 
-    encoded_jwt = jwt.encode(
-        to_encode, config.security.local_token.session_secret_key, algorithm=jwt_algorithm
-    )
+        # calculate expiration date
+        expires_delta = timedelta(
+            minutes=config.security.local_token.session_expiration_time_minutes
+        )
+        to_encode["exp"] = datetime.now(timezone.utc) + expires_delta
+    else:
+        assert name is not None
+        second_half_secret = await dp.db.get_new_token_for_user(user_id, name)
+
+    to_encode["token_id"] = second_half_secret.id
+    secret_key = config.security.local_token.session_secret_key + second_half_secret.secret
+    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=jwt_algorithm)
     return encoded_jwt
 
 
 # this function validates jwt tokens (for both local and LDAP accounts) and returns the associated users
 async def validate_local_token(
-    config: Settings, token: Annotated[str, Depends(oauth2_scheme)]
+    config: Settings, token: Annotated[str, Depends(oauth2_scheme)], token_payload: dict
 ) -> DecodedTokenData:
     # prepare http exceptions
     credentials_exception = HTTPException(
@@ -77,11 +88,22 @@ async def validate_local_token(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    # get secret key
+    user_id = token_payload.get("sub")
+    token_id = token_payload.get("token_id")
+    if user_id is None or token_id is None:
+        raise credentials_exception
+
+    second_half_secret = await dp.db.get_token_secret_of_user(user_id, token_id)
+    if second_half_secret is None:
+        raise credentials_exception
+    secret_key = config.security.local_token.session_secret_key + second_half_secret.secret
+
     # validate token by checking its hash value, exp and the existence of all required fields
     try:
         payload = jwt.decode(
             token,
-            config.security.local_token.session_secret_key,
+            secret_key,
             algorithms=[jwt_algorithm],
             issuer=jwt_issuer,
         )
@@ -106,5 +128,4 @@ async def validate_local_token(
         payload["is_admin"] = False
 
     # return queried user
-    print(payload)
     return DecodedTokenData.model_validate(payload)

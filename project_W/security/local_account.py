@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from .. import dependencies as dp
-from ..models.internal import DecodedTokenData, TokenData, TokenTypeEnum
-from ..models.response_data import ErrorResponse, User
+from ..models.internal import DecodedTokenData, TokenData
+from ..models.response_data import ErrorResponse, User, UserTypeEnum
 from .local_token import create_jwt_token
 
 router = APIRouter(
@@ -29,13 +29,13 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
         )
 
     data = TokenData(
-        token_type=TokenTypeEnum.local,
+        user_type=UserTypeEnum.local,
         sub=str(user.id),
         email=user.email,
         is_verified=user.is_verified,
     )
 
-    return create_jwt_token(dp.config, data)
+    return await create_jwt_token(dp.config, data, user.id)
 
 
 async def lookup_local_user_in_db_from_token(user_token_data: DecodedTokenData) -> User:
@@ -47,6 +47,7 @@ async def lookup_local_user_in_db_from_token(user_token_data: DecodedTokenData) 
         )
     return User(
         id=local_user.id,
+        user_type=UserTypeEnum.local,
         email=local_user.email,
         provider_name="project-W",
         is_admin=local_user.is_admin,
