@@ -35,7 +35,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
         is_verified=user.is_verified,
     )
 
-    return await create_jwt_token(dp.config, data, user.id)
+    return await create_jwt_token(dp.config, data, user.id, user.is_admin, form_data.scopes)
 
 
 async def lookup_local_user_in_db_from_token(user_token_data: DecodedTokenData) -> User:

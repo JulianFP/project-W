@@ -29,7 +29,7 @@ class TokenData(BaseModel):
 
 
 class DecodedTokenData(TokenData):
-    token_id: int | None
+    token_id: int | None = None
     is_admin: bool
     iss: str
 

@@ -144,20 +144,10 @@ def has_role(role_conf: OidcRoleSettings, user) -> bool:
         return role_name == role_conf.name
 
 
-async def validate_oidc_token(
-    config: Settings, token: str, token_payload: dict
-) -> DecodedTokenData:
+async def validate_oidc_token(config: Settings, token: str, iss: str) -> DecodedTokenData:
     oidc_prov = config.security.oidc_providers
     assert oidc_prov is not {}
     # get current oidc config name
-    iss = token_payload.get("iss")
-    if iss is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate token, 'iss' field missing in token",
-            # can't put scope here because if the issuer is unknown we also don't know which scope might be required
-            headers={"WWW-Authenticate": "Bearer"},
-        )
     name = oauth_iss_to_name.get(iss)
     if name is None:
         raise HTTPException(

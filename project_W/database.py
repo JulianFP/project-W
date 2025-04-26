@@ -72,6 +72,7 @@ class DatabaseAdapter(ABC):
     async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
         """
         Add a database entry for an oidc user if it doesn't exist yet. Will be called at first login of this user.
+        If the user exists but with a different email then update the email address of the user.
         Returns the user id of the created user
         """
         pass
@@ -80,6 +81,7 @@ class DatabaseAdapter(ABC):
     async def ensure_ldap_user_exists(self, provider_name: str, dn: str, email: str) -> int:
         """
         Add a database entry for an ldap user if it doesn't exist yet. Will be called at first login of this user.
+        If the user exists but with a different email then update the email address of the user.
         Returns the user id of the user
         """
         pass
@@ -632,17 +634,26 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                    SELECT id
+                    SELECT (id, email)
                     FROM {self.schema}.oidc_accounts
                     WHERE iss = %s AND sub = %s
                 """,
                     (iss, sub),
                 )
-                if user_id := await cur.fetchone():
-                    return user_id
+                if return_val := await cur.fetchone():
+                    if return_val[0][1] != email:
+                        await cur.execute(
+                            f"""
+                            UPDATE {self.schema}.oidc_accounts
+                            SET email = %s
+                            WHERE iss = %s AND sub = %s
+                            """,
+                            (email, iss, sub),
+                        )
+                    return return_val[0][0]
 
                 await cur.execute(
                     f"""
@@ -651,15 +662,15 @@ class PostgresAdapter(DatabaseAdapter):
                     RETURNING id
                     """,
                 )
-                if user_id := await cur.fetchone():
+                if return_val := await cur.fetchone():
                     await cur.execute(
                         f"""
                         INSERT INTO {self.schema}.oidc_accounts (iss, sub, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (iss, sub, user_id, email),
+                        (iss, sub, return_val[0][0], email),
                     )
-                    return user_id
+                    return return_val[0][0]
                 else:
                     raise Exception(
                         f"Error occurred while creating oidc user {email}: No user id returned!"
@@ -667,17 +678,26 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def ensure_ldap_user_exists(self, provider_name: str, dn: str, email: str) -> int:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                    SELECT id
+                    SELECT (id, email)
                     FROM {self.schema}.ldap_accounts
                     WHERE provider_name = %s AND dn = %s
                 """,
                     (provider_name, dn),
                 )
-                if user_id := await cur.fetchone():
-                    return user_id
+                if return_val := await cur.fetchone():
+                    if return_val[0][1] != email:
+                        await cur.execute(
+                            f"""
+                            UPDATE {self.schema}.ldap_accounts
+                            SET email = %s
+                            WHERE provider_name = %s AND dn = %s
+                            """,
+                            (email, provider_name, dn),
+                        )
+                    return return_val[0][0]
 
                 await cur.execute(
                     f"""
@@ -686,22 +706,22 @@ class PostgresAdapter(DatabaseAdapter):
                     RETURNING id
                     """,
                 )
-                if user_id := await cur.fetchone():
+                if return_val := await cur.fetchone():
                     await cur.execute(
                         f"""
                         INSERT INTO {self.schema}.ldap_accounts (provider_name, dn, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (provider_name, dn, user_id, email),
+                        (provider_name, dn, return_val[0][0], email),
                     )
                     await cur.execute(
                         f"""
                         INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
                         VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
                     """,
-                        (user_id,),
+                        (return_val[0][0],),
                     )
-                    return user_id
+                    return return_val[0][0]
                 else:
                     raise Exception(
                         f"Error occurred while creating ldap user {email}: No user id returned!"

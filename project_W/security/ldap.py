@@ -205,7 +205,7 @@ async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, D
         data = TokenData(
             user_type=UserTypeEnum.ldap, sub=str(user_id), email=user.email, is_verified=True
         )
-        token = await create_jwt_token(dp.config, data, user_id)
+        token = await create_jwt_token(dp.config, data, user_id, user.is_admin, form_data.scopes)
         return token
     else:
         raise http_exc

@@ -66,18 +66,18 @@ def validate_user(require_admin: bool):
     ) -> DecodedTokenData:
         # first check how this token was generated without verifying the signature
         token_payload = get_payload_from_token(token.credentials)
-        if token_payload.get("iss") is None:
+        iss = token_payload.get("iss")
+        if iss is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate token",
                 # can't put scope here because if the issuer is unknown we also don't know which scope might be required
                 headers={"WWW-Authenticate": "Bearer"},
             )
-
-        if token_payload.get("iss") == jwt_issuer:
+        if iss == jwt_issuer:
             token_data = await validate_local_token(dp.config, token.credentials, token_payload)
         else:
-            token_data = await validate_oidc_token(dp.config, token.credentials, token_payload)
+            token_data = await validate_oidc_token(dp.config, token.credentials, iss)
 
         if require_admin and not token_data.is_admin:
             raise HTTPException(
