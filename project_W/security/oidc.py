@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from httpx import AsyncClient, HTTPError, HTTPStatusError
 
 import project_W.dependencies as dp
+from project_W.logger import get_logger
 from project_W.models.settings import OidcRoleSettings, Settings
 
 from ..models.internal import DecodedTokenData
@@ -17,12 +18,15 @@ oauth = OAuth()
 
 oauth_iss_to_name = {}
 
+logger = get_logger("project-W")
+
 
 async def register_with_oidc_providers(config: Settings):
     oidc_prov = config.security.oidc_providers
     if oidc_prov is {}:
         raise Exception("Tried to use oidc router even though oidc is disabled in config!")
     for name, idp in oidc_prov.items():
+        logger.info(f"Trying to connect with OIDC provider {name}...")
         if idp.ca_pem_file_path:
             cafile = str(idp.ca_pem_file_path)
         else:
@@ -53,6 +57,7 @@ async def register_with_oidc_providers(config: Settings):
                     f"Error occured while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
                 )
             oauth_iss_to_name[oidc_config["issuer"]] = name
+        logger.info(f"Connected with OIDC provider {name}")
 
 
 router = APIRouter(

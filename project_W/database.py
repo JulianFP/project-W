@@ -69,6 +69,28 @@ class DatabaseAdapter(ABC):
         )
 
     @abstractmethod
+    async def _ensure_local_user_is_provisioned_hashed(
+        self, provision_number: int, email: str, hashed_password: str, is_admin: bool = False
+    ) -> int:
+        """
+        This method provisions a user from the config file. Compared to ensure_local_user_exists it also checks the provision_number and changes the users email, password and admin privileges if they have changed.
+        Returns the user id of the user
+        """
+        pass
+
+    async def ensure_local_user_is_provisioned(
+        self, provision_number: int, email: str, password: str, is_admin: bool = False
+    ) -> int:
+        """
+        Provision a user from the config file. The password will be hashed in this function before writing it in the database.
+        Returns the user id of the user
+        """
+        hashed_password = self.hasher.hash(password)
+        return await self._ensure_local_user_is_provisioned_hashed(
+            provision_number, email, hashed_password, is_admin
+        )
+
+    @abstractmethod
     async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
         """
         Add a database entry for an oidc user if it doesn't exist yet. Will be called at first login of this user.
@@ -435,6 +457,7 @@ class PostgresAdapter(DatabaseAdapter):
                     password_hash char(97) NOT NULL,
                     is_admin boolean NOT NULL DEFAULT false,
                     is_verified boolean NOT NULL DEFAULT false,
+                    provision_number integer UNIQUE DEFAULT null,
                     PRIMARY KEY (email),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
                 )
@@ -632,19 +655,72 @@ class PostgresAdapter(DatabaseAdapter):
                         f"Error occurred while creating local user {email}: No user id returned!"
                     )
 
-    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
+    async def _ensure_local_user_is_provisioned_hashed(
+        self, provision_number: int, email: str, hashed_password: str, is_admin: bool = False
+    ) -> int:
         async with self.apool.connection() as conn:
-            async with conn.cursor() as cur:
+            async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
                 await cur.execute(
                     f"""
-                    SELECT (id, email)
+                    SELECT *
+                    FROM {self.schema}.local_accounts
+                    WHERE provision_number = %s
+                """,
+                    (provision_number,),
+                )
+                if user := await cur.fetchone():
+                    await cur.execute(
+                        f"""
+                            UPDATE {self.schema}.local_accounts
+                            SET (email, password_hash, is_admin) = (%s, %s, %s)
+                            WHERE id = %s
+                        """,
+                        (email, hashed_password, is_admin, user.id),
+                    )
+                    return user.id
+
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.users (id)
+                    VALUES (DEFAULT)
+                    RETURNING id
+                    """,
+                )
+                if user_id := await cur.fetchone():
+                    await cur.execute(
+                        f"""
+                        INSERT INTO {self.schema}.local_accounts (email, id, password_hash, is_admin, is_verified, provision_number)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                        (email, user_id, hashed_password, is_admin, True, provision_number),
+                    )
+                    await cur.execute(
+                        f"""
+                        INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
+                        VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
+                    """,
+                        (user_id,),
+                    )
+                    return user_id
+                else:
+                    raise Exception(
+                        f"Error occurred while creating local user {email}: No user id returned!"
+                    )
+
+    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT *
                     FROM {self.schema}.oidc_accounts
                     WHERE iss = %s AND sub = %s
                 """,
                     (iss, sub),
                 )
-                if return_val := await cur.fetchone():
-                    if return_val[0][1] != email:
+                if user := await cur.fetchone():
+                    if user.email != email:
                         await cur.execute(
                             f"""
                             UPDATE {self.schema}.oidc_accounts
@@ -653,8 +729,9 @@ class PostgresAdapter(DatabaseAdapter):
                             """,
                             (email, iss, sub),
                         )
-                    return return_val[0][0]
+                    return user.id
 
+            async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
                     INSERT INTO {self.schema}.users (id)
@@ -662,15 +739,15 @@ class PostgresAdapter(DatabaseAdapter):
                     RETURNING id
                     """,
                 )
-                if return_val := await cur.fetchone():
+                if user_id := await cur.fetchone():
                     await cur.execute(
                         f"""
                         INSERT INTO {self.schema}.oidc_accounts (iss, sub, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (iss, sub, return_val[0][0], email),
+                        (iss, sub, user_id, email),
                     )
-                    return return_val[0][0]
+                    return user_id
                 else:
                     raise Exception(
                         f"Error occurred while creating oidc user {email}: No user id returned!"
@@ -678,17 +755,17 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def ensure_ldap_user_exists(self, provider_name: str, dn: str, email: str) -> int:
         async with self.apool.connection() as conn:
-            async with conn.cursor() as cur:
+            async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
                 await cur.execute(
                     f"""
-                    SELECT (id, email)
+                    SELECT *
                     FROM {self.schema}.ldap_accounts
                     WHERE provider_name = %s AND dn = %s
                 """,
                     (provider_name, dn),
                 )
-                if return_val := await cur.fetchone():
-                    if return_val[0][1] != email:
+                if user := await cur.fetchone():
+                    if user.email != email:
                         await cur.execute(
                             f"""
                             UPDATE {self.schema}.ldap_accounts
@@ -697,8 +774,9 @@ class PostgresAdapter(DatabaseAdapter):
                             """,
                             (email, provider_name, dn),
                         )
-                    return return_val[0][0]
+                    return user.id
 
+            async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
                     INSERT INTO {self.schema}.users (id)
@@ -706,22 +784,22 @@ class PostgresAdapter(DatabaseAdapter):
                     RETURNING id
                     """,
                 )
-                if return_val := await cur.fetchone():
+                if user_id := await cur.fetchone():
                     await cur.execute(
                         f"""
                         INSERT INTO {self.schema}.ldap_accounts (provider_name, dn, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (provider_name, dn, return_val[0][0], email),
+                        (provider_name, dn, user_id, email),
                     )
                     await cur.execute(
                         f"""
                         INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
                         VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
                     """,
-                        (return_val[0][0],),
+                        (user_id,),
                     )
-                    return return_val[0][0]
+                    return user_id
                 else:
                     raise Exception(
                         f"Error occurred while creating ldap user {email}: No user id returned!"

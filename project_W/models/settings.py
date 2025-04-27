@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Annotated
 
 from pydantic import (
@@ -11,17 +12,48 @@ from pydantic import (
 )
 
 
-class LocalAccountSettings(BaseModel):
+class ProvisionedUser(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    disable: bool = Field(
+    email: str = Field(
+        description="Email address of this user. This address will be treated as a verified email address, so make sure that it is valid",
+        examples=[
+            "admin@example.org",
+            "user@example.org",
+        ],
+    )
+    password: str = Field(
+        description="The password of this user (for login). Please make sure that this password is secure, especially when provisioning admin users!"
+    )
+    is_admin: bool = Field(
         default=False,
-        description="Whether users should be able to authenticate using local accounts (stored in local PostgreSQL database). Only disable if you want to enforce authentication over LDAP or OIDC providers.",
+        description="Whether this user should be an admin user. Be very careful with this, admin users have full access over all other users and their data! Warning: Revoking a users admin privileges over provisioning settings will currently not revoke any existing access tokens of that user, don't rely on that!",
         validate_default=True,
     )
-    disable_signup: bool = Field(
-        default=False,
-        description="Whether signup of new local accounts should be possible. If set to 'true' then only users who already have an local account will be able to login with it. Mostly useful if only the admin account should be local but everybody else should authenticate using LDAP or OIDC instead.",
+
+
+class LocalAccountOperationModeEnum(str, Enum):
+    disabled = "disabled"
+    no_signup_hidden = "no-signup_hidden"
+    no_signup = "no-signup"
+    enabled = "enabled"
+
+
+class LocalAccountSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: LocalAccountOperationModeEnum = Field(
+        default=LocalAccountOperationModeEnum.enabled,
+        description="""
+        To what extend local accounts should be enabled.
+        - enabled: Both login and signup possible and advertised in frontend to users (default).
+        - no_signup: Login possible and advertised to users, signup not. Thus users can only login using already existing accounts (created through provisioning or by signup before this setting was set). Use this for example if you want users to login using local accounts that you created for them through provisioning.
+        - no_signup_hidden: Login still possible but not advertised to users in the frontend. Especially helpful if the only local accounts should be provisioned admin accounts for administration purposes while normal users should only login using oidc or ldap accounts.
+        - disabled: no login, no signup, no provisioned accounts. Login only through ldap and oidc. Please note that in this case you need to provide admin accounts through ldap or oidc as well!
+        """,
         validate_default=True,
+    )
+    allow_creation_of_api_tokens: bool = Field(
+        default=True,
+        description="If set to true then users logged in with local accounts can create api tokens with infinite lifetime. They will get invalidated if the user gets deleted.",
     )
     allowed_email_domains: list[
         Annotated[
@@ -33,6 +65,13 @@ class LocalAccountSettings(BaseModel):
             ),
         ]
     ] = []
+    user_provisioning: Annotated[
+        dict[int, ProvisionedUser],
+        Field(
+            description="Attribute set of users that should be created beforehand. Give every provisioned user a number using the key of this attribute set. This way the users email, password and admin privileges can still be changed later on using this config file. Warning: Deleting a user from this dict will not delete it from the application or database, use the /user/delete route for this!",
+            examples=["0: {<ProvisionedUserSettings>}", "1: {<ProvisionedUserSettings>}"],
+        ),
+    ] = {}
 
 
 class LocalTokenSettings(BaseModel):
@@ -139,11 +178,16 @@ class LdapQuerySettings(BaseModel):
     )
 
 
+class LdapAuthMechanismEnum(str, Enum):
+    simple = "SIMPLE"
+    md5 = "DIGEST-MD5"
+    ntlm = "NTLM"
+
+
 class LdapAuthSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    mechanism: str = Field(
-        pattern=r"^SIMPLE|DIGEST-MD5|NTLM$",
-        default="SIMPLE",
+    mechanism: LdapAuthMechanismEnum = Field(
+        default=LdapAuthMechanismEnum.simple,
         description="Authentication mechanism that should be used. Can be one of 'SIMPLE', 'DIGEST-MD5' or 'NTLM'",
     )
     user: str = Field(description="Identification of binding user.")

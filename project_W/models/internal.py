@@ -9,6 +9,7 @@ class LocalUserInDb(UserInDb):
     password_hash: str
     is_admin: bool
     is_verified: bool
+    provision_number: int | None
 
 
 class OidcUserInDb(UserInDb):

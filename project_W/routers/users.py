@@ -52,7 +52,7 @@ async def get_new_api_token(
     # check if current user is from a provider which allows creation of api tokens
     disabled_exc = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Creation of api tokens is disabled for your identity provider {current_user.provider_name}. Login using a different provider or ask the administrator to enable this.",
+        detail=f"Creation of api tokens is disabled for your account type. Login using a different provider or ask the administrator to enable this.",
     )
     if (
         current_user.user_type == UserTypeEnum.oidc
@@ -66,6 +66,11 @@ async def get_new_api_token(
         and not dp.config.security.ldap_providers[
             current_user.provider_name
         ].allow_creation_of_api_tokens
+    ):
+        raise disabled_exc
+    if (
+        current_user.user_type == UserTypeEnum.local
+        and not dp.config.security.local_account.allow_creation_of_api_tokens
     ):
         raise disabled_exc
 

@@ -10,6 +10,7 @@ import project_W.dependencies as dp
 from project_W.caching import RedisAdapter
 from project_W.database import PostgresAdapter
 from project_W.logger import get_logger
+from project_W.models.settings import LocalAccountOperationModeEnum
 
 from ._version import __version__
 from .config import loadConfig
@@ -36,17 +37,6 @@ async def lifespan(app: FastAPI):
     else:
         dp.config = loadConfig()
 
-    # include security routers depending on which authentication backends are configured in config file
-    if dp.config.security.oidc_providers is not {}:
-        app.include_router(oidc.router)
-        await oidc.register_with_oidc_providers(dp.config)
-    if dp.config.security.ldap_providers is not {}:
-        app.include_router(ldap.router)
-        ldap.ldap_adapter = ldap.LdapAdapter()
-        await ldap.ldap_adapter.open(dp.config.security.ldap_providers)
-    if not dp.config.security.local_account.disable:
-        app.include_router(local_account.router)
-
     # connect to database
     dp.db = PostgresAdapter(dp.config.postgres_connection_string)
     await dp.db.open()
@@ -55,7 +45,28 @@ async def lifespan(app: FastAPI):
     dp.ch = RedisAdapter()
     await dp.ch.open(unix_socket_path="/run/redis-project-W/redis.sock")
 
-    await dp.db.ensure_local_user_exists("julian@partanengroup.de", "Password-1234", False, True)
+    # include security routers depending on which authentication backends are configured in config file
+    login_method_exists = False
+    if dp.config.security.oidc_providers is not {}:
+        login_method_exists = True
+        app.include_router(oidc.router)
+        await oidc.register_with_oidc_providers(dp.config)
+    if dp.config.security.ldap_providers is not {}:
+        login_method_exists = True
+        app.include_router(ldap.router)
+        ldap.ldap_adapter = ldap.LdapAdapter()
+        await ldap.ldap_adapter.open(dp.config.security.ldap_providers)
+    if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.disabled:
+        login_method_exists = True
+        app.include_router(local_account.router)
+        for prov_num, prov_user in dp.config.security.local_account.user_provisioning.items():
+            await dp.db.ensure_local_user_is_provisioned(
+                prov_num, prov_user.email, prov_user.password, prov_user.is_admin
+            )
+    if not login_method_exists:
+        raise Exception(
+            "No login method (one of local_account, ldap or oidc) has been specified in the config!"
+        )
 
     yield
 
