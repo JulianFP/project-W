@@ -92,9 +92,9 @@ class LdapAdapter:
                 )
 
             self.logger.info(f"Trying to connect to LDAP server {name}...")
-            ldap_client = LDAPClient(idp.server_address)
+            ldap_client = LDAPClient(str(idp.server_address))
             if idp.ca_pem_file_path:
-                ldap_client.set_ca_cert(idp.ca_pem_file_path)
+                ldap_client.set_ca_cert(str(idp.ca_pem_file_path))
                 ldap_client.set_cert_policy("allow")  # TODO
             self.clients[name] = copy.deepcopy(ldap_client)
             ldap_client.set_credentials(

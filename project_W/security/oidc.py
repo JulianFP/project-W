@@ -24,13 +24,17 @@ async def register_with_oidc_providers(config: Settings):
         raise Exception("Tried to use oidc router even though oidc is disabled in config!")
     for name, idp in oidc_prov.items():
         if idp.ca_pem_file_path:
-            cafile = idp.ca_pem_file_path
+            cafile = str(idp.ca_pem_file_path)
         else:
             cafile = certifi.where()
         ctx = ssl.create_default_context(cafile=cafile)
+
+        base_url = str(idp.base_url)
+        if base_url[-1] != "/":
+            base_url += "/"
         async with AsyncClient(verify=ctx) as client:
             name = name.lower()
-            metadata_uri = f"{idp.base_url}/.well-known/openid-configuration"
+            metadata_uri = f"{base_url}.well-known/openid-configuration"
             oauth.register(
                 name,
                 client_id=idp.client_id,

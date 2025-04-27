@@ -1,6 +1,14 @@
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    FilePath,
+    HttpUrl,
+    UrlConstraints,
+)
 
 
 class LocalAccountSettings(BaseModel):
@@ -49,14 +57,14 @@ class ProviderSettings(BaseModel):
         default=False,
         description="If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will not be automatically invalidated if the user gets deleted or looses permissions in the identity provider. This means that with this setting enabled, users that ones have access to Project-W can retain that access possibly forever. Consider if this is a problem for you before enabling this!",
     )
-    icon_url: str | None = Field(
+    icon_url: HttpUrl | None = Field(
         default=None,
         description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
         examples=[
             "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
         ],
     )
-    ca_pem_file_path: str | None = Field(
+    ca_pem_file_path: FilePath | None = Field(
         default=None,
         description="Path to the pem certs file that includes the certificates that should be trusted for this provider (alternative certificate verification). Useful if the identity provider uses a self-signed certificate",
     )
@@ -84,8 +92,7 @@ class OidcRoleSettings(BaseModel):
 
 class OidcProviderSettings(ProviderSettings):
     model_config = ConfigDict(extra="forbid")
-    base_url: str = Field(
-        pattern=r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?$",
+    base_url: HttpUrl = Field(
         description="Base url of the OIDC provider. If '/.well-known/openid-configuration' is appended to it it should return its metadata",
         examples=[
             "https://accounts.google.com",
@@ -145,8 +152,14 @@ class LdapAuthSettings(BaseModel):
 
 class LdapProviderSettings(ProviderSettings):
     model_config = ConfigDict(extra="forbid")
-    server_address: str = Field(
-        pattern=r"^(ldap|ldaps|ldapi):\/\/.+$",
+    server_address: AnyUrl = Field(
+        UrlConstraints(
+            allowed_schemes=[
+                "ldap",
+                "ldaps",
+                "ldapi",
+            ],
+        ),
         description="Address of the ldap server. Should start with either ldap://, ldaps:// or ldapi:// depending on whether the connection should be unencrypted, ssl/tls encrypted or if it's an URL-encoded filesocket connection",
         examples=[
             "ldap://example.org",
