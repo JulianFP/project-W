@@ -70,8 +70,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # close database connections before application exit
+    # close connections before application exit
     await dp.db.close()
+    await dp.ch.close()
+    await ldap.ldap_adapter.close()
 
 
 # this can be in Markdown

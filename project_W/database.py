@@ -282,7 +282,7 @@ class PostgresAdapter(DatabaseAdapter):
         self.logger.info("Database is ready to use")
 
     async def close(self):
-        self.logger.info("Closing database connections...")
+        self.logger.info("Closing PostgreSQL connections...")
         await self.apool.close()
 
     async def __ensure_postgresql_version(self, conn: AsyncConnection):

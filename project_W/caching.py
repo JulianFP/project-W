@@ -52,4 +52,5 @@ class RedisAdapter(CachingAdapter):
         self.logger.info(f"Redis server is on version {redis_version}")
 
     async def close(self):
+        self.logger.info("Closing Redis connections...")
         await self.client.close()

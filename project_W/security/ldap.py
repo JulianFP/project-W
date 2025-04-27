@@ -111,6 +111,11 @@ class LdapAdapter:
             ldap_service_user = await self.__exec_lambda(name, func)
             self.logger.info(f"Connected to LDAP server {name} as user {ldap_service_user}")
 
+    async def close(self):
+        self.logger.info("Closing Ldap connections...")
+        for pool in self.apools.values():
+            await pool.close()
+
     def check_idp_name(self, idp_name: str) -> bool:
         if self.ldap_prov.get(idp_name):
             return True
