@@ -95,7 +95,6 @@ class LdapAdapter:
             ldap_client = LDAPClient(str(idp.server_address))
             if idp.ca_pem_file_path:
                 ldap_client.set_ca_cert(str(idp.ca_pem_file_path))
-                ldap_client.set_cert_policy("allow")  # TODO
             self.clients[name] = copy.deepcopy(ldap_client)
             ldap_client.set_credentials(
                 idp.service_account_auth.mechanism,
