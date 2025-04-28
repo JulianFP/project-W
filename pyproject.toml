@@ -42,6 +42,8 @@ dependencies = [
     "psycopg",
     "psycopg_pool",
     "redis",
+    "pydantic",
+    "email-validator",
     "fastapi",
     "uvicorn",
     "python-multipart",
@@ -49,6 +51,7 @@ dependencies = [
     "authlib",
     "pyjwt",
     "bonsai",
+    "aiosmtplib",
     # getting platform-independent directories for config and data (follows xdg standard on Linux)
     "platformdirs",
     # parsing config from yaml file and env vars

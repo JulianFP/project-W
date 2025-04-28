@@ -23,12 +23,15 @@ python3Packages.buildPythonPackage rec {
     psycopg
     psycopg-pool
     redis
+    pydantic
+    email-validator
     fastapi
     uvicorn
     python-multipart
     httpx
     pyjwt
     bonsai
+    aiosmtplib
   ];
 
   nativeCheckInputs = with python3Packages; [

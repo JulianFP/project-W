@@ -9,12 +9,12 @@ import project_W.dependencies as dp
 from project_W.models.response_data import User
 
 from ..logger import get_logger
-from ..models.internal import DecodedTokenData
+from ..models.internal import DecodedAuthTokenData
 from ..models.response_data import ErrorResponse, User, UserTypeEnum
-from .ldap import lookup_ldap_user_in_db_from_token
-from .local_account import lookup_local_user_in_db_from_token
-from .local_token import jwt_issuer, validate_local_token
-from .oidc import lookup_oidc_user_in_db_from_token, validate_oidc_token
+from .ldap_deps import lookup_ldap_user_in_db_from_token
+from .local_account_deps import lookup_local_user_in_db_from_token
+from .local_token import jwt_issuer, validate_local_auth_token
+from .oidc_deps import lookup_oidc_user_in_db_from_token, validate_oidc_token
 
 logger = get_logger("project-W")
 
@@ -63,7 +63,7 @@ def get_payload_from_token(token: str) -> dict:
 def validate_user(require_admin: bool):
     async def user_validation_dep(
         token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)]
-    ) -> DecodedTokenData:
+    ) -> DecodedAuthTokenData:
         # first check how this token was generated without verifying the signature
         token_payload = get_payload_from_token(token.credentials)
         iss = token_payload.get("iss")
@@ -75,7 +75,9 @@ def validate_user(require_admin: bool):
                 headers={"WWW-Authenticate": "Bearer"},
             )
         if iss == jwt_issuer:
-            token_data = await validate_local_token(dp.config, token.credentials, token_payload)
+            token_data = await validate_local_auth_token(
+                dp.config, token.credentials, token_payload
+            )
         else:
             token_data = await validate_oidc_token(dp.config, token.credentials, iss)
 
@@ -94,7 +96,7 @@ def validate_user(require_admin: bool):
 def validate_user_and_get_from_db(require_admin: bool):
     async def user_lookup_dep(
         user_token_data: Annotated[
-            DecodedTokenData, Depends(validate_user(require_admin=require_admin))
+            DecodedAuthTokenData, Depends(validate_user(require_admin=require_admin))
         ]
     ) -> User:
         if user_token_data.user_type == UserTypeEnum.local:

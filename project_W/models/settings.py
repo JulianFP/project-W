@@ -11,10 +11,12 @@ from pydantic import (
     UrlConstraints,
 )
 
+from .base import EmailValidated
+
 
 class ProvisionedUser(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    email: str = Field(
+    email: EmailValidated = Field(
         description="Email address of this user. This address will be treated as a verified email address, so make sure that it is valid",
         examples=[
             "admin@example.org",
@@ -77,9 +79,9 @@ class LocalAccountSettings(BaseModel):
 class LocalTokenSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_secret_key: str = Field(
-        # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, half of it is supplied here, the other half comes from per user token secrets stored in database)
-        min_length=32,
-        max_length=32,
+        # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, if second half is supplied by database then only first half of that is used)
+        min_length=64,
+        max_length=64,
         pattern=r"^[a-f0-9]*$",  # hex
         description="The secret key used to generate JWT Tokens. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
     )
@@ -245,22 +247,29 @@ class SecuritySettings(BaseModel):
     ] = {}
 
 
+class SMTPSecureEnum(str, Enum):
+    ssl = "ssl"
+    starttls = "starttls"
+    plain = "plain"
+
+
 class SMTPServerSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    domain: str = Field(
+    hostname: str = Field(
         pattern=r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost$",
         description="FQDN of your smtp server.",
     )
     port: int = Field(
         ge=0,
         le=65535,
+        default=587,
         description="Port that should be used for the smtp connection.",
     )
-    secure: str = Field(
-        pattern=r"^ssl|starttls|unencrypted$",
+    secure: SMTPSecureEnum = Field(
+        default=SMTPSecureEnum.starttls,
         description="Whether to use ssl, starttls or no encryption with the smtp server.",
     )
-    sender_email: str = Field(
+    sender_email: EmailValidated = Field(
         description="Email address from which emails will be sent to the users.",
     )
     username: str | None = Field(

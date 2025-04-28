@@ -1,24 +1,17 @@
 import copy
-from typing import Annotated, Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from bonsai import AuthenticationError, ConnectionError, LDAPClient, TimeoutError
 from bonsai.asyncio import AIOConnectionPool, AIOLDAPConnection
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import HTTPException, status
+from pydantic import ValidationError
 
 import project_W.dependencies as dp
 from project_W.logger import get_logger
-from project_W.models.internal import DecodedTokenData, LdapUserInfo, TokenData
-from project_W.models.response_data import ErrorResponse, User, UserTypeEnum
+from project_W.models.base import EmailValidated
+from project_W.models.internal import DecodedAuthTokenData, LdapUserInfo
+from project_W.models.response_data import User, UserTypeEnum
 from project_W.models.settings import LdapProviderSettings
-
-from .local_token import create_jwt_token
-
-router = APIRouter(
-    prefix="/ldap",
-    tags=["ldap"],
-)
-
 
 http_exc = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -126,6 +119,11 @@ class LdapAdapter:
         prov = self.ldap_prov[idp_name]
         user: LdapUserInfo
 
+        invalid_email_exc = HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The email address that Ldap returned is not valid",
+        )
+
         if prov.admin_query and (admins := await self.__query_admin_user(idp_name, username)):
             if len(admins) > 1:
                 self.logger.error(
@@ -137,7 +135,11 @@ class LdapAdapter:
                 and (user_email := admins[0].get(prov.admin_query.mail_attribute_name))
                 and len(user_email) > 0
             ):
-                user = LdapUserInfo(dn=str(user_dn), is_admin=True, email=str(user_email[0]))
+                try:
+                    validated_email = EmailValidated.model_validate(str(user_email[0]))
+                except ValidationError:
+                    raise invalid_email_exc
+                user = LdapUserInfo(dn=str(user_dn), is_admin=True, email=validated_email)
             else:
                 self.logger.error(
                     f"Couldn't get dn or email address for admin LDAP user {username} in LDAP directory {idp_name}"
@@ -154,7 +156,11 @@ class LdapAdapter:
                 and (user_email := users[0].get(prov.user_query.mail_attribute_name))
                 and len(user_email) > 0
             ):
-                user = LdapUserInfo(dn=str(user_dn), is_admin=False, email=str(user_email[0]))
+                try:
+                    validated_email = EmailValidated.model_validate(str(user_email[0]))
+                except ValidationError:
+                    raise invalid_email_exc
+                user = LdapUserInfo(dn=str(user_dn), is_admin=False, email=validated_email)
             else:
                 self.logger.error(
                     f"Couldn't get dn or email address for normal LDAP user {username} in LDAP directory {idp_name}"
@@ -184,38 +190,7 @@ class LdapAdapter:
 ldap_adapter: LdapAdapter
 
 
-@router.post(
-    "/login/{idp_name}",
-    responses={
-        400: {
-            "model": ErrorResponse,
-            "description": "idp_name is invalid",
-        },
-        401: {"model": ErrorResponse, "description": "Authentication was unsuccessful"},
-    },
-)
-async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-
-    if not ldap_adapter.check_idp_name(idp_name):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not query user, ldap server {idp_name} not known",
-        )
-
-    user = await ldap_adapter.query_user(idp_name, form_data.username)
-
-    if await ldap_adapter.authenticate_user(idp_name, user.dn, form_data.password):
-        user_id = await dp.db.ensure_ldap_user_exists(idp_name, user.dn, user.email)
-        data = TokenData(
-            user_type=UserTypeEnum.ldap, sub=str(user_id), email=user.email, is_verified=True
-        )
-        token = await create_jwt_token(dp.config, data, user_id, user.is_admin, form_data.scopes)
-        return token
-    else:
-        raise http_exc
-
-
-async def lookup_ldap_user_in_db_from_token(user_token_data: DecodedTokenData) -> User:
+async def lookup_ldap_user_in_db_from_token(user_token_data: DecodedAuthTokenData) -> User:
     ldap_user = await dp.db.get_ldap_user_by_id(int(user_token_data.sub))
     if not ldap_user:
         raise HTTPException(

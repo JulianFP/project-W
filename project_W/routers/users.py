@@ -5,14 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 import project_W.dependencies as dp
 from project_W.models.response_data import ErrorResponse, User
 
-from ..models.internal import DecodedTokenData, TokenData
+from ..models.internal import AuthTokenData, DecodedAuthTokenData
 from ..models.response_data import TokenSecretInfo, UserTypeEnum
 from ..security.auth import (
     auth_dependency_responses,
     validate_user,
     validate_user_and_get_from_db,
 )
-from ..security.local_token import create_jwt_token
+from ..security.local_token import create_auth_token
 
 router = APIRouter(
     prefix="/users",
@@ -23,7 +23,7 @@ router = APIRouter(
 
 @router.post("/invalidate_token")
 async def invalidate_token(
-    current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))],
+    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))],
     token_id: int,
 ):
     await dp.db.delete_token_secret_of_user(int(current_token.sub), token_id)
@@ -31,7 +31,7 @@ async def invalidate_token(
 
 @router.post("/invalidate_all_tokens")
 async def invalidate_all_tokens(
-    current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))],
+    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))],
 ):
     await dp.db.delete_all_token_secrets_of_user(int(current_token.sub))
 
@@ -74,28 +74,28 @@ async def get_new_api_token(
     ):
         raise disabled_exc
 
-    data = TokenData(
+    data = AuthTokenData(
         user_type=current_user.user_type,
         sub=str(current_user.id),
         email=current_user.email,
         is_verified=current_user.is_verified,
     )
-    return await create_jwt_token(
+    return await create_auth_token(
         dp.config, data, current_user.id, current_user.is_admin, infinite_lifetime=True, name=name
     )
 
 
 @router.get("/get_all_token_info")
 async def get_all_token_info(
-    current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))]
+    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))]
 ) -> list[TokenSecretInfo]:
     return await dp.db.get_info_of_all_tokens_of_user(int(current_token.sub))
 
 
 @router.get("/info")
 async def token_info(
-    current_token: Annotated[DecodedTokenData, Depends(validate_user(require_admin=False))]
-) -> DecodedTokenData:
+    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))]
+) -> DecodedAuthTokenData:
     return current_token
 
 

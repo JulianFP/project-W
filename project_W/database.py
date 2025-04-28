@@ -10,6 +10,8 @@ from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 
+from project_W.models.base import EmailValidated
+
 from ._version import version, version_tuple
 from .logger import get_logger
 from .models.internal import LdapUserInDb, LocalUserInDb, OidcUserInDb, TokenSecret
@@ -47,39 +49,51 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def _ensure_local_user_exists_hashed(
-        self, email: str, hashed_password: str, is_admin: bool = False, is_verified: bool = False
-    ) -> int:
+    async def _add_local_user_hashed(
+        self,
+        email: EmailValidated,
+        hashed_password: str,
+        is_admin: bool = False,
+        is_verified: bool = False,
+    ) -> int | None:
         """
         This method creates a new user if it doesn't exist yet. The password is already hashed here which is the reason why this method is protected. It should not be used outside of this base class, use add_new_user instead!
-        Returns the user id of the user
+        Returns the user id of the created user
+        Returns None if a user with this email already exists.
         """
         pass
 
-    async def ensure_local_user_exists(
-        self, email: str, password: str, is_admin: bool = False, is_verified: bool = False
-    ) -> int:
+    async def add_local_user(
+        self,
+        email: EmailValidated,
+        password: str,
+        is_admin: bool = False,
+        is_verified: bool = False,
+    ) -> int | None:
         """
         Create a new user if it doesn't exist yet. The password will be hashed in this function before writing it in the database.
-        Returns the user id of the user
+        Returns the user id of the created user
+        Returns None if a user with this email already exists.
         """
         hashed_password = self.hasher.hash(password)
-        return await self._ensure_local_user_exists_hashed(
-            email, hashed_password, is_admin, is_verified
-        )
+        return await self._add_local_user_hashed(email, hashed_password, is_admin, is_verified)
 
     @abstractmethod
     async def _ensure_local_user_is_provisioned_hashed(
-        self, provision_number: int, email: str, hashed_password: str, is_admin: bool = False
+        self,
+        provision_number: int,
+        email: EmailValidated,
+        hashed_password: str,
+        is_admin: bool = False,
     ) -> int:
         """
-        This method provisions a user from the config file. Compared to ensure_local_user_exists it also checks the provision_number and changes the users email, password and admin privileges if they have changed.
+        This method provisions a user from the config file. Compared to add_local_user it also checks the provision_number and changes the users email, password and admin privileges if they have changed.
         Returns the user id of the user
         """
         pass
 
     async def ensure_local_user_is_provisioned(
-        self, provision_number: int, email: str, password: str, is_admin: bool = False
+        self, provision_number: int, email: EmailValidated, password: str, is_admin: bool = False
     ) -> int:
         """
         Provision a user from the config file. The password will be hashed in this function before writing it in the database.
@@ -91,7 +105,7 @@ class DatabaseAdapter(ABC):
         )
 
     @abstractmethod
-    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
+    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: EmailValidated) -> int:
         """
         Add a database entry for an oidc user if it doesn't exist yet. Will be called at first login of this user.
         If the user exists but with a different email then update the email address of the user.
@@ -100,7 +114,9 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def ensure_ldap_user_exists(self, provider_name: str, dn: str, email: str) -> int:
+    async def ensure_ldap_user_exists(
+        self, provider_name: str, dn: str, email: EmailValidated
+    ) -> int:
         """
         Add a database entry for an ldap user if it doesn't exist yet. Will be called at first login of this user.
         If the user exists but with a different email then update the email address of the user.
@@ -137,7 +153,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_local_user_by_email(self, email: str) -> LocalUserInDb | None:
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
         """
         Return a local user with the matching email, or None if the email doesn't match any user
         """
@@ -187,7 +203,7 @@ class DatabaseAdapter(ABC):
         pass
 
     async def get_local_user_by_email_checked_password(
-        self, email: str, password: str
+        self, email: EmailValidated, password: str
     ) -> LocalUserInDb | None:
         """
         Return a user with the matching email if the provided password is also correct, or None if the email doesn't match any user or the password is incorrect
@@ -206,6 +222,14 @@ class DatabaseAdapter(ABC):
             await self._update_password_hash(user.id, self.hasher.hash(password))
 
         return user
+
+    @abstractmethod
+    async def verify_local_user(self, user_id: int, new_email: EmailValidated):
+        """
+        Update a local user to be verified.
+        Update the email address to new_email as well.
+        """
+        pass
 
 
 class PostgresAdapter(DatabaseAdapter):
@@ -611,9 +635,13 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     self.logger.info("No database schema migration required")
 
-    async def _ensure_local_user_exists_hashed(
-        self, email: str, hashed_password: str, is_admin: bool = False, is_verified: bool = False
-    ) -> int:
+    async def _add_local_user_hashed(
+        self,
+        email: EmailValidated,
+        hashed_password: str,
+        is_admin: bool = False,
+        is_verified: bool = False,
+    ) -> int | None:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
@@ -622,10 +650,10 @@ class PostgresAdapter(DatabaseAdapter):
                     FROM {self.schema}.local_accounts
                     WHERE email = %s
                 """,
-                    (email,),
+                    (email.normalized,),
                 )
                 if user_id := await cur.fetchone():
-                    return user_id
+                    return None
 
                 await cur.execute(
                     f"""
@@ -640,7 +668,7 @@ class PostgresAdapter(DatabaseAdapter):
                         INSERT INTO {self.schema}.local_accounts (email, id, password_hash, is_admin, is_verified)
                         VALUES (%s, %s, %s, %s, %s)
                     """,
-                        (email, user_id, hashed_password, is_admin, is_verified),
+                        (email.normalized, user_id, hashed_password, is_admin, is_verified),
                     )
                     await cur.execute(
                         f"""
@@ -656,7 +684,11 @@ class PostgresAdapter(DatabaseAdapter):
                     )
 
     async def _ensure_local_user_is_provisioned_hashed(
-        self, provision_number: int, email: str, hashed_password: str, is_admin: bool = False
+        self,
+        provision_number: int,
+        email: EmailValidated,
+        hashed_password: str,
+        is_admin: bool = False,
     ) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
@@ -675,7 +707,7 @@ class PostgresAdapter(DatabaseAdapter):
                             SET (email, password_hash, is_admin) = (%s, %s, %s)
                             WHERE id = %s
                         """,
-                        (email, hashed_password, is_admin, user.id),
+                        (email.normalized, hashed_password, is_admin, user.id),
                     )
                     return user.id
 
@@ -693,7 +725,14 @@ class PostgresAdapter(DatabaseAdapter):
                         INSERT INTO {self.schema}.local_accounts (email, id, password_hash, is_admin, is_verified, provision_number)
                         VALUES (%s, %s, %s, %s, %s, %s)
                     """,
-                        (email, user_id, hashed_password, is_admin, True, provision_number),
+                        (
+                            email.normalized,
+                            user_id,
+                            hashed_password,
+                            is_admin,
+                            True,
+                            provision_number,
+                        ),
                     )
                     await cur.execute(
                         f"""
@@ -708,7 +747,7 @@ class PostgresAdapter(DatabaseAdapter):
                         f"Error occurred while creating local user {email}: No user id returned!"
                     )
 
-    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: str) -> int:
+    async def ensure_oidc_user_exists(self, iss: str, sub: str, email: EmailValidated) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
                 await cur.execute(
@@ -720,14 +759,14 @@ class PostgresAdapter(DatabaseAdapter):
                     (iss, sub),
                 )
                 if user := await cur.fetchone():
-                    if user.email != email:
+                    if user.email.normalized != email:
                         await cur.execute(
                             f"""
                             UPDATE {self.schema}.oidc_accounts
                             SET email = %s
                             WHERE iss = %s AND sub = %s
                             """,
-                            (email, iss, sub),
+                            (email.normalized, iss, sub),
                         )
                     return user.id
 
@@ -745,7 +784,7 @@ class PostgresAdapter(DatabaseAdapter):
                         INSERT INTO {self.schema}.oidc_accounts (iss, sub, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (iss, sub, user_id, email),
+                        (iss, sub, user_id, email.normalized),
                     )
                     return user_id
                 else:
@@ -753,7 +792,9 @@ class PostgresAdapter(DatabaseAdapter):
                         f"Error occurred while creating oidc user {email}: No user id returned!"
                     )
 
-    async def ensure_ldap_user_exists(self, provider_name: str, dn: str, email: str) -> int:
+    async def ensure_ldap_user_exists(
+        self, provider_name: str, dn: str, email: EmailValidated
+    ) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
                 await cur.execute(
@@ -765,14 +806,14 @@ class PostgresAdapter(DatabaseAdapter):
                     (provider_name, dn),
                 )
                 if user := await cur.fetchone():
-                    if user.email != email:
+                    if user.email.normalized != email:
                         await cur.execute(
                             f"""
                             UPDATE {self.schema}.ldap_accounts
                             SET email = %s
                             WHERE provider_name = %s AND dn = %s
                             """,
-                            (email, provider_name, dn),
+                            (email.normalized, provider_name, dn),
                         )
                     return user.id
 
@@ -790,7 +831,7 @@ class PostgresAdapter(DatabaseAdapter):
                         INSERT INTO {self.schema}.ldap_accounts (provider_name, dn, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (provider_name, dn, user_id, email),
+                        (provider_name, dn, user_id, email.normalized),
                     )
                     await cur.execute(
                         f"""
@@ -855,7 +896,7 @@ class PostgresAdapter(DatabaseAdapter):
                     (user_id,),
                 )
 
-    async def get_local_user_by_email(self, email: str) -> LocalUserInDb | None:
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
                 await cur.execute(
@@ -864,7 +905,7 @@ class PostgresAdapter(DatabaseAdapter):
                     FROM {self.schema}.local_accounts
                     WHERE email = %s
                 """,
-                    (email,),
+                    (email.normalized,),
                 )
                 return await cur.fetchone()
 
@@ -947,4 +988,16 @@ class PostgresAdapter(DatabaseAdapter):
                         WHERE id = %s
                     """,
                     (new_password_hash, user_id),
+                )
+
+    async def verify_local_user(self, user_id: int, new_email: EmailValidated):
+        async with self.apool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                        UPDATE {self.schema}.local_accounts
+                        SET (email, is_verified) = (%s, true)
+                        WHERE id = %s
+                    """,
+                    (new_email.normalized, user_id),
                 )

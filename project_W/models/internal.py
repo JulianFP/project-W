@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from .base import UserInDb
+from .base import EmailValidated, UserInDb
 from .response_data import TokenSecretInfo, UserTypeEnum
 
 
@@ -22,14 +22,23 @@ class LdapUserInDb(UserInDb):
     dn: str
 
 
-class TokenData(BaseModel):
+class AccountActivationTokenData(BaseModel):
+    old_email: EmailValidated
+    new_email: EmailValidated
+
+
+class PasswordResetTokenData(BaseModel):
+    email: EmailValidated
+
+
+class AuthTokenData(BaseModel):
     user_type: UserTypeEnum
     sub: str
-    email: str
+    email: EmailValidated
     is_verified: bool
 
 
-class DecodedTokenData(TokenData):
+class DecodedAuthTokenData(AuthTokenData):
     token_id: int | None = None
     is_admin: bool
     iss: str
@@ -43,4 +52,4 @@ class TokenSecret(TokenSecretInfo):
 class LdapUserInfo(BaseModel):
     dn: str
     is_admin: bool
-    email: str
+    email: EmailValidated

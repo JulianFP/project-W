@@ -11,12 +11,13 @@ from project_W.caching import RedisAdapter
 from project_W.database import PostgresAdapter
 from project_W.logger import get_logger
 from project_W.models.settings import LocalAccountOperationModeEnum
+from project_W.smtp import SmtpClient
 
 from ._version import __version__
 from .config import loadConfig
 from .models.response_data import AboutResponse
-from .routers import admins, users
-from .security import ldap, local_account, oidc
+from .routers import admins, ldap, local_account, oidc, users
+from .security import ldap_deps, oidc_deps
 
 
 # startup database connections before spinning up application
@@ -45,17 +46,21 @@ async def lifespan(app: FastAPI):
     dp.ch = RedisAdapter()
     await dp.ch.open(unix_socket_path="/run/redis-project-W/redis.sock")
 
+    # connect to smtp server
+    dp.smtp = SmtpClient(dp.config.smtp_server)
+    await dp.smtp.open()
+
     # include security routers depending on which authentication backends are configured in config file
     login_method_exists = False
     if dp.config.security.oidc_providers is not {}:
         login_method_exists = True
         app.include_router(oidc.router)
-        await oidc.register_with_oidc_providers(dp.config)
+        await oidc_deps.register_with_oidc_providers(dp.config)
     if dp.config.security.ldap_providers is not {}:
         login_method_exists = True
         app.include_router(ldap.router)
-        ldap.ldap_adapter = ldap.LdapAdapter()
-        await ldap.ldap_adapter.open(dp.config.security.ldap_providers)
+        ldap_deps.ldap_adapter = ldap_deps.LdapAdapter()
+        await ldap_deps.ldap_adapter.open(dp.config.security.ldap_providers)
     if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.disabled:
         login_method_exists = True
         app.include_router(local_account.router)
@@ -73,7 +78,8 @@ async def lifespan(app: FastAPI):
     # close connections before application exit
     await dp.db.close()
     await dp.ch.close()
-    await ldap.ldap_adapter.close()
+    await dp.smtp.close()
+    await ldap_deps.ldap_adapter.close()
 
 
 # this can be in Markdown

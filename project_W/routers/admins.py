@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from ..models.internal import DecodedTokenData
+from ..models.internal import DecodedAuthTokenData
 from ..security.auth import auth_dependency_responses, validate_user
 
 router = APIRouter(
@@ -14,5 +14,7 @@ router = APIRouter(
 
 
 @router.get("/test")
-async def admin_test(_: Annotated[DecodedTokenData, Depends(validate_user(require_admin=True))]):
+async def admin_test(
+    _: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=True))]
+):
     return "Only an admin is allowed to see this"
