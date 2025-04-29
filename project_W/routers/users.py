@@ -42,7 +42,11 @@ async def invalidate_all_tokens(
         400: {
             "model": ErrorResponse,
             "description": "Creation of api tokens is disabled for your identity provider",
-        }
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "Your user isn't verified",
+        },
     },
 )
 async def get_new_api_token(
@@ -73,6 +77,13 @@ async def get_new_api_token(
         and not dp.config.security.local_account.allow_creation_of_api_tokens
     ):
         raise disabled_exc
+
+    # only verified users should be able to create api tokens
+    if not current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"This user is not verified. Please click on the link sent to {current_user.email} or request a new confirmation email.",
+        )
 
     data = AuthTokenData(
         user_type=current_user.user_type,

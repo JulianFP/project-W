@@ -45,14 +45,16 @@ class SmtpClient:
     ):
         msg = EmailMessage()
         msg["Subject"] = msg_subject
-        msg["From"] = self.smtp_settings.sender_email.normalized
-        msg["To"] = receiver.normalized
-        msg["Message-ID"] = make_msgid(f"Project-W.{msg_type}", receiver.domain)
+        msg["From"] = self.smtp_settings.sender_email.root
+        msg["To"] = receiver.root
+        msg["Message-ID"] = make_msgid(
+            f"Project-W.{msg_type}", self.smtp_settings.sender_email.get_domain()
+        )
         msg["Date"] = formatdate(localtime=True)
         msg.set_content(msg_body)
 
         await self.client.send_message(msg)
-        self.logger.info(f"-> Sent {msg_type} email to {receiver}")
+        self.logger.info(f"-> Sent {msg_type} email to {receiver.root}")
 
     async def send_account_activation_email(
         self, receiver: EmailValidated, token: str, client_url: str

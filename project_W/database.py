@@ -10,7 +10,7 @@ from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 
-from project_W.models.base import EmailValidated
+from project_W.models.base import EmailValidated, PasswordValidated
 
 from ._version import version, version_tuple
 from .logger import get_logger
@@ -66,7 +66,7 @@ class DatabaseAdapter(ABC):
     async def add_local_user(
         self,
         email: EmailValidated,
-        password: str,
+        password: PasswordValidated,
         is_admin: bool = False,
         is_verified: bool = False,
     ) -> int | None:
@@ -75,7 +75,7 @@ class DatabaseAdapter(ABC):
         Returns the user id of the created user
         Returns None if a user with this email already exists.
         """
-        hashed_password = self.hasher.hash(password)
+        hashed_password = self.hasher.hash(password.root.get_secret_value())
         return await self._add_local_user_hashed(email, hashed_password, is_admin, is_verified)
 
     @abstractmethod
@@ -230,6 +230,32 @@ class DatabaseAdapter(ABC):
         Update the email address to new_email as well.
         """
         pass
+
+    @abstractmethod
+    async def _update_local_user_password(
+        self,
+        email: EmailValidated,
+        hashed_new_password: str,
+    ) -> int | None:
+        """
+        This method updates the password of an existing local user.
+        Returns the user id of the user whose password was updated.
+        Returns None if no user with this email exists.
+        """
+        pass
+
+    async def update_local_user_password(
+        self,
+        email: EmailValidated,
+        new_password: PasswordValidated,
+    ) -> int | None:
+        """
+        Create a new user if it doesn't exist yet. The password will be hashed in this function before writing it in the database.
+        Returns the user id of the created user
+        Returns None if a user with this email already exists.
+        """
+        hashed_new_password = self.hasher.hash(new_password.root.get_secret_value())
+        return await self._update_local_user_password(email, hashed_new_password)
 
 
 class PostgresAdapter(DatabaseAdapter):
@@ -650,7 +676,7 @@ class PostgresAdapter(DatabaseAdapter):
                     FROM {self.schema}.local_accounts
                     WHERE email = %s
                 """,
-                    (email.normalized,),
+                    (email.root,),
                 )
                 if user_id := await cur.fetchone():
                     return None
@@ -668,7 +694,7 @@ class PostgresAdapter(DatabaseAdapter):
                         INSERT INTO {self.schema}.local_accounts (email, id, password_hash, is_admin, is_verified)
                         VALUES (%s, %s, %s, %s, %s)
                     """,
-                        (email.normalized, user_id, hashed_password, is_admin, is_verified),
+                        (email.root, user_id, hashed_password, is_admin, is_verified),
                     )
                     await cur.execute(
                         f"""
@@ -707,7 +733,7 @@ class PostgresAdapter(DatabaseAdapter):
                             SET (email, password_hash, is_admin) = (%s, %s, %s)
                             WHERE id = %s
                         """,
-                        (email.normalized, hashed_password, is_admin, user.id),
+                        (email.root, hashed_password, is_admin, user.id),
                     )
                     return user.id
 
@@ -726,7 +752,7 @@ class PostgresAdapter(DatabaseAdapter):
                         VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                         (
-                            email.normalized,
+                            email.root,
                             user_id,
                             hashed_password,
                             is_admin,
@@ -759,14 +785,14 @@ class PostgresAdapter(DatabaseAdapter):
                     (iss, sub),
                 )
                 if user := await cur.fetchone():
-                    if user.email.normalized != email:
+                    if user.email.root != email:
                         await cur.execute(
                             f"""
                             UPDATE {self.schema}.oidc_accounts
                             SET email = %s
                             WHERE iss = %s AND sub = %s
                             """,
-                            (email.normalized, iss, sub),
+                            (email.root, iss, sub),
                         )
                     return user.id
 
@@ -784,7 +810,7 @@ class PostgresAdapter(DatabaseAdapter):
                         INSERT INTO {self.schema}.oidc_accounts (iss, sub, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (iss, sub, user_id, email.normalized),
+                        (iss, sub, user_id, email.root),
                     )
                     return user_id
                 else:
@@ -806,14 +832,14 @@ class PostgresAdapter(DatabaseAdapter):
                     (provider_name, dn),
                 )
                 if user := await cur.fetchone():
-                    if user.email.normalized != email:
+                    if user.email.root != email:
                         await cur.execute(
                             f"""
                             UPDATE {self.schema}.ldap_accounts
                             SET email = %s
                             WHERE provider_name = %s AND dn = %s
                             """,
-                            (email.normalized, provider_name, dn),
+                            (email.root, provider_name, dn),
                         )
                     return user.id
 
@@ -831,7 +857,7 @@ class PostgresAdapter(DatabaseAdapter):
                         INSERT INTO {self.schema}.ldap_accounts (provider_name, dn, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (provider_name, dn, user_id, email.normalized),
+                        (provider_name, dn, user_id, email.root),
                     )
                     await cur.execute(
                         f"""
@@ -905,7 +931,7 @@ class PostgresAdapter(DatabaseAdapter):
                     FROM {self.schema}.local_accounts
                     WHERE email = %s
                 """,
-                    (email.normalized,),
+                    (email.root,),
                 )
                 return await cur.fetchone()
 
@@ -999,5 +1025,21 @@ class PostgresAdapter(DatabaseAdapter):
                         SET (email, is_verified) = (%s, true)
                         WHERE id = %s
                     """,
-                    (new_email.normalized, user_id),
+                    (new_email.root, user_id),
                 )
+
+    async def _update_local_user_password(
+        self, email: EmailValidated, hashed_new_password: str
+    ) -> int | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        UPDATE {self.schema}.local_accounts
+                        SET password_hash = %s
+                        WHERE email = %s
+                        RETURNING id
+                    """,
+                    (hashed_new_password, email.root),
+                )
+                return await cur.fetchone()
