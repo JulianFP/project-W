@@ -39,3 +39,8 @@ class TokenSecretInfo(BaseModel):
     id: int
     name: str | None = Field(max_length=64)
     temp_token_secret: bool
+
+
+class RunnerCreatedInfo(BaseModel):
+    id: int
+    token: str

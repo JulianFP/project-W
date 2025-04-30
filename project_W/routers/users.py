@@ -23,7 +23,9 @@ router = APIRouter(
 
 @router.post("/invalidate_token")
 async def invalidate_token(
-    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))],
+    current_token: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    ],
     token_id: int,
 ):
     await dp.db.delete_token_secret_of_user(int(current_token.sub), token_id)
@@ -31,7 +33,9 @@ async def invalidate_token(
 
 @router.post("/invalidate_all_tokens")
 async def invalidate_all_tokens(
-    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))],
+    current_token: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    ],
 ):
     await dp.db.delete_all_token_secrets_of_user(int(current_token.sub))
 
@@ -42,15 +46,13 @@ async def invalidate_all_tokens(
         400: {
             "model": ErrorResponse,
             "description": "Creation of api tokens is disabled for your identity provider",
-        },
-        403: {
-            "model": ErrorResponse,
-            "description": "Your user isn't verified",
-        },
+        }
     },
 )
 async def get_new_api_token(
-    current_user: Annotated[User, Depends(validate_user_and_get_from_db(require_admin=False))],
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+    ],
     name: str,
 ):
     # check if current user is from a provider which allows creation of api tokens
@@ -78,13 +80,6 @@ async def get_new_api_token(
     ):
         raise disabled_exc
 
-    # only verified users should be able to create api tokens
-    if not current_user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"This user is not verified. Please click on the link sent to {current_user.email} or request a new confirmation email.",
-        )
-
     data = AuthTokenData(
         user_type=current_user.user_type,
         sub=str(current_user.id),
@@ -98,28 +93,36 @@ async def get_new_api_token(
 
 @router.get("/get_all_token_info")
 async def get_all_token_info(
-    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))]
+    current_token: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    ]
 ) -> list[TokenSecretInfo]:
     return await dp.db.get_info_of_all_tokens_of_user(int(current_token.sub))
 
 
 @router.get("/info")
 async def token_info(
-    current_token: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=False))]
+    current_token: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    ]
 ) -> DecodedAuthTokenData:
     return current_token
 
 
 @router.get("/info_db")
 async def user_info(
-    current_user: Annotated[User, Depends(validate_user_and_get_from_db(require_admin=False))]
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+    ]
 ) -> User:
     return current_user
 
 
 @router.delete("/delete")
 async def delete_user(
-    current_user: Annotated[User, Depends(validate_user_and_get_from_db(require_admin=False))]
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+    ]
 ):
     await dp.db.delete_user(current_user.id)
     return "success!"

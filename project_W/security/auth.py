@@ -60,7 +60,7 @@ def get_payload_from_token(token: str) -> dict:
     return json.loads(payload_decoded)
 
 
-def validate_user(require_admin: bool):
+def validate_user(require_verified: bool, require_admin: bool):
     async def user_validation_dep(
         token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)]
     ) -> DecodedAuthTokenData:
@@ -81,6 +81,12 @@ def validate_user(require_admin: bool):
         else:
             token_data = await validate_oidc_token(dp.config, token.credentials, iss)
 
+        if require_verified and not token_data.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Your email address needs to be verified to access this route. Please click on the link sent to {token_data.email} or request a new confirmation email.",
+            )
+
         if require_admin and not token_data.is_admin:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -93,10 +99,10 @@ def validate_user(require_admin: bool):
     return user_validation_dep
 
 
-def validate_user_and_get_from_db(require_admin: bool):
+def validate_user_and_get_from_db(require_verified: bool, require_admin: bool):
     async def user_lookup_dep(
         user_token_data: Annotated[
-            DecodedAuthTokenData, Depends(validate_user(require_admin=require_admin))
+            DecodedAuthTokenData, Depends(validate_user(require_verified, require_admin))
         ]
     ) -> User:
         if user_token_data.user_type == UserTypeEnum.local:

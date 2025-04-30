@@ -1,3 +1,6 @@
+import base64
+import hashlib
+import secrets
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import LiteralString
@@ -14,8 +17,14 @@ from project_W.models.base import EmailValidated, PasswordValidated
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .models.internal import LdapUserInDb, LocalUserInDb, OidcUserInDb, TokenSecret
-from .models.response_data import TokenSecretInfo
+from .models.internal import (
+    LdapUserInDb,
+    LocalUserInDb,
+    OidcUserInDb,
+    RunnerInDb,
+    TokenSecret,
+)
+from .models.response_data import RunnerCreatedInfo, TokenSecretInfo
 from .utils import parse_version_tuple
 
 
@@ -256,6 +265,55 @@ class DatabaseAdapter(ABC):
         """
         hashed_new_password = self.hasher.hash(new_password.root.get_secret_value())
         return await self._update_local_user_password(email, hashed_new_password)
+
+    @abstractmethod
+    async def _create_runner_hashed(self, token_hash: str) -> int:
+        """
+        INSERT a new runner with the provided token_hash into the database
+        Return the id of the newly created runner
+        """
+        pass
+
+    def __runner_token_hash(self, token: str):
+        """
+        We only store the hash of the token, otherwise a db leak would make
+        it possible to impersonate any runner. We don't need to use a salted hash
+        because the token is created by the server and already has sufficient entropy.
+        The hash itself is stored using base64.
+        """
+        return (
+            base64.urlsafe_b64encode(hashlib.sha256(token.encode("ascii")).digest())
+            .rstrip(b"=")
+            .decode("ascii")
+        )
+
+    @abstractmethod
+    async def _get_runner_by_token_hashed(self, token_hash: str) -> int | None:
+        """
+        Returns the id of the runner with the matching token_hash
+        Returns None if no Runner matches
+        """
+        pass
+
+    async def create_runner(self) -> RunnerCreatedInfo:
+        """
+        Creates a new runner, inserts it into the database and returns its newly generated token
+        token generation is done here because it is important that the token is sever generated (because of how it is hashed)
+        """
+        token = secrets.token_urlsafe()
+        token_hash = self.__runner_token_hash(token)
+
+        # Sanity check to ensure that the token and its hash are unique.
+        while (await self._get_runner_by_token_hashed(token_hash)) is not None:
+            token = secrets.token_urlsafe()
+            token_hash = self.__runner_token_hash(token)
+
+        runner_id = await self._create_runner_hashed(token_hash)
+        return RunnerCreatedInfo(id=runner_id, token=token)
+
+    async def get_runner_by_token(self, token: str) -> int | None:
+        token_hash = self.__runner_token_hash(token)
+        return await self._get_runner_by_token_hashed(token_hash)
 
 
 class PostgresAdapter(DatabaseAdapter):
@@ -547,7 +605,7 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.runners (
                     id int GENERATED ALWAYS AS IDENTITY,
-                    token_hash char(24) UNIQUE,
+                    token_hash char(43) UNIQUE,
                     PRIMARY KEY (id)
                 )
             """
@@ -1043,3 +1101,37 @@ class PostgresAdapter(DatabaseAdapter):
                     (hashed_new_password, email.root),
                 )
                 return await cur.fetchone()
+
+    async def _create_runner_hashed(self, token_hash: str) -> int:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        INSERT INTO {self.schema}.runners (id, token_hash)
+                        VALUES (DEFAULT, %s)
+                        RETURNING id
+                    """,
+                    (token_hash,),
+                )
+
+                if not (runner_id := await cur.fetchone()):
+                    raise Exception("Database didn't return runner ID after inserting new runner")
+                else:
+                    return runner_id
+
+    async def _get_runner_by_token_hashed(self, token_hash: str) -> int | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(RunnerInDb)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.runners
+                        WHERE token_hash = %s
+                    """,
+                    (token_hash,),
+                )
+
+                if not (runner := await cur.fetchone()):
+                    return None
+                else:
+                    return runner.id

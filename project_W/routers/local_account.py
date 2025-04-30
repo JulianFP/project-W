@@ -11,10 +11,11 @@ from .. import dependencies as dp
 from ..models.internal import (
     AccountActivationTokenData,
     AuthTokenData,
+    DecodedAuthTokenData,
     PasswordResetTokenData,
 )
 from ..models.request_data import PasswordResetData, SignupData
-from ..models.response_data import ErrorResponse, User, UserTypeEnum
+from ..models.response_data import ErrorResponse, UserTypeEnum
 from ..security.auth import auth_dependency_responses, validate_user
 from ..security.local_token import (
     create_account_activation_token,
@@ -26,8 +27,10 @@ from ..security.local_token import (
 
 
 async def validate_token_local_not_provisioned(
-    current_token: Annotated[User, Depends(validate_user(require_admin=False))],
-):
+    current_token: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    ],
+) -> DecodedAuthTokenData:
     if current_token.user_type is not UserTypeEnum.local:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -41,6 +44,8 @@ async def validate_token_local_not_provisioned(
             detail="This route cannot be called by the current user because they have been provisioned through the admin config file. Please change any user attributes there instead.",
         )
 
+    return current_token
+
 
 validate_token_local_not_provisioned_responses = {
     400: {
@@ -53,8 +58,8 @@ validate_token_local_not_provisioned_responses = {
 # for when users need to confirm their identity with their password
 async def validate_token_local_not_provisioned_confirmed(
     password: Annotated[SecretStr, Body()],
-    current_token: Annotated[User, Depends(validate_token_local_not_provisioned)],
-) -> User:
+    current_token: Annotated[DecodedAuthTokenData, Depends(validate_token_local_not_provisioned)],
+) -> DecodedAuthTokenData:
     if not (
         await dp.db.get_local_user_by_email_checked_password(
             current_token.email, password.get_secret_value()
@@ -64,8 +69,8 @@ async def validate_token_local_not_provisioned_confirmed(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Confirmation password invalid",
         )
-    else:
-        return current_token
+
+    return current_token
 
 
 validate_token_local_not_provisioned_confirmed_responses = {
@@ -197,7 +202,7 @@ async def activate(token: SecretStr):
     | auth_dependency_responses,
 )
 async def resend_activation_email(
-    current_token: Annotated[User, Depends(validate_token_local_not_provisioned)],
+    current_token: Annotated[DecodedAuthTokenData, Depends(validate_token_local_not_provisioned)],
     background_tasks: BackgroundTasks,
 ):
     if current_token.user_type != UserTypeEnum.local:
@@ -290,7 +295,9 @@ async def reset_password(password_reset: PasswordResetData):
 )
 async def change_user_email(
     new_email: EmailValidated,
-    current_token: Annotated[User, Depends(validate_token_local_not_provisioned_confirmed)],
+    current_token: Annotated[
+        DecodedAuthTokenData, Depends(validate_token_local_not_provisioned_confirmed)
+    ],
     background_tasks: BackgroundTasks,
 ):
     if new_email.get_domain() not in dp.config.security.local_account.allowed_email_domains:
@@ -323,7 +330,9 @@ async def change_user_email(
 )
 async def change_user_password(
     new_password: PasswordValidated,
-    current_token: Annotated[User, Depends(validate_token_local_not_provisioned_confirmed)],
+    current_token: Annotated[
+        DecodedAuthTokenData, Depends(validate_token_local_not_provisioned_confirmed)
+    ],
 ):
     await dp.db.update_local_user_password(current_token.email, new_password)
     return "Successfully updated user password"

@@ -22,6 +22,11 @@ class LdapUserInDb(UserInDb):
     dn: str
 
 
+class RunnerInDb(BaseModel):
+    id: int
+    token_hash: str
+
+
 class AccountActivationTokenData(BaseModel):
     old_email: EmailValidated
     new_email: EmailValidated

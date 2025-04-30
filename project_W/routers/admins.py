@@ -2,6 +2,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+import project_W.dependencies as dp
+from project_W.models.response_data import RunnerCreatedInfo
+
 from ..models.internal import DecodedAuthTokenData
 from ..security.auth import auth_dependency_responses, validate_user
 
@@ -13,8 +16,19 @@ router = APIRouter(
 )
 
 
+@router.post("/create_runner")
+async def create_runner(
+    _: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
+    ]
+) -> RunnerCreatedInfo:
+    return await dp.db.create_runner()
+
+
 @router.get("/test")
 async def admin_test(
-    _: Annotated[DecodedAuthTokenData, Depends(validate_user(require_admin=True))]
+    _: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=True))
+    ]
 ):
     return "Only an admin is allowed to see this"
