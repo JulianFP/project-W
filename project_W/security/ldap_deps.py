@@ -199,7 +199,7 @@ async def lookup_ldap_user_in_db_from_token(user_token_data: DecodedAuthTokenDat
         )
     return User(
         id=ldap_user.id,
-        user_type=UserTypeEnum.ldap,
+        user_type=UserTypeEnum.LDAP,
         email=ldap_user.email,
         provider_name=ldap_user.provider_name,
         is_admin=user_token_data.is_admin,

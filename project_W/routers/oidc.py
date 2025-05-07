@@ -3,7 +3,9 @@ from fastapi.responses import RedirectResponse
 
 import project_W.dependencies as dp
 import project_W.security.oidc_deps as oidc
-from project_W.models.response_data import ErrorResponse
+from project_W.models.base import EmailValidated
+
+from ..models.response_data import ErrorResponse
 
 router = APIRouter(
     prefix="/oidc",
@@ -66,10 +68,10 @@ async def auth(idp_name: str, request: Request):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get sub from the identity provider. Please make sure that the IdP supports the sub claim",
         )
-    if not (email := userinfo.get("email")):
+    if not (email := EmailValidated.model_validate(userinfo.get("email"))):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not get your email address from the identity provider. Please make sure that the IdP supports the email claim and that your account has an email address associated with it",
+            detail="Could not get a valid email address from the identity provider. Please make sure that the IdP supports the email claim, that your account has an email address associated with it and that this email is valid",
         )
     if not (id_token := oidc_response.get("id_token")):
         raise HTTPException(

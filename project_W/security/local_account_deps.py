@@ -14,7 +14,7 @@ async def lookup_local_user_in_db_from_token(user_token_data: DecodedAuthTokenDa
         )
     return User(
         id=local_user.id,
-        user_type=UserTypeEnum.local,
+        user_type=UserTypeEnum.LOCAL,
         email=local_user.email,
         provider_name="project-W",
         is_admin=local_user.is_admin,

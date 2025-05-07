@@ -6,9 +6,9 @@ from .base import UserInDb
 
 
 class UserTypeEnum(str, Enum):
-    local = "local"
-    ldap = "ldap"
-    oidc = "oidc"
+    LOCAL = "local"
+    LDAP = "ldap"
+    OIDC = "oidc"
 
 
 # user model for the api
@@ -44,3 +44,9 @@ class TokenSecretInfo(BaseModel):
 class RunnerCreatedInfo(BaseModel):
     id: int
     token: str
+
+
+class HeartbeatResponse(BaseModel):
+    error: str | None = None
+    abort: bool = False
+    job_assigned: bool = False

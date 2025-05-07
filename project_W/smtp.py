@@ -17,8 +17,8 @@ class SmtpClient:
 
     def __init__(self, smtp_settings: SMTPServerSettings) -> None:
         self.smtp_settings = smtp_settings
-        ssl = smtp_settings.secure == SMTPSecureEnum.ssl
-        self.starttls = smtp_settings.secure == SMTPSecureEnum.starttls
+        ssl = smtp_settings.secure == SMTPSecureEnum.SSL
+        self.starttls = smtp_settings.secure == SMTPSecureEnum.STARTTLS
         self.client = SMTP(
             hostname=smtp_settings.hostname,
             port=smtp_settings.port,

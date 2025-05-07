@@ -5,9 +5,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 import project_W.dependencies as dp
 import project_W.security.ldap_deps as ldap
-from project_W.models.internal import AuthTokenData
-from project_W.models.response_data import ErrorResponse, UserTypeEnum
 
+from ..models.internal import AuthTokenData
+from ..models.response_data import ErrorResponse, UserTypeEnum
 from ..security.local_token import create_auth_token
 
 router = APIRouter(
@@ -44,7 +44,7 @@ async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, D
     if await ldap.ldap_adapter.authenticate_user(idp_name, user.dn, form_data.password):
         user_id = await dp.db.ensure_ldap_user_exists(idp_name, user.dn, user.email)
         data = AuthTokenData(
-            user_type=UserTypeEnum.ldap, sub=str(user_id), email=user.email, is_verified=True
+            user_type=UserTypeEnum.LDAP, sub=str(user_id), email=user.email, is_verified=True
         )
         token = await create_auth_token(dp.config, data, user_id, user.is_admin, form_data.scopes)
         return token

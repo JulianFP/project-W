@@ -7,17 +7,17 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 import project_W.dependencies as dp
-from project_W.caching import RedisAdapter
-from project_W.database import PostgresAdapter
-from project_W.logger import get_logger
-from project_W.models.settings import LocalAccountOperationModeEnum
-from project_W.smtp import SmtpClient
 
 from ._version import __version__
+from .caching import RedisAdapter
 from .config import loadConfig
+from .database import PostgresAdapter
+from .logger import get_logger
 from .models.response_data import AboutResponse
-from .routers import admins, ldap, local_account, oidc, users
+from .models.settings import LocalAccountOperationModeEnum
+from .routers import admins, jobs, ldap, local_account, oidc, users
 from .security import ldap_deps, oidc_deps
+from .smtp import SmtpClient
 
 
 # startup database connections before spinning up application
@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
         app.include_router(ldap.router)
         ldap_deps.ldap_adapter = ldap_deps.LdapAdapter()
         await ldap_deps.ldap_adapter.open(dp.config.security.ldap_providers)
-    if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.disabled:
+    if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.DISABLED:
         login_method_exists = True
         app.include_router(local_account.router)
         for prov_num, prov_user in dp.config.security.local_account.user_provisioning.items():
@@ -125,6 +125,7 @@ app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))  # for o
 
 app.include_router(users.router)
 app.include_router(admins.router)
+app.include_router(jobs.router)
 
 
 @app.get("/about")

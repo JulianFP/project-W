@@ -105,11 +105,11 @@ def validate_user_and_get_from_db(require_verified: bool, require_admin: bool):
             DecodedAuthTokenData, Depends(validate_user(require_verified, require_admin))
         ]
     ) -> User:
-        if user_token_data.user_type == UserTypeEnum.local:
+        if user_token_data.user_type == UserTypeEnum.LOCAL:
             return await lookup_local_user_in_db_from_token(user_token_data)
-        elif user_token_data.user_type == UserTypeEnum.ldap:
+        elif user_token_data.user_type == UserTypeEnum.LDAP:
             return await lookup_ldap_user_in_db_from_token(user_token_data)
-        elif user_token_data.user_type == UserTypeEnum.oidc:
+        elif user_token_data.user_type == UserTypeEnum.OIDC:
             return await lookup_oidc_user_in_db_from_token(user_token_data)
         else:
             raise Exception("Invalid token type encountered!")

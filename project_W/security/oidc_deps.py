@@ -98,7 +98,7 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
             headers={"WWW-Authenticate": "Bearer"},
         )
     user["is_verified"] = True
-    user["user_type"] = UserTypeEnum.oidc
+    user["user_type"] = UserTypeEnum.OIDC
 
     # check if user is admin
     admin_role_conf = oidc_prov[name].admin_role
@@ -135,7 +135,7 @@ async def lookup_oidc_user_in_db_from_token(user_token_data: DecodedAuthTokenDat
         )
     return User(
         id=oidc_user.id,
-        user_type=UserTypeEnum.oidc,
+        user_type=UserTypeEnum.OIDC,
         email=oidc_user.email,
         provider_name=provider_name,
         is_admin=user_token_data.is_admin,

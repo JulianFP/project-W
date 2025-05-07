@@ -31,7 +31,7 @@ async def validate_token_local_not_provisioned(
         DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
     ],
 ) -> DecodedAuthTokenData:
-    if current_token.user_type is not UserTypeEnum.local:
+    if current_token.user_type is not UserTypeEnum.LOCAL:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only users who are logged in with a local Project-W account can use this route",
@@ -108,7 +108,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
         )
 
     data = AuthTokenData(
-        user_type=UserTypeEnum.local,
+        user_type=UserTypeEnum.LOCAL,
         sub=str(user.id),
         email=user.email,
         is_verified=user.is_verified,
@@ -128,7 +128,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     },
 )
 async def signup(data: SignupData, background_tasks: BackgroundTasks):
-    if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.enabled:
+    if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.ENABLED:
         raise HTTPException(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
             detail="Signup of new local accounts is disabled on this server",
@@ -205,7 +205,7 @@ async def resend_activation_email(
     current_token: Annotated[DecodedAuthTokenData, Depends(validate_token_local_not_provisioned)],
     background_tasks: BackgroundTasks,
 ):
-    if current_token.user_type != UserTypeEnum.local:
+    if current_token.user_type != UserTypeEnum.LOCAL:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This is not a local Project-W user",

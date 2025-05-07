@@ -3,10 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 import project_W.dependencies as dp
-from project_W.models.response_data import ErrorResponse, User
 
 from ..models.internal import AuthTokenData, DecodedAuthTokenData
-from ..models.response_data import TokenSecretInfo, UserTypeEnum
+from ..models.response_data import ErrorResponse, TokenSecretInfo, User, UserTypeEnum
 from ..security.auth import (
     auth_dependency_responses,
     validate_user,
@@ -23,21 +22,21 @@ router = APIRouter(
 
 @router.post("/invalidate_token")
 async def invalidate_token(
-    current_token: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
     ],
     token_id: int,
 ):
-    await dp.db.delete_token_secret_of_user(int(current_token.sub), token_id)
+    await dp.db.delete_token_secret_of_user(current_user.id, token_id)
 
 
 @router.post("/invalidate_all_tokens")
 async def invalidate_all_tokens(
-    current_token: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
     ],
 ):
-    await dp.db.delete_all_token_secrets_of_user(int(current_token.sub))
+    await dp.db.delete_all_token_secrets_of_user(int(current_user.id))
 
 
 @router.post(
@@ -61,21 +60,21 @@ async def get_new_api_token(
         detail=f"Creation of api tokens is disabled for your account type. Login using a different provider or ask the administrator to enable this.",
     )
     if (
-        current_user.user_type == UserTypeEnum.oidc
+        current_user.user_type == UserTypeEnum.OIDC
         and not dp.config.security.oidc_providers[
             current_user.provider_name
         ].allow_creation_of_api_tokens
     ):
         raise disabled_exc
     if (
-        current_user.user_type == UserTypeEnum.ldap
+        current_user.user_type == UserTypeEnum.LDAP
         and not dp.config.security.ldap_providers[
             current_user.provider_name
         ].allow_creation_of_api_tokens
     ):
         raise disabled_exc
     if (
-        current_user.user_type == UserTypeEnum.local
+        current_user.user_type == UserTypeEnum.LOCAL
         and not dp.config.security.local_account.allow_creation_of_api_tokens
     ):
         raise disabled_exc
@@ -93,11 +92,11 @@ async def get_new_api_token(
 
 @router.get("/get_all_token_info")
 async def get_all_token_info(
-    current_token: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
     ]
 ) -> list[TokenSecretInfo]:
-    return await dp.db.get_info_of_all_tokens_of_user(int(current_token.sub))
+    return await dp.db.get_info_of_all_tokens_of_user(current_user.id)
 
 
 @router.get("/info")

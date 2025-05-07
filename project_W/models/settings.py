@@ -34,16 +34,16 @@ class ProvisionedUser(BaseModel):
 
 
 class LocalAccountOperationModeEnum(str, Enum):
-    disabled = "disabled"
-    no_signup_hidden = "no-signup_hidden"
-    no_signup = "no-signup"
-    enabled = "enabled"
+    DISABLED = "disabled"
+    NO_SIGNUP_HIDDEN = "no-signup_hidden"
+    NO_SIGNUP = "no-signup"
+    ENABLED = "enabled"
 
 
 class LocalAccountSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: LocalAccountOperationModeEnum = Field(
-        default=LocalAccountOperationModeEnum.enabled,
+        default=LocalAccountOperationModeEnum.ENABLED,
         description="""
         To what extend local accounts should be enabled.
         - enabled: Both login and signup possible and advertised in frontend to users (default).
@@ -181,15 +181,15 @@ class LdapQuerySettings(BaseModel):
 
 
 class LdapAuthMechanismEnum(str, Enum):
-    simple = "SIMPLE"
-    md5 = "DIGEST-MD5"
-    ntlm = "NTLM"
+    SIMPLE = "SIMPLE"
+    MD5 = "DIGEST-MD5"
+    NTLM = "NTLM"
 
 
 class LdapAuthSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mechanism: LdapAuthMechanismEnum = Field(
-        default=LdapAuthMechanismEnum.simple,
+        default=LdapAuthMechanismEnum.SIMPLE,
         description="Authentication mechanism that should be used. Can be one of 'SIMPLE', 'DIGEST-MD5' or 'NTLM'",
     )
     user: str = Field(description="Identification of binding user.")
@@ -248,9 +248,9 @@ class SecuritySettings(BaseModel):
 
 
 class SMTPSecureEnum(str, Enum):
-    ssl = "ssl"
-    starttls = "starttls"
-    plain = "plain"
+    SSL = "ssl"
+    STARTTLS = "starttls"
+    PLAIN = "plain"
 
 
 class SMTPServerSettings(BaseModel):
@@ -266,7 +266,7 @@ class SMTPServerSettings(BaseModel):
         description="Port that should be used for the smtp connection.",
     )
     secure: SMTPSecureEnum = Field(
-        default=SMTPSecureEnum.starttls,
+        default=SMTPSecureEnum.STARTTLS,
         description="Whether to use ssl, starttls or no encryption with the smtp server.",
     )
     sender_email: EmailValidated = Field(

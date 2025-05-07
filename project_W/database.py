@@ -7,16 +7,16 @@ from typing import LiteralString
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
+from fastapi import UploadFile
 from psycopg import pq
 from psycopg.connection_async import AsyncConnection
 from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 
-from project_W.models.base import EmailValidated, PasswordValidated
-
 from ._version import version, version_tuple
 from .logger import get_logger
+from .models.base import EmailValidated, PasswordValidated
 from .models.internal import (
     LdapUserInDb,
     LocalUserInDb,
@@ -24,6 +24,7 @@ from .models.internal import (
     RunnerInDb,
     TokenSecret,
 )
+from .models.request_data import JobSettings
 from .models.response_data import RunnerCreatedInfo, TokenSecretInfo
 from .utils import parse_version_tuple
 
@@ -288,6 +289,35 @@ class DatabaseAdapter(ABC):
         )
 
     @abstractmethod
+    async def add_new_job_settings(
+        self, user_id: int, job_settings: JobSettings, is_new_default: bool = False
+    ) -> int:
+        """
+        Create a new set of job settings for the user with id user_id and return its id
+        If is_new_default is true then make that new set of settings the new default for this user
+        """
+        pass
+
+    @abstractmethod
+    async def get_default_job_settings_of_user(self, user_id: int) -> JobSettings | None:
+        """
+        Return the job settings of that user that are marked as the default
+        Returns None if the user doesn't have any default settings
+        """
+        pass
+
+    @abstractmethod
+    async def add_new_job(
+        self, user_id: int, audio_file: UploadFile, job_settings_id: int | None = None
+    ) -> int | None:
+        """
+        Create a new job of the provided user and with the provided audio file and job settings
+        If provided job_settings_id is None then use the default job settings of that user
+        Returns None if the user doesn't own job_settings with id job_settings_id
+        """
+        pass
+
+    @abstractmethod
     async def _get_runner_by_token_hashed(self, token_hash: str) -> int | None:
         """
         Returns the id of the runner with the matching token_hash
@@ -320,6 +350,7 @@ class PostgresAdapter(DatabaseAdapter):
     apool: AsyncConnectionPool
     schema: LiteralString = "project_w"
     minimal_required_postgres_version = 14  # for both postgres and libpq
+    file_chunk_size_in_bytes = 10240  # 10MiB
 
     def __init__(self, connection_string: str) -> None:
         self.apool = AsyncConnectionPool(
@@ -355,6 +386,7 @@ class PostgresAdapter(DatabaseAdapter):
                     "oidc_accounts"
                     "ldap_accounts"
                     "runners"
+                    "job_settings"
                     "jobs"
                     "token_secrets"
                 ):
@@ -377,6 +409,7 @@ class PostgresAdapter(DatabaseAdapter):
                     "oidc_accounts",
                     "ldap_accounts",
                     "runners",
+                    "job_settings",
                     "token_secrets",
                 ]
                 for table_name in table_names:
@@ -515,7 +548,7 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.users (
                     id int GENERATED ALWAYS AS IDENTITY,
-                    PRIMARY KEY (id)
+                    primary key (id)
                 )
             """
             )
@@ -526,7 +559,7 @@ class PostgresAdapter(DatabaseAdapter):
                 CREATE TABLE {self.schema}.token_secrets (
                     id int GENERATED ALWAYS AS IDENTITY,
                     name varchar(64) NOT NULL,
-                    user_id integer NOT NULL,
+                    user_id int NOT NULL,
                     secret char(32) NOT NULL DEFAULT MD5(random()::text),
                     temp_token_secret boolean NOT NULL DEFAULT false,
                     PRIMARY KEY (id),
@@ -534,12 +567,21 @@ class PostgresAdapter(DatabaseAdapter):
                 )
             """
             )
+            # make sure that only one token secret can be the temp_token_secret
+            await cur.execute(
+                f"""
+                CREATE UNIQUE INDEX only_one_temp_token_secret_per_user
+                ON {self.schema}.token_secrets (user_id)
+                WHERE temp_token_secret
+                """
+            )
+            # make sure that there will always be exactly one temp_token_secret by generating a new one at deletion
             await cur.execute(
                 f"""
                 CREATE OR REPLACE FUNCTION rotatesecret() RETURNS TRIGGER AS $$
                 BEGIN
-                    INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
-                    VALUES (DEFAULT, 'Temporary sessions', OLD.user_id, DEFAULT, true);
+                    INSERT INTO {self.schema}.token_secrets (name, user_id, temp_token_secret)
+                    VALUES ('Temporary sessions', OLD.user_id, true);
                     RETURN NULL;
                 END;
                 $$ LANGUAGE plpgsql
@@ -561,11 +603,11 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.local_accounts (
                     email varchar(254) NOT NULL,
-                    id integer NOT NULL,
+                    id int NOT NULL,
                     password_hash char(97) NOT NULL,
                     is_admin boolean NOT NULL DEFAULT false,
                     is_verified boolean NOT NULL DEFAULT false,
-                    provision_number integer UNIQUE DEFAULT null,
+                    provision_number int UNIQUE DEFAULT null,
                     PRIMARY KEY (email),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
                 )
@@ -578,7 +620,7 @@ class PostgresAdapter(DatabaseAdapter):
                 CREATE TABLE {self.schema}.oidc_accounts (
                     iss text NOT NULL,
                     sub text NOT NULL,
-                    id integer NOT NULL,
+                    id int NOT NULL,
                     email varchar(254) NOT NULL,
                     PRIMARY KEY (iss, sub),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
@@ -592,7 +634,7 @@ class PostgresAdapter(DatabaseAdapter):
                 CREATE TABLE {self.schema}.ldap_accounts (
                     provider_name text NOT NULL,
                     dn text NOT NULL,
-                    id integer NOT NULL,
+                    id int NOT NULL,
                     email varchar(254) NOT NULL,
                     PRIMARY KEY (provider_name, dn),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
@@ -611,6 +653,29 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
+            self.logger.info("Creating job_settings table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.job_settings (
+                    id int GENERATED ALWAYS AS IDENTITY,
+                    user_id int NOT NULL,
+                    is_default bool NOT NULL DEFAULT false,
+                    model text NOT NULL DEFAULT 'large',
+                    language varchar(3),
+                    PRIMARY KEY (id),
+                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
+                )
+                """
+            )
+            # make sure that there can only be one setting set as default per user
+            await cur.execute(
+                f"""
+                CREATE UNIQUE INDEX only_one_default_setting_per_user
+                ON {self.schema}.job_settings (user_id)
+                WHERE is_default
+                """
+            )
+
         await self.__create_jobs_table(conn)
 
     async def __create_jobs_table(self, conn: AsyncConnection):
@@ -624,15 +689,14 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.jobs (
                     id int GENERATED ALWAYS AS IDENTITY,
-                    user_id integer NOT NULL,
+                    user_id int NOT NULL,
+                    job_settings_id int,
                     creation_timestamp timestamptz NOT NULL DEFAULT now(),
                     file_name text NOT NULL,
-                    model text,
-                    language char(2),
                     audio_oid oid,
                     finish_timestamp timestamptz,
                     runner_name varchar(40),
-                    runner_id integer,
+                    runner_id int,
                     runner_version text,
                     runner_git_hash char(40),
                     runner_source_code_url text,
@@ -641,6 +705,7 @@ class PostgresAdapter(DatabaseAdapter):
                     error_msg text,
                     PRIMARY KEY (id),
                     FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE,
+                    FOREIGN KEY (job_settings_id) REFERENCES {self.schema}.job_settings (id) ON DELETE CASCADE,
                     FOREIGN KEY (runner_id) REFERENCES {self.schema}.runners (id) ON DELETE SET NULL,
                     CONSTRAINT only_finished_job_has_runner CHECK (
                         (finish_timestamp IS NOT NULL AND runner_name IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
@@ -756,8 +821,8 @@ class PostgresAdapter(DatabaseAdapter):
                     )
                     await cur.execute(
                         f"""
-                        INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
-                        VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
+                        INSERT INTO {self.schema}.token_secrets (name, user_id, temp_token_secret)
+                        VALUES ('Temporary sessions', %s, true)
                     """,
                         (user_id,),
                     )
@@ -820,8 +885,8 @@ class PostgresAdapter(DatabaseAdapter):
                     )
                     await cur.execute(
                         f"""
-                        INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
-                        VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
+                        INSERT INTO {self.schema}.token_secrets (name, user_id, temp_token_secret)
+                        VALUES ('Temporary sessions', %s, true)
                     """,
                         (user_id,),
                     )
@@ -919,8 +984,8 @@ class PostgresAdapter(DatabaseAdapter):
                     )
                     await cur.execute(
                         f"""
-                        INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
-                        VALUES (DEFAULT, 'Temporary sessions', %s, DEFAULT, true)
+                        INSERT INTO {self.schema}.token_secrets (name, user_id, temp_token_secret)
+                        VALUES ('Temporary sessions', %s, true)
                     """,
                         (user_id,),
                     )
@@ -935,8 +1000,8 @@ class PostgresAdapter(DatabaseAdapter):
             async with conn.cursor(row_factory=class_row(TokenSecret)) as cur:
                 await cur.execute(
                     f"""
-                    INSERT INTO {self.schema}.token_secrets (id, name, user_id, secret, temp_token_secret)
-                    VALUES (DEFAULT, %s, %s, DEFAULT, false)
+                    INSERT INTO {self.schema}.token_secrets (name, user_id, temp_token_secret)
+                    VALUES (%s, %s, false)
                     RETURNING *
                     """,
                     (name, user_id),
@@ -1107,8 +1172,8 @@ class PostgresAdapter(DatabaseAdapter):
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
-                        INSERT INTO {self.schema}.runners (id, token_hash)
-                        VALUES (DEFAULT, %s)
+                        INSERT INTO {self.schema}.runners (token_hash)
+                        VALUES (%s)
                         RETURNING id
                     """,
                     (token_hash,),
@@ -1135,3 +1200,99 @@ class PostgresAdapter(DatabaseAdapter):
                     return None
                 else:
                     return runner.id
+
+    async def add_new_job_settings(
+        self, user_id: int, job_settings: JobSettings, is_new_default: bool = False
+    ) -> int:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                if is_new_default:  # first set the old settings to not be the default anymore
+                    await cur.execute(
+                        f"""
+                            UPDATE {self.schema}.job_settings
+                            SET is_default = false
+                            WHERE user_id = %s AND is_default = true
+                        """,
+                        (user_id,),
+                    )
+                await cur.execute(
+                    f"""
+                        INSERT INTO {self.schema}.job_settings (user_id, is_default, model, language)
+                        VALUES (%s, %s, %s, %s)
+                        RETURNING id
+                    """,
+                    (user_id, is_new_default, job_settings.model, job_settings.language),
+                )
+                if job_settings_id := await cur.fetchone():
+                    return job_settings_id
+                else:
+                    raise Exception("Didn't return id of new job_settings")
+
+    async def get_default_job_settings_of_user(self, user_id: int) -> JobSettings | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(JobSettings)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.job_settings
+                        WHERE user_id = %s AND is_default = true
+                    """,
+                    (user_id,),
+                )
+                return await cur.fetchone()
+
+    async def add_new_job(
+        self, user_id: int, audio_file: UploadFile, job_settings_id: int | None = None
+    ) -> int | None:
+        async with self.apool.connection() as conn:
+            if job_settings_id is None:
+                async with conn.cursor(row_factory=scalar_row) as cur:
+                    await cur.execute(
+                        f"""
+                                SELECT id
+                                FROM {self.schema}.job_settings
+                                WHERE user_id = %s AND is_default = true
+                            """,
+                        (user_id,),
+                    )
+                    job_settings_id = await cur.fetchone()
+            else:
+                async with conn.cursor(row_factory=class_row(JobSettings)) as cur:
+                    await cur.execute(
+                        f"""
+                            SELECT *
+                            FROM {self.schema}.job_settings
+                            WHERE user_id = %s AND id = %s
+                        """,
+                        (user_id, job_settings_id),
+                    )
+                    if await cur.fetchone() is None:
+                        return None
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT lo_creat(-1)
+                    """
+                )
+                oid = await cur.fetchone()
+                offset = 0
+                while chunk := await audio_file.read(self.file_chunk_size_in_bytes):
+                    await cur.execute(
+                        f"""
+                            SELECT lo_put(%s, %s, %s)
+                        """,
+                        (oid, offset, chunk),
+                    )
+                    offset += self.file_chunk_size_in_bytes
+                await cur.execute(
+                    f"""
+                        INSERT INTO {self.schema}.jobs (user_id, job_settings_id, file_name, audio_oid)
+                        VALUES (%s, %s, %s, %s)
+                        RETURNING id
+                    """,
+                    (user_id, job_settings_id, audio_file.filename, oid),
+                )
+                if job_id := await cur.fetchone():
+                    return job_id
+                else:
+                    raise Exception("Didn't return id of new job")
