@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -62,6 +63,24 @@ class LdapUserInfo(BaseModel):
     email: EmailValidated
 
 
+class JobInDb(BaseModel):
+    id: int
+    user_id: int
+    job_settings_id: int | None
+    creation_timestamp: datetime
+    file_name: str
+    audio_oid: int | None
+    finish_timestamp: datetime | None
+    runner_name: str | None = Field(max_length=40)
+    runner_id: int | None
+    runner_version: str | None
+    runner_git_hash: str | None = Field(max_length=40)
+    runner_source_code_url: str | None
+    downloaded: bool | None
+    transcript: str | None
+    error_msg: str | None
+
+
 class JobStatus(str, Enum):
     """
     Represents all the possible statuses that a
@@ -99,8 +118,8 @@ class InProcessJob(BaseModel):
     the completed transcript or until the runner fails.
     """
 
+    id: int
     runner_id: int
-    job_id: int
     progress: float = Field(ge=0.0, le=1.0, default=0.0)
     abort: bool = False
 
@@ -113,8 +132,11 @@ class OnlineRunner(BaseModel):
     store them to the DB anyways.
     """
 
-    runner_id: int
-    runner_priority: int
+    id: int
+    name: str = Field(max_length=40)
+    version: str
+    git_hash: str = Field(max_length=40)
+    source_code_url: str
+    priority: int
     assigned_job_id: int | None = None
-    in_process_job: int | None = None
-    last_heartbeat_timestamp: float
+    in_process_job_id: int | None = None

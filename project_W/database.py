@@ -21,6 +21,7 @@ from .models.internal import (
     LdapUserInDb,
     LocalUserInDb,
     OidcUserInDb,
+    OnlineRunner,
     RunnerInDb,
     TokenSecret,
 )
@@ -314,6 +315,28 @@ class DatabaseAdapter(ABC):
         Create a new job of the provided user and with the provided audio file and job settings
         If provided job_settings_id is None then use the default job settings of that user
         Returns None if the user doesn't own job_settings with id job_settings_id
+        """
+        pass
+
+    @abstractmethod
+    async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
+        """
+        Returns all jobs in the database that haven't finished yet (not downloaded, finished, failed).
+        Will be called at startup to enqueue existing jobs
+        """
+        pass
+
+    @abstractmethod
+    async def finish_successful_job(self, runner: OnlineRunner, transcript: str):
+        """
+        Mark the job with id job_id as successfully finished by adding all the submitted information to it (if that job exists)
+        """
+        pass
+
+    @abstractmethod
+    async def finish_failed_job(self, runner: OnlineRunner, error_msg: str):
+        """
+        Mark the job with id job_id as unsuccessfully finished by adding all the submitted information to it (if that job exists)
         """
         pass
 
@@ -712,9 +735,13 @@ class PostgresAdapter(DatabaseAdapter):
                         OR (finish_timestamp IS NULL AND runner_id IS NULL AND runner_name IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
                     ),
                     CONSTRAINT only_finished_job_is_succeeded_or_failed CHECK (
-                        (finish_timestamp IS NOT NULL AND downloaded IS NOT NULL AND transcript IS NOT NULL AND error_msg IS NULL and audio_oid IS NULL)
-                        OR (finish_timestamp IS NOT NULL AND error_msg IS NOT NULL AND audio_oid IS NOT NULL AND downloaded IS NULL AND transcript IS NULL)
+                        (finish_timestamp IS NOT NULL AND downloaded IS NOT NULL AND transcript IS NOT NULL AND error_msg IS NULL)
+                        OR (finish_timestamp IS NOT NULL AND error_msg IS NOT NULL AND downloaded IS NULL AND transcript IS NULL)
                         OR (finish_timestamp IS NULL AND downloaded IS NULL AND transcript IS NULL AND error_msg IS NULL)
+                    ),
+                    CONSTRAINT only_running_job_has_audio_oidc CHECK (
+                        (finish_timestamp IS NULL AND audio_oid IS NOT NULL)
+                        OR (finish_timestamp IS NOT NULL AND audio_oid IS NULL)
                     )
                 )
             """
@@ -1296,3 +1323,91 @@ class PostgresAdapter(DatabaseAdapter):
                     return job_id
                 else:
                     raise Exception("Didn't return id of new job")
+
+    async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT id
+                        FROM {self.schema}.jobs
+                        WHERE finish_timestamp IS NULL
+                    """
+                )
+                return await cur.fetchall()
+
+    async def finish_successful_job(self, runner: OnlineRunner, transcript: str):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT audio_oid
+                        FROM {self.schema}.jobs
+                        WHERE id = %s
+                    """,
+                    (runner.in_process_job_id,),
+                )
+                if (audio_oid := await cur.fetchone()) is None:
+                    raise Exception(
+                        f"Couldn't get audio_oid for the unfinished job with id {runner.in_process_job_id}"
+                    )
+                await cur.execute(
+                    f"""
+                        UPDATE {self.schema}.jobs
+                        SET (audio_oid, finish_timestamp, downloaded, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, transcript) = (NULL, now(), false, %s, %s, %s, %s, %s, %s)
+                        WHERE id = %s
+                    """,
+                    (
+                        runner.id,
+                        runner.name,
+                        runner.version,
+                        runner.git_hash,
+                        runner.source_code_url,
+                        transcript,
+                        runner.in_process_job_id,
+                    ),
+                )
+                await cur.execute(
+                    f"""
+                        SELECT lo_unlink(%s)
+                    """,
+                    (audio_oid,),
+                )
+
+    async def finish_failed_job(self, runner: OnlineRunner, error_msg: str):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT audio_oid
+                        FROM {self.schema}.jobs
+                        WHERE id = %s
+                    """,
+                    (runner.in_process_job_id,),
+                )
+                if (audio_oid := await cur.fetchone()) is None:
+                    raise Exception(
+                        f"Couldn't get audio_oid for the unfinished job with id {runner.in_process_job_id}"
+                    )
+                await cur.execute(
+                    f"""
+                        UPDATE {self.schema}.jobs
+                        SET (audio_oid, finish_timestamp, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, error_msg) = (NULL, now(), %s, %s, %s, %s, %s, %s)
+                        WHERE id = %s
+                    """,
+                    (
+                        runner.id,
+                        runner.name,
+                        runner.version,
+                        runner.git_hash,
+                        runner.source_code_url,
+                        error_msg,
+                        runner.in_process_job_id,
+                    ),
+                )
+                await cur.execute(
+                    f"""
+                        SELECT lo_unlink(%s)
+                    """,
+                    (audio_oid,),
+                )

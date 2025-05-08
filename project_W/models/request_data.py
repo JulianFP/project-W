@@ -149,3 +149,7 @@ class JobSettings(BaseModel):
                 "If you want to use the 'tiny.en', 'base.en', 'small.en' or 'medium.en' models, you have to set the language to 'en'"
             )
         return self
+
+
+class HeartbeatRequest(BaseModel):
+    progress: float
