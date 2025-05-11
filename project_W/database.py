@@ -1385,6 +1385,19 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def get_job_settings_by_job_id(self, job_id: int) -> JobSettings | None:
         async with self.apool.connection() as conn:
+            # first check if job uses application wide default settings
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT job_settings_id IS NULL
+                        FROM {self.schema}.jobs
+                        WHERE id = %s
+                    """,
+                    (job_id,),
+                )
+                if await cur.fetchone():
+                    return JobSettings()
+
             async with conn.cursor(row_factory=class_row(JobSettings)) as cur:
                 await cur.execute(
                     f"""
@@ -1530,8 +1543,8 @@ class PostgresAdapter(DatabaseAdapter):
                     f"""
                         SELECT *
                         FROM {self.schema}.jobs
-                        WHERE job.user_id = %s
-                        AND job.id = ANY(%s)
+                        WHERE user_id = %s
+                        AND id = ANY(%s)
                     """,
                     (user_id, job_ids),
                 )
@@ -1540,8 +1553,21 @@ class PostgresAdapter(DatabaseAdapter):
     async def get_job_infos_with_settings_of_user(
         self, user_id: int, job_ids: list[int]
     ) -> list[JobAndSettings]:
+        jobs = []
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(JobAndSettings)) as cur:
+                # first query jobs that use application wide default settings
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.jobs
+                        WHERE job_settings_id IS NULL
+                        AND id = ANY(%s)
+                    """,
+                    (job_ids,),
+                )
+                jobs += await cur.fetchall()
+
                 await cur.execute(
                     f"""
                         SELECT *
@@ -1552,7 +1578,8 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                     (user_id, job_ids),
                 )
-                return await cur.fetchall()
+                jobs += await cur.fetchall()
+                return jobs
 
     async def get_job_audio(self, job_id: int) -> AsyncGenerator[bytes, None]:
         async with self.apool.connection() as conn:

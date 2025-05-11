@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .base import EmailValidated, InProcessJobBase, JobBase, UserInDb
+from .base import EmailValidated, InProcessJobBase, UserInDb
 from .request_data import RunnerRegisterRequest
 from .response_data import TokenSecretInfo, UserTypeEnum
 
@@ -61,12 +61,6 @@ class LdapUserInfo(BaseModel):
     dn: str
     is_admin: bool
     email: EmailValidated
-
-
-class JobInDb(JobBase):
-    user_id: int
-    job_settings_id: int | None
-    audio_oid: int | None
 
 
 class JobSortKey(str, Enum):

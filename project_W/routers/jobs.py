@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from starlette.status import HTTP_400_BAD_REQUEST
 
 import project_W.dependencies as dp
@@ -136,7 +136,7 @@ async def job_info(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
     ],
-    job_ids: list[int],
+    job_ids: Annotated[list[int], Query()],
 ) -> list[JobInfo]:
     job_and_setting_infos: list[JobAndSettings] = await dp.db.get_job_infos_with_settings_of_user(
         current_user.id, job_ids
@@ -152,7 +152,7 @@ async def job_info(
             ) is not None and (
                 runner := await dp.ch.get_online_runner_by_id(runner_id)
             ) is not None:
-                data = data | runner.model_dump()  # RunnerInfoBase
+                data = data | runner.model_dump()  # JobBase optional data
         job_infos.append(JobInfo.model_validate(data))
     return job_infos
 
@@ -174,7 +174,7 @@ async def abort_jobs(
 ):
     jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
-        jobStatus = job_status(job)
+        jobStatus = await job_status(job)
         if jobStatus in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
@@ -183,7 +183,7 @@ async def abort_jobs(
 
     # second loop because first loop ensures that all jobs are valid first
     for job in jobs:
-        jobStatus = job_status(job)
+        jobStatus = await job_status(job)
         if jobStatus in [JobStatus.RUNNER_ASSIGNED, JobStatus.RUNNER_IN_PROGRESS]:
             await dp.ch.set_in_process_job(job.id, {"abort": 1})
         else:
@@ -209,7 +209,7 @@ async def delete_jobs(
 ):
     jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
-        jobStatus = job_status(job)
+        jobStatus = await job_status(job)
         if jobStatus not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

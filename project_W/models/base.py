@@ -53,13 +53,6 @@ class UserInDb(BaseModel):
     email: EmailValidated
 
 
-class RunnerInfoBase(BaseModel):
-    name: str = Field(max_length=40)
-    version: str
-    git_hash: str = Field(max_length=40)
-    source_code_url: str
-
-
 class JobBase(BaseModel):
     id: int
     creation_timestamp: datetime

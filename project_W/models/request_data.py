@@ -1,9 +1,9 @@
 from enum import Enum
 from typing import Self
 
-from pydantic import BaseModel, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 
-from .base import EmailValidated, PasswordValidated, RunnerInfoBase
+from .base import EmailValidated, PasswordValidated
 
 
 class SignupData(BaseModel):
@@ -151,7 +151,11 @@ class JobSettings(BaseModel):
         return self
 
 
-class RunnerRegisterRequest(RunnerInfoBase):
+class RunnerRegisterRequest(BaseModel):
+    name: str = Field(max_length=40)
+    version: str
+    git_hash: str = Field(max_length=40)
+    source_code_url: str
     priority: int
 
 
