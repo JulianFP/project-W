@@ -32,7 +32,9 @@ class SmtpClient:
         if self.starttls:
             await self.client.starttls()
         if self.smtp_settings.username and self.smtp_settings.password:
-            await self.client.login(self.smtp_settings.username, self.smtp_settings.password)
+            await self.client.login(
+                self.smtp_settings.username, self.smtp_settings.password.get_secret_value()
+            )
 
         self.logger.info("Connected to SMTP server")
 

@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .base import JobBase, UserInDb
+from .base import InProcessJobBase, JobBase, RunnerInfoBase, UserInDb
 from .request_data import JobSettings
 
 
@@ -86,5 +86,5 @@ class JobAndSettings(JobBase, JobSettings):
     pass
 
 
-class JobInfo(JobAndSettings):
-    status: JobStatus
+class JobInfo(JobAndSettings, InProcessJobBase, RunnerInfoBase):
+    step: JobStatus

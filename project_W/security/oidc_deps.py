@@ -41,7 +41,7 @@ async def register_with_oidc_providers(config: Settings):
             oauth.register(
                 name,
                 client_id=idp.client_id,
-                client_secret=idp.client_secret,
+                client_secret=idp.client_secret.get_secret_value(),
                 server_metadata_url=metadata_uri,
                 client_kwargs={
                     "scope": "openid email",

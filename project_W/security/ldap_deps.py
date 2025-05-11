@@ -92,7 +92,7 @@ class LdapAdapter:
             ldap_client.set_credentials(
                 idp.service_account_auth.mechanism,
                 idp.service_account_auth.user,
-                idp.service_account_auth.password,
+                idp.service_account_auth.password.get_secret_value(),
             )
 
             self.apools[name] = AIOConnectionPool(ldap_client, 5, 10)

@@ -13,10 +13,11 @@ from psycopg.connection_async import AsyncConnection
 from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
+from pydantic import SecretStr
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .models.base import EmailValidated, PasswordValidated
+from .models.base import EmailValidated, JobBase, PasswordValidated
 from .models.internal import (
     JobSortKey,
     LdapUserInDb,
@@ -26,7 +27,7 @@ from .models.internal import (
     RunnerInDb,
     TokenSecret,
 )
-from .models.request_data import JobSettings
+from .models.request_data import JobSettings, Transcript, TranscriptTypeEnum
 from .models.response_data import JobAndSettings, RunnerCreatedInfo, TokenSecretInfo
 from .utils import parse_version_tuple
 
@@ -105,13 +106,17 @@ class DatabaseAdapter(ABC):
         pass
 
     async def ensure_local_user_is_provisioned(
-        self, provision_number: int, email: EmailValidated, password: str, is_admin: bool = False
+        self,
+        provision_number: int,
+        email: EmailValidated,
+        password: PasswordValidated,
+        is_admin: bool = False,
     ) -> int:
         """
         Provision a user from the config file. The password will be hashed in this function before writing it in the database.
         Returns the user id of the user
         """
-        hashed_password = self.hasher.hash(password)
+        hashed_password = self.hasher.hash(password.root.get_secret_value())
         return await self._ensure_local_user_is_provisioned_hashed(
             provision_number, email, hashed_password, is_admin
         )
@@ -161,6 +166,13 @@ class DatabaseAdapter(ABC):
     async def delete_all_token_secrets_of_user(self, user_id: int):
         """
         Delete all token secrets of user with id user_id
+        """
+        pass
+
+    @abstractmethod
+    async def delete_jobs_of_user(self, user_id: int, job_ids: list[int]):
+        """
+        Delete all provided jobs of the provided user
         """
         pass
 
@@ -215,7 +227,7 @@ class DatabaseAdapter(ABC):
         pass
 
     async def get_local_user_by_email_checked_password(
-        self, email: EmailValidated, password: str
+        self, email: EmailValidated, password: SecretStr
     ) -> LocalUserInDb | None:
         """
         Return a user with the matching email if the provided password is also correct, or None if the email doesn't match any user or the password is incorrect
@@ -226,12 +238,12 @@ class DatabaseAdapter(ABC):
             return None
 
         try:
-            self.hasher.verify(user.password_hash, password)
+            self.hasher.verify(user.password_hash, password.get_secret_value())
         except VerificationError:
             return None
 
         if self.hasher.check_needs_rehash(user.password_hash):
-            await self._update_password_hash(user.id, self.hasher.hash(password))
+            await self._update_password_hash(user.id, self.hasher.hash(password.get_secret_value()))
 
         return user
 
@@ -352,7 +364,16 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobAndSettings]:
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobBase]:
+        """
+        Returns all job metadata (excluding job settings, audio/audio oid, user_id, job_settings_id and transcript) for all provided job ids that belong to the provided user_id
+        """
+        pass
+
+    @abstractmethod
+    async def get_job_infos_with_settings_of_user(
+        self, user_id: int, job_ids: list[int]
+    ) -> list[JobAndSettings]:
         """
         Returns all job metadata (including job settings but excluding audio/audio oid, user_id, job_settings_id and transcript) for all provided job ids that belong to the provided user_id
         """
@@ -368,6 +389,16 @@ class DatabaseAdapter(ABC):
         yield b""  # type annotation needs this for some reason even though this is an abstract method
 
     @abstractmethod
+    async def get_job_transcript_of_user(
+        self, user_id: int, job_id: int, transcript_type: TranscriptTypeEnum
+    ) -> str | dict | None:
+        """
+        Returns the transcript object of a finished job belonging to that user
+        Returns None if no job with that id exists or if that job doesn't have a transcript (yet)
+        """
+        pass
+
+    @abstractmethod
     async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
         """
         Returns all jobs in the database that haven't finished yet (not downloaded, finished, failed).
@@ -376,16 +407,19 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def finish_successful_job(self, runner: OnlineRunner, transcript: str):
+    async def finish_successful_job(self, runner: OnlineRunner, transcript: Transcript):
         """
         Mark the job with id job_id as successfully finished by adding all the submitted information to it (if that job exists)
         """
         pass
 
     @abstractmethod
-    async def finish_failed_job(self, runner: OnlineRunner, error_msg: str):
+    async def finish_failed_job(
+        self, job_id: int, error_msg: str, runner: OnlineRunner | None = None
+    ):
         """
-        Mark the job with id job_id as unsuccessfully finished by adding all the submitted information to it (if that job exists)
+        Mark the job with id job_id as unsuccessfully finished by adding all the submitted information to it (if that job exists).
+        Note that in contrary to finish_successful_job here OnlineRunner is optional because the job might have failed before it was assigned to a runner (e.g. if it was aborted)
         """
         pass
 
@@ -445,6 +479,18 @@ class PostgresAdapter(DatabaseAdapter):
             # ensure that the postgresql database version is at least the minimal supported one
             await self.__ensure_postgresql_version(conn)
 
+            table_names: list[LiteralString] = [
+                "users",
+                "local_accounts",
+                "oidc_accounts",
+                "ldap_accounts",
+                "runners",
+                "job_settings",
+                "jobs",
+                "transcripts",
+                "token_secrets",
+            ]
+
             if not await self.__check_schema_exists(conn, self.schema):
                 await self.__create_schema(conn, self.schema)
 
@@ -452,16 +498,7 @@ class PostgresAdapter(DatabaseAdapter):
                 await self.__create_all_tables(conn)
             elif not await self.__check_table_exists(conn, "metadata"):
                 # if the metadata is missing we can't know whether and how to do a migration on the other table. Because of this we throw an exception if the metadata table is missing but any other table exists to be safe
-                for table_name in (
-                    "users"
-                    "local_accounts"
-                    "oidc_accounts"
-                    "ldap_accounts"
-                    "runners"
-                    "job_settings"
-                    "jobs"
-                    "token_secrets"
-                ):
+                for table_name in table_names:
                     if await self.__check_table_exists(conn, table_name):
                         raise Exception(
                             f"Critical: The metadata table is missing but the {table_name} table still exists. Either restore the metadata table with its previous contents or drop the {table_name} table!"
@@ -471,26 +508,15 @@ class PostgresAdapter(DatabaseAdapter):
                 await self.__create_all_tables(conn)
             else:
                 # if schema and metadata table already existed we still have to check if all the other tables still exist
-                # the only table that is allowed to be dropped on its own is the jobs table, so we throw an error if any of the other tables don't exist
+                # no table can be dropped on its own
                 # do database migration before creating any missing tables because those created tables would have the new format which would brick the migration code
                 await self.__update_database_schema_if_needed(conn)
 
-                table_names: list[LiteralString] = [
-                    "users",
-                    "local_accounts",
-                    "oidc_accounts",
-                    "ldap_accounts",
-                    "runners",
-                    "job_settings",
-                    "token_secrets",
-                ]
                 for table_name in table_names:
                     if not await self.__check_table_exists(conn, table_name):
                         raise Exception(
                             f"Critical: The metadata table exists but the {table_name} table is missing. Either restore the {table_name} table with its previous contents or drop the metadata table as well!"
                         )
-                if not await self.__check_table_exists(conn, "jobs"):
-                    await self.__create_jobs_table(conn)
 
         self.logger.info("Database is ready to use")
 
@@ -675,7 +701,7 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.local_accounts (
                     email varchar(254) NOT NULL,
-                    id int NOT NULL,
+                    id int NOT NULL UNIQUE,
                     password_hash char(97) NOT NULL,
                     is_admin boolean NOT NULL DEFAULT false,
                     is_verified boolean NOT NULL DEFAULT false,
@@ -692,7 +718,7 @@ class PostgresAdapter(DatabaseAdapter):
                 CREATE TABLE {self.schema}.oidc_accounts (
                     iss text NOT NULL,
                     sub text NOT NULL,
-                    id int NOT NULL,
+                    id int NOT NULL UNIQUE,
                     email varchar(254) NOT NULL,
                     PRIMARY KEY (iss, sub),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
@@ -706,7 +732,7 @@ class PostgresAdapter(DatabaseAdapter):
                 CREATE TABLE {self.schema}.ldap_accounts (
                     provider_name text NOT NULL,
                     dn text NOT NULL,
-                    id int NOT NULL,
+                    id int NOT NULL UNIQUE,
                     email varchar(254) NOT NULL,
                     PRIMARY KEY (provider_name, dn),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
@@ -748,15 +774,7 @@ class PostgresAdapter(DatabaseAdapter):
                 """
             )
 
-        await self.__create_jobs_table(conn)
-
-    async def __create_jobs_table(self, conn: AsyncConnection):
-        """
-        Since nothing references the jobs table we allow lazy deletion of all jobs by dropping the whole jobs table.
-        This is why it gets its own function.
-        """
-        self.logger.info("Creating jobs table")
-        async with conn.cursor() as cur:
+            self.logger.info("Creating jobs table")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.jobs (
@@ -773,20 +791,23 @@ class PostgresAdapter(DatabaseAdapter):
                     runner_git_hash char(40),
                     runner_source_code_url text,
                     downloaded boolean,
-                    transcript text,
                     error_msg text,
                     PRIMARY KEY (id),
                     FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE,
                     FOREIGN KEY (job_settings_id) REFERENCES {self.schema}.job_settings (id) ON DELETE CASCADE,
                     FOREIGN KEY (runner_id) REFERENCES {self.schema}.runners (id) ON DELETE SET NULL,
-                    CONSTRAINT only_finished_job_has_runner CHECK (
-                        (finish_timestamp IS NOT NULL AND runner_name IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
-                        OR (finish_timestamp IS NULL AND runner_id IS NULL AND runner_name IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
+                    CONSTRAINT only_finished_job_can_have_runner CHECK (
+                        (finish_timestamp IS NULL AND runner_id IS NULL AND runner_name IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
+                        OR finish_timestamp IS NOT NULL
+                    ),
+                    CONSTRAINT either_no_or_all_runner_info CHECK (
+                        (runner_id IS NULL AND runner_name IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
+                        OR (runner_id IS NOT NULL AND runner_name IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
                     ),
                     CONSTRAINT only_finished_job_is_succeeded_or_failed CHECK (
-                        (finish_timestamp IS NOT NULL AND downloaded IS NOT NULL AND transcript IS NOT NULL AND error_msg IS NULL)
-                        OR (finish_timestamp IS NOT NULL AND error_msg IS NOT NULL AND downloaded IS NULL AND transcript IS NULL)
-                        OR (finish_timestamp IS NULL AND downloaded IS NULL AND transcript IS NULL AND error_msg IS NULL)
+                        (finish_timestamp IS NOT NULL AND downloaded IS NOT NULL AND error_msg IS NULL)
+                        OR (finish_timestamp IS NOT NULL AND downloaded IS NULL AND error_msg IS NOT NULL)
+                        OR (finish_timestamp IS NULL AND downloaded IS NULL AND error_msg IS NULL)
                     ),
                     CONSTRAINT only_running_job_has_audio_oidc CHECK (
                         (finish_timestamp IS NULL AND audio_oid IS NOT NULL)
@@ -801,6 +822,22 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE INDEX ON {self.schema}.jobs (user_id)
             """
+            )
+
+            self.logger.info("Creating transcripts table")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.transcripts (
+                    job_id int,
+                    as_txt text NOT NULL,
+                    as_srt text NOT NULL,
+                    as_tsv text NOT NULL,
+                    as_vtt text NOT NULL,
+                    as_json jsonb NOT NULL,
+                    PRIMARY KEY (job_id),
+                    FOREIGN KEY (job_id) REFERENCES {self.schema}.jobs (id) ON DELETE CASCADE
+                )
+                """
             )
 
     async def __update_database_schema_if_needed(self, conn: AsyncConnection):
@@ -1089,7 +1126,7 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def delete_user(self, user_id):
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 # jobs of that user get automatically deleted because of the 'ON DELETE CASCADE' specified during table creation
                 await cur.execute(
                     f"""
@@ -1101,7 +1138,7 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def delete_token_secret_of_user(self, user_id: int, token_id: int):
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
                         DELETE FROM {self.schema}.token_secrets
@@ -1112,13 +1149,42 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def delete_all_token_secrets_of_user(self, user_id: int):
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
                         DELETE FROM {self.schema}.token_secrets
                         WHERE user_id = %s
                     """,
                     (user_id,),
+                )
+
+    async def delete_jobs_of_user(self, user_id: int, job_ids: list[int]):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        DELETE FROM {self.schema}.jobs
+                        WHERE user_id = %s
+                        AND id = ANY(%s)
+                        RETURNING job_settings_id
+                    """,
+                    (user_id, job_ids),
+                )
+                job_setting_ids = await cur.fetchall()
+
+                # also cleanup job_settings table, but only if no other job references the same job setting anymore and it isn't the default
+                await cur.execute(
+                    f"""
+                        DELETE FROM {self.schema}.job_settings settings
+                        WHERE settings.id = ANY(%s)
+                        AND settings.is_default = false
+                        AND NOT EXISTS (
+                            SELECT *
+                            FROM {self.schema}.jobs jobs
+                            WHERE jobs.job_settings_id = settings.id
+                        )
+                    """,
+                    (job_setting_ids,),
                 )
 
     async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
@@ -1457,7 +1523,23 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchall()
 
-    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobAndSettings]:
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobBase]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(JobBase)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.jobs
+                        WHERE job.user_id = %s
+                        AND job.id = ANY(%s)
+                    """,
+                    (user_id, job_ids),
+                )
+                return await cur.fetchall()
+
+    async def get_job_infos_with_settings_of_user(
+        self, user_id: int, job_ids: list[int]
+    ) -> list[JobAndSettings]:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(JobAndSettings)) as cur:
                 await cur.execute(
@@ -1503,6 +1585,23 @@ class PostgresAdapter(DatabaseAdapter):
                         (audio_oid, offset, self.__file_chunk_size_in_bytes),
                     )
 
+    async def get_job_transcript_of_user(
+        self, user_id: int, job_id: int, transcript_type: TranscriptTypeEnum
+    ) -> str | dict | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT transcripts.%s
+                        FROM {self.schema}.transcripts transcripts, {self.schema}.jobs jobs
+                        WHERE transcript.job_id = jobs.id
+                        AND jobs.user_id = %s
+                        AND transcripts.job_id = %s
+                    """,
+                    (transcript_type, user_id, job_id),
+                )
+                return await cur.fetchone()
+
     async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -1515,7 +1614,7 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchall()
 
-    async def finish_successful_job(self, runner: OnlineRunner, transcript: str):
+    async def finish_successful_job(self, runner: OnlineRunner, transcript: Transcript):
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
@@ -1533,7 +1632,7 @@ class PostgresAdapter(DatabaseAdapter):
                 await cur.execute(
                     f"""
                         UPDATE {self.schema}.jobs
-                        SET (audio_oid, finish_timestamp, downloaded, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, transcript) = (NULL, now(), false, %s, %s, %s, %s, %s, %s)
+                        SET (audio_oid, finish_timestamp, downloaded, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url) = (NULL, now(), false, %s, %s, %s, %s, %s)
                         WHERE id = %s
                     """,
                     (
@@ -1542,8 +1641,21 @@ class PostgresAdapter(DatabaseAdapter):
                         runner.version,
                         runner.git_hash,
                         runner.source_code_url,
-                        transcript,
                         runner.in_process_job_id,
+                    ),
+                )
+                await cur.execute(
+                    f"""
+                        INSERT INTO {self.schema}.transcripts (job_id, as_txt, as_srt, as_tsv, as_vtt, as_json)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        runner.in_process_job_id,
+                        transcript.as_txt,
+                        transcript.as_srt,
+                        transcript.as_tsv,
+                        transcript.as_vtt,
+                        Jsonb(transcript.as_json),
                     ),
                 )
                 await cur.execute(
@@ -1553,7 +1665,23 @@ class PostgresAdapter(DatabaseAdapter):
                     (audio_oid,),
                 )
 
-    async def finish_failed_job(self, runner: OnlineRunner, error_msg: str):
+    async def finish_failed_job(
+        self, job_id: int, error_msg: str, runner: OnlineRunner | None = None
+    ):
+        if runner:
+            if runner.assigned_job_id != job_id:
+                raise Exception("The provided online runner doesn't fit to the provided job_id!")
+            runner_id = runner.id
+            runner_name = runner.id
+            runner_version = runner.id
+            runner_git_hash = runner.git_hash
+            runner_source_code_url = runner.source_code_url
+        else:
+            runner_id = None
+            runner_name = None
+            runner_version = None
+            runner_git_hash = None
+            runner_source_code_url = None
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
@@ -1562,11 +1690,11 @@ class PostgresAdapter(DatabaseAdapter):
                         FROM {self.schema}.jobs
                         WHERE id = %s
                     """,
-                    (runner.in_process_job_id,),
+                    (job_id,),
                 )
                 if (audio_oid := await cur.fetchone()) is None:
                     raise Exception(
-                        f"Couldn't get audio_oid for the unfinished job with id {runner.in_process_job_id}"
+                        f"Couldn't get audio_oid for the unfinished job with id {job_id}"
                     )
                 await cur.execute(
                     f"""
@@ -1575,13 +1703,13 @@ class PostgresAdapter(DatabaseAdapter):
                         WHERE id = %s
                     """,
                     (
-                        runner.id,
-                        runner.name,
-                        runner.version,
-                        runner.git_hash,
-                        runner.source_code_url,
+                        runner_id,
+                        runner_name,
+                        runner_version,
+                        runner_git_hash,
+                        runner_source_code_url,
                         error_msg,
-                        runner.in_process_job_id,
+                        job_id,
                     ),
                 )
                 await cur.execute(

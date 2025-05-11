@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import ValidationError
 
 import project_W.dependencies as dp
-from project_W.models.settings import Settings
+from project_W.models.settings import SessionTokenValidated, Settings
 
 from ..logger import get_logger
 from ..models.internal import (
@@ -32,24 +32,22 @@ logger = get_logger("project-W")
 
 def create_token(
     data: dict,
-    secret_key: str,
+    secret_key: SessionTokenValidated,
     expires_delta: timedelta | None = None,  # None means infinite lifetime
 ):
-    assert len(secret_key) == 64  # 256-bit secret key
-
     data["iss"] = jwt_issuer
     if expires_delta is not None:
         data["exp"] = datetime.now(timezone.utc) + expires_delta
 
-    token = jwt.encode(data, secret_key, algorithm=jwt_algorithm)
+    token = jwt.encode(data, secret_key.root.get_secret_value(), algorithm=jwt_algorithm)
     return token
 
 
-def validate_token(token: str, secret_key: str) -> dict | None:
+def validate_token(token: str, secret_key: SessionTokenValidated) -> dict | None:
     try:
         payload = jwt.decode(
             token,
-            secret_key,
+            secret_key.root.get_secret_value(),
             algorithms=[jwt_algorithm],
             issuer=jwt_issuer,
         )
@@ -104,7 +102,10 @@ async def create_auth_token(
         expires_delta = None
 
     to_encode["token_id"] = second_half_secret.id
-    secret_key = config.security.local_token.session_secret_key[:32] + second_half_secret.secret
+    secret_key = SessionTokenValidated.model_validate(
+        config.security.local_token.session_secret_key.root.get_secret_value()[:32]
+        + second_half_secret.secret
+    )
     return create_token(to_encode, secret_key, expires_delta)
 
 
@@ -140,7 +141,10 @@ async def validate_local_auth_token(
     second_half_secret = await dp.db.get_token_secret_of_user(user_id, token_id)
     if second_half_secret is None:
         raise credentials_exception
-    secret_key = config.security.local_token.session_secret_key[:32] + second_half_secret.secret
+    secret_key = SessionTokenValidated.model_validate(
+        config.security.local_token.session_secret_key.root.get_secret_value()[:32]
+        + second_half_secret.secret
+    )
 
     payload = validate_token(token, secret_key)
     if payload is None:

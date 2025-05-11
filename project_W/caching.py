@@ -6,22 +6,23 @@ from redis.backoff import ExponentialBackoff
 
 from .logger import get_logger
 from .models.internal import InProcessJob, OnlineRunner
+from .models.settings import RedisConnection
 
 
 class CachingAdapter(ABC):
     logger = get_logger("project-W")
 
     @abstractmethod
-    async def open(self, host="localhost", port=6379, password=None, unix_socket_path=None):
+    async def open(self, connection_obj):
         """
-        This method initiates the redis connection pool and is called only on application startup.
+        This method initiates the connection pool and is called only on application startup.
         """
         pass
 
     @abstractmethod
     async def close(self):
         """
-        This method teares down the redis connections and is called only on application shutdown
+        This method teares down the connections and is called only on application shutdown
         """
         pass
 
@@ -80,7 +81,7 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_online_runner_by_assigned_job(self, job_id: int) -> int | None:
+    async def get_online_runner_id_by_assigned_job(self, job_id: int) -> int | None:
         """
         Returns the runner id of the runner that the job with the id job_id is currently assigned to
         Returns None if not found
@@ -141,7 +142,7 @@ class CachingAdapter(ABC):
 
 class RedisAdapter(CachingAdapter):
 
-    __heartbeat_timeout = 5
+    __heartbeat_timeout = 60
 
     __runner_sorted_set_name = "online_runners_sorted"
 
@@ -153,18 +154,17 @@ class RedisAdapter(CachingAdapter):
     def __get_job_key(self, job_id: int) -> str:
         return f"in_process_job:{str(job_id)}"
 
-    async def open(self, host="localhost", port=6379, password=None, unix_socket_path=None):
+    async def open(self, connection_obj: RedisConnection):
         # 3 retries on timeout
         retry = Retry(ExponentialBackoff(), 3)
         self.client = redis.StrictRedis(
-            host=host,
-            port=port,
-            password=password,
-            unix_socket_path=unix_socket_path,
+            unix_socket_path=str(connection_obj.unix_socket_path),
             retry=retry,
             retry_on_timeout=True,
             decode_responses=True,
         )  # implicitly creates connection pool
+        if connection_obj.connection_string is not None:
+            self.client = self.client.from_url(str(connection_obj.connection_string))
 
         if not await self.client.ping():
             raise Exception(
@@ -271,7 +271,7 @@ class RedisAdapter(CachingAdapter):
             pipe.zrem("online_runners_sorted", runner_id)
             await pipe.execute()
 
-    async def get_online_runner_by_assigned_job(self, job_id: int) -> int | None:
+    async def get_online_runner_id_by_assigned_job(self, job_id: int) -> int | None:
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.hget(self.__get_job_key(job_id), "runner_id")
             (runner_id,) = await pipe.execute()

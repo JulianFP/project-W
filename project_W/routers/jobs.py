@@ -4,11 +4,38 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from starlette.status import HTTP_400_BAD_REQUEST
 
 import project_W.dependencies as dp
+from project_W.models.base import JobBase
 from project_W.models.internal import JobSortKey
 
-from ..models.request_data import JobSettings
-from ..models.response_data import ErrorResponse, User
+from ..models.request_data import JobSettings, TranscriptTypeEnum
+from ..models.response_data import (
+    ErrorResponse,
+    JobAndSettings,
+    JobInfo,
+    JobStatus,
+    User,
+)
 from ..security.auth import auth_dependency_responses, validate_user_and_get_from_db
+
+
+async def job_status(job: JobBase) -> JobStatus:
+    if job.downloaded:
+        return JobStatus.DOWNLOADED
+    if job.downloaded is not None:
+        return JobStatus.SUCCESS
+    if job.error_msg is not None:
+        return JobStatus.FAILED
+    if (await dp.ch.get_job_pos_in_queue(job.id)) is not None:
+        return JobStatus.PENDING_RUNNER
+    if (runner_id := (await dp.ch.get_online_runner_id_by_assigned_job(job.id))) is not None and (
+        runner := await dp.ch.get_online_runner_by_id(runner_id)
+    ) is not None:
+        if runner.in_process_job_id is not None:
+            return JobStatus.RUNNER_IN_PROGRESS
+        return JobStatus.RUNNER_ASSIGNED
+    # TODO: Do we need additional logic here?
+    return JobStatus.NOT_QUEUED
+
 
 router = APIRouter(
     prefix="/jobs",
@@ -32,7 +59,7 @@ async def submit_settings(
 async def get_default_settings(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
-    ]
+    ],
 ) -> JobSettings:
     if (job_settings := await dp.db.get_default_job_settings_of_user(current_user.id)) is not None:
         return job_settings
@@ -102,3 +129,120 @@ async def top_k_jobs(
     return await dp.db.get_top_k_job_ids_of_user(
         current_user.id, k, sort_key, descending, exclude_finished, exclude_downloaded
     )
+
+
+@router.get("/info")
+async def job_info(
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+    ],
+    job_ids: list[int],
+) -> list[JobInfo]:
+    job_and_setting_infos: list[JobAndSettings] = await dp.db.get_job_infos_with_settings_of_user(
+        current_user.id, job_ids
+    )
+    job_infos = []
+    for job in job_and_setting_infos:
+        data = job.model_dump()  # JobAndSettings
+        data["step"] = await job_status(job)  # step
+        if (in_process_job := await dp.ch.get_in_process_job(job.id)) is not None:
+            data = data | in_process_job.model_dump()  # InProcessJobBase
+            if (
+                runner_id := (await dp.ch.get_online_runner_id_by_assigned_job(job.id))
+            ) is not None and (
+                runner := await dp.ch.get_online_runner_by_id(runner_id)
+            ) is not None:
+                data = data | runner.model_dump()  # RunnerInfoBase
+        job_infos.append(JobInfo.model_validate(data))
+    return job_infos
+
+
+@router.post(
+    "/abort",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "At least one of jobs is not running",
+        }
+    },
+)
+async def abort_jobs(
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+    ],
+    job_ids: list[int],
+):
+    jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
+    for job in jobs:
+        jobStatus = job_status(job)
+        if jobStatus in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="At least one of the provided jobs is currently not running",
+            )
+
+    # second loop because first loop ensures that all jobs are valid first
+    for job in jobs:
+        jobStatus = job_status(job)
+        if jobStatus in [JobStatus.RUNNER_ASSIGNED, JobStatus.RUNNER_IN_PROGRESS]:
+            await dp.ch.set_in_process_job(job.id, {"abort": 1})
+        else:
+            if jobStatus is JobStatus.PENDING_RUNNER:
+                await dp.ch.remove_job_from_queue(job.id)
+            await dp.db.finish_failed_job(job.id, "Job was aborted")
+
+
+@router.post(
+    "/delete",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "At least one of jobs is running",
+        }
+    },
+)
+async def delete_jobs(
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+    ],
+    job_ids: list[int],
+):
+    jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
+    for job in jobs:
+        jobStatus = job_status(job)
+        if jobStatus not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The job with id {job.id} is currently still running. Only finished jobs can be deleted!",
+            )
+
+    await dp.db.delete_jobs_of_user(current_user.id, job_ids)
+
+
+@router.get(
+    "/download_transcript",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "No job with that id exists or that job isn't finished",
+        }
+    },
+)
+async def download_transcript(
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+    ],
+    job_id: int,
+    transcript_type: TranscriptTypeEnum,
+) -> str | dict:
+    if (
+        transcript := await dp.db.get_job_transcript_of_user(
+            current_user.id, job_id, transcript_type
+        )
+    ) is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No job with id {job_id} found or job isn't finished yet",
+        )
+    else:
+        return transcript

@@ -15,7 +15,7 @@ from .database import PostgresAdapter
 from .logger import get_logger
 from .models.response_data import AboutResponse
 from .models.settings import LocalAccountOperationModeEnum
-from .routers import admins, jobs, ldap, local_account, oidc, users
+from .routers import admins, jobs, ldap, local_account, oidc, runners, users
 from .security import ldap_deps, oidc_deps
 from .smtp import SmtpClient
 
@@ -39,12 +39,12 @@ async def lifespan(app: FastAPI):
         dp.config = loadConfig()
 
     # connect to database
-    dp.db = PostgresAdapter(dp.config.postgres_connection_string)
+    dp.db = PostgresAdapter(str(dp.config.postgres_connection_string))
     await dp.db.open()
 
     # connect to caching server
     dp.ch = RedisAdapter()
-    await dp.ch.open(unix_socket_path="/run/redis-project-W/redis.sock")
+    await dp.ch.open(dp.config.redis_connection)
 
     # connect to smtp server
     dp.smtp = SmtpClient(dp.config.smtp_server)
@@ -72,6 +72,10 @@ async def lifespan(app: FastAPI):
         raise Exception(
             "No login method (one of local_account, ldap or oidc) has been specified in the config!"
         )
+
+    # enqueue all jobs from the database that are not finished yet
+    for job_id in await dp.db.get_all_ids_of_unfinished_jobs():
+        await dp.ch.enqueue_new_job(job_id, 0)
 
     yield
 
@@ -126,6 +130,7 @@ app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))  # for o
 app.include_router(users.router)
 app.include_router(admins.router)
 app.include_router(jobs.router)
+app.include_router(runners.router)
 
 
 @app.get("/about")

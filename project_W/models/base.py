@@ -53,6 +53,13 @@ class UserInDb(BaseModel):
     email: EmailValidated
 
 
+class RunnerInfoBase(BaseModel):
+    name: str = Field(max_length=40)
+    version: str
+    git_hash: str = Field(max_length=40)
+    source_code_url: str
+
+
 class JobBase(BaseModel):
     id: int
     creation_timestamp: datetime
@@ -65,3 +72,9 @@ class JobBase(BaseModel):
     runner_source_code_url: str | None
     downloaded: bool | None
     error_msg: str | None
+
+
+class InProcessJobBase(BaseModel):
+    id: int
+    progress: float = Field(ge=0.0, le=1.0, default=0.0)
+    abort: bool = False

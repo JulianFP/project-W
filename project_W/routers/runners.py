@@ -5,79 +5,19 @@ from fastapi.responses import StreamingResponse
 
 import project_W.dependencies as dp
 
-from ..models.internal import JobInDb, OnlineRunner
+from ..models.internal import OnlineRunner
 from ..models.request_data import (
     HeartbeatRequest,
     JobSettings,
     RunnerRegisterRequest,
     RunnerSubmitResultRequest,
 )
-from ..models.response_data import ErrorResponse, HeartbeatResponse, JobStatus
+from ..models.response_data import ErrorResponse, HeartbeatResponse
 from ..security.auth import (
     auth_dependency_responses,
     validate_online_runner,
     validate_runner,
 )
-
-
-async def load_jobs_from_db():
-    """
-    Enqueues all jobs from the database that are not finished yet.
-    We do not need to check if it already is in the queue since enqueue_job
-    already does that (-> no mutex needed for this method)
-    Currently, this is only called once just after the server startup
-    """
-    for job_id in await dp.db.get_all_ids_of_unfinished_jobs():
-        await dp.ch.enqueue_new_job(job_id, 0)
-
-
-async def job_status(job: JobInDb) -> JobStatus:
-    if job.downloaded:
-        return JobStatus.DOWNLOADED
-    if job.transcript is not None:
-        return JobStatus.SUCCESS
-    if job.error_msg is not None:
-        return JobStatus.FAILED
-    if (await dp.ch.get_job_pos_in_queue(job.id)) is not None:
-        return JobStatus.PENDING_RUNNER
-    if (runner_id := (await dp.ch.get_online_runner_by_assigned_job(job.id))) is not None and (
-        runner := await dp.ch.get_online_runner_by_id(runner_id)
-    ) is not None:
-        if runner.in_process_job_id is not None:
-            return JobStatus.RUNNER_IN_PROGRESS
-        return JobStatus.RUNNER_ASSIGNED
-    # TODO: Do we need additional logic here?
-    return JobStatus.NOT_QUEUED
-
-
-async def status_dict(job: JobInDb) -> dict[str, str | int | float]:
-    data: dict[str, str | int | float] = {"step": (await job_status(job)).value}
-    if (runner_id := (await dp.ch.get_online_runner_by_assigned_job(job.id))) is not None and (
-        runner := await dp.ch.get_online_runner_by_id(runner_id)
-    ) is not None:
-        data["runner"] = runner.id
-        if runner.in_process_job_id is not None:
-            if runner.assigned_job_id is None:
-                raise Exception(
-                    f"Redis data invalid: in_process_job of runner {runner_id} is set but assigned_job_id is None"
-                )
-            data["progress"] = runner.assigned_job_id
-    return data
-
-
-async def abort_job(job: JobInDb):
-    jobStatus = job_status(job)
-    assert (
-        jobStatus is not JobStatus.SUCCESS or JobStatus.FAILED or JobStatus.DOWNLOADED
-    ), "you cannot abort a job that has already run!"
-    if jobStatus is JobStatus.NOT_QUEUED:
-        job.error_msg = "Job was aborted"
-    elif jobStatus is JobStatus.PENDING_RUNNER:
-        await dp.ch.remove_job_from_queue(job.id)
-        job.error_msg = "Job was aborted"
-    elif jobStatus is JobStatus.RUNNER_ASSIGNED or JobStatus.RUNNER_IN_PROGRESS:
-        await dp.ch.set_in_process_job(job.id, {"abort": 1})
-
 
 router = APIRouter(
     prefix="/runners",
@@ -86,7 +26,15 @@ router = APIRouter(
 )
 
 
-@router.post("/register")
+@router.post(
+    "/register",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Runner already registered",
+        }
+    },
+)
 async def register(
     runner_id: Annotated[int, Depends(validate_runner)],
     runner_data: RunnerRegisterRequest,
@@ -118,7 +66,7 @@ async def register(
 
 @router.post("/unregister")
 async def unregister_runner(
-    online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)]
+    online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
 ):
     """
     Unregisters an online runner.
@@ -134,12 +82,12 @@ async def unregister_runner(
     responses={
         400: {
             "model": ErrorResponse,
-            "description": "No job assigned",
+            "description": "No job assigned or job not in database",
         },
     },
 )
 async def retrieve_job_info(
-    online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)]
+    online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
 ) -> JobSettings:
     if online_runner.assigned_job_id is None:
         raise HTTPException(
@@ -166,7 +114,7 @@ async def retrieve_job_info(
     },
 )
 async def retrieve_job_audio(
-    online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)]
+    online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
 ) -> StreamingResponse:
     """
     For a given online runner, retrieves the job that it has been assigned.
@@ -215,10 +163,16 @@ async def submit_job_result(
             detail="This runner is currently not processing a job!",
         )
 
-    if submitted_data.error:
-        await dp.db.finish_failed_job(online_runner, submitted_data.result)
+    if submitted_data.error_msg is not None:
+        await dp.db.finish_failed_job(
+            online_runner.in_process_job_id, submitted_data.error_msg, online_runner
+        )
+    elif submitted_data.transcript is not None:
+        await dp.db.finish_successful_job(online_runner, submitted_data.transcript)
     else:
-        await dp.db.finish_successful_job(online_runner, submitted_data.result)
+        raise Exception(
+            "Pydantic model validation failed, job submission has neither error_msg nor a transcript attached to it"
+        )
 
     await dp.ch.finish_job_of_online_runner(online_runner)
 

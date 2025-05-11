@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .base import EmailValidated, JobBase, UserInDb
+from .base import EmailValidated, InProcessJobBase, JobBase, UserInDb
 from .request_data import RunnerRegisterRequest
 from .response_data import TokenSecretInfo, UserTypeEnum
 
@@ -67,7 +67,6 @@ class JobInDb(JobBase):
     user_id: int
     job_settings_id: int | None
     audio_oid: int | None
-    transcript: str | None
 
 
 class JobSortKey(str, Enum):
@@ -75,7 +74,7 @@ class JobSortKey(str, Enum):
     FILENAME = "filename"
 
 
-class InProcessJob(BaseModel):
+class InProcessJob(InProcessJobBase):
     """
     Represents a job that is currently being processed by a runner.
     Instances of this are created as soon as the runner retrieves the
@@ -83,10 +82,7 @@ class InProcessJob(BaseModel):
     the completed transcript or until the runner fails.
     """
 
-    id: int
     runner_id: int
-    progress: float = Field(ge=0.0, le=1.0, default=0.0)
-    abort: bool = False
 
 
 class OnlineRunner(RunnerRegisterRequest):

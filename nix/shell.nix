@@ -13,6 +13,7 @@ let
     ps: with ps; [
       #all required dependencies + this projects package itself (required for sphinx)
       (dontCheckPythonPkg project-W)
+      fastapi-cli
 
       #optional dependencies: tests
       pytest

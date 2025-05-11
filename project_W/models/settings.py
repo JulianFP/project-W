@@ -1,17 +1,23 @@
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Self
 
 from pydantic import (
-    AnyUrl,
     BaseModel,
     ConfigDict,
     Field,
     FilePath,
     HttpUrl,
+    PostgresDsn,
+    RedisDsn,
+    RootModel,
+    SecretStr,
+    SocketPath,
     UrlConstraints,
+    model_validator,
 )
+from pydantic_core import Url
 
-from .base import EmailValidated
+from .base import EmailValidated, PasswordValidated
 
 
 class ProvisionedUser(BaseModel):
@@ -23,7 +29,7 @@ class ProvisionedUser(BaseModel):
             "user@example.org",
         ],
     )
-    password: str = Field(
+    password: PasswordValidated = Field(
         description="The password of this user (for login). Please make sure that this password is secure, especially when provisioning admin users!"
     )
     is_admin: bool = Field(
@@ -76,13 +82,22 @@ class LocalAccountSettings(BaseModel):
     ] = {}
 
 
+class SessionTokenValidated(RootModel):
+    root: SecretStr
+
+    @model_validator(mode="after")
+    def password_validation(self) -> Self:
+        # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, if second half is supplied by database then only first half of that is used)
+        if len(self.root.get_secret_value()) != 64:
+            raise ValueError(
+                "The session token has to be exactly 64 characters in length. Use the command `python -c 'import secrets; print(secrets.token_hex(32))'` to generate a valid session token!"
+            )
+        return self
+
+
 class LocalTokenSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    session_secret_key: str = Field(
-        # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, if second half is supplied by database then only first half of that is used)
-        min_length=64,
-        max_length=64,
-        pattern=r"^[a-f0-9]*$",  # hex
+    session_secret_key: SessionTokenValidated = Field(
         description="The secret key used to generate JWT Tokens. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
     )
     session_expiration_time_minutes: int = Field(
@@ -143,7 +158,7 @@ class OidcProviderSettings(ProviderSettings):
     client_id: str = Field(
         description="The client_id string as returned by the identity provider after setting up this application"
     )
-    client_secret: str = Field(
+    client_secret: SecretStr = Field(
         description="The client_secret string as returned by the identity provider after setting up this application"
     )
     user_role: OidcRoleSettings | None = Field(
@@ -193,12 +208,13 @@ class LdapAuthSettings(BaseModel):
         description="Authentication mechanism that should be used. Can be one of 'SIMPLE', 'DIGEST-MD5' or 'NTLM'",
     )
     user: str = Field(description="Identification of binding user.")
-    password: str = Field(description="Password of binding user.")
+    password: SecretStr = Field(description="Password of binding user.")
 
 
 class LdapProviderSettings(ProviderSettings):
     model_config = ConfigDict(extra="forbid")
-    server_address: AnyUrl = Field(
+    server_address: Annotated[
+        Url,
         UrlConstraints(
             allowed_schemes=[
                 "ldap",
@@ -206,6 +222,7 @@ class LdapProviderSettings(ProviderSettings):
                 "ldapi",
             ],
         ),
+    ] = Field(
         description="Address of the ldap server. Should start with either ldap://, ldaps:// or ldapi:// depending on whether the connection should be unencrypted, ssl/tls encrypted or if it's an URL-encoded filesocket connection",
         examples=[
             "ldap://example.org",
@@ -277,11 +294,34 @@ class SMTPServerSettings(BaseModel):
         description="Username that should be used to authenticate with the smtp server. Most of the time this is the same as 'senderEmail'.",
         validate_default=True,
     )
-    password: str | None = Field(
+    password: SecretStr | None = Field(
         default=None,
         description="Password that should be used to authenticate with the smtp server.",
         validate_default=True,
     )
+
+
+class RedisConnection(BaseModel):
+    connection_string: RedisDsn | None = Field(
+        default=None,
+        description="Redis connection string to connect to the caching database that should be used by Project-W.",
+        validate_default=True,
+    )
+    unix_socket_path: SocketPath | None = Field(
+        default=None,
+        description="Path to a redis unix socket. Can be used instead of connection_string",
+        validate_default=True,
+    )
+
+    @model_validator(mode="after")
+    def either_connection_string_unix_socket_path(self) -> Self:
+        if self.connection_string is None and self.unix_socket_path is None:
+            raise ValueError(
+                "You need to set either connection_string or unix_socket_path for your Redis connection"
+            )
+        if self.connection_string is not None and self.unix_socket_path is not None:
+            raise ValueError("You can only define one of connection_string or unix_socket_path")
+        return self
 
 
 class Settings(BaseModel):
@@ -296,11 +336,11 @@ class Settings(BaseModel):
             "http://192.168.1.100:5173/#",
         ],
     )
-    postgres_connection_string: str = Field(
-        default="host=/var/run/postgresql dbname=postgres user=postgres",
+    postgres_connection_string: PostgresDsn = Field(
         description="PostgreSQL connection string to connect to the database that should be used by Project-W. See https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING for the syntax.",
         validate_default=True,
     )
+    redis_connection: RedisConnection
     security: SecuritySettings
     smtp_server: SMTPServerSettings
     disable_option_validation: bool = Field(

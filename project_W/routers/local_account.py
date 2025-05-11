@@ -60,11 +60,7 @@ async def validate_token_local_not_provisioned_confirmed(
     password: Annotated[SecretStr, Body()],
     current_token: Annotated[DecodedAuthTokenData, Depends(validate_token_local_not_provisioned)],
 ) -> DecodedAuthTokenData:
-    if not (
-        await dp.db.get_local_user_by_email_checked_password(
-            current_token.email, password.get_secret_value()
-        )
-    ):
+    if not (await dp.db.get_local_user_by_email_checked_password(current_token.email, password)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Confirmation password invalid",
@@ -100,7 +96,9 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             detail="Provided username is not a valid email address",
         )
 
-    user = await dp.db.get_local_user_by_email_checked_password(email, form_data.password)
+    user = await dp.db.get_local_user_by_email_checked_password(
+        email, SecretStr(form_data.password)
+    )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
