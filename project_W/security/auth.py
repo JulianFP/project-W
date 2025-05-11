@@ -9,7 +9,7 @@ import project_W.dependencies as dp
 from project_W.models.response_data import User
 
 from ..logger import get_logger
-from ..models.internal import DecodedAuthTokenData
+from ..models.internal import DecodedAuthTokenData, OnlineRunner
 from ..models.response_data import ErrorResponse, User, UserTypeEnum
 from .ldap_deps import lookup_ldap_user_in_db_from_token
 from .local_account_deps import lookup_local_user_in_db_from_token
@@ -42,13 +42,14 @@ auth_dependency_responses: dict[int | str, dict[str, Any]] = {
 
 get_token = HTTPBearer(
     bearerFormat="Bearer",
-    scheme_name="JWT token (from local account, oidc or ldap auth)",
+    scheme_name="JWT token (from local account, oidc or ldap auth) or runner token",
     description="""
     A valid JWT token returned by one of the following login routes:
     - local account: /local-account/login
     - oidc: /oidc/login/{idp_name}
     - ldap: /ldap/login/{idp_name}
     Which of these are available with what idp's depends on the server configuration
+    For the /runners/ routes you need to obtain a runner token from the /admins/create_runner route
     """,
 )
 
@@ -115,3 +116,28 @@ def validate_user_and_get_from_db(require_verified: bool, require_admin: bool):
             raise Exception("Invalid token type encountered!")
 
     return user_lookup_dep
+
+
+async def validate_runner(
+    token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)]
+) -> int:
+    if (runner_id := await dp.db.get_runner_by_token(token.credentials)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No runner with that token exists!",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return runner_id
+
+
+async def validate_online_runner(
+    runner_id: Annotated[int, Depends(validate_runner)]
+) -> OnlineRunner:
+    if not (online_runner := await dp.ch.get_online_runner_by_id(runner_id)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This runner is currently not registered as online!",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return online_runner

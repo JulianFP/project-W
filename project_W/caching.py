@@ -278,9 +278,12 @@ class RedisAdapter(CachingAdapter):
             return runner_id
 
     async def enqueue_new_job(self, job_id: int, job_priority: int):
-        async with self.client.pipeline(transaction=True) as pipe:
-            pipe.zadd(self.__job_queue_sorted_set_name, {str(job_id): job_priority})
-            await pipe.execute()
+        if not (
+            await self.assign_job_to_online_runner(job_id)
+        ):  # try to assign job to a free runner first
+            async with self.client.pipeline(transaction=True) as pipe:
+                pipe.zadd(self.__job_queue_sorted_set_name, {str(job_id): job_priority})
+                await pipe.execute()
 
     async def number_of_enqueued_jobs(self) -> int:
         async with self.client.pipeline(transaction=True) as pipe:

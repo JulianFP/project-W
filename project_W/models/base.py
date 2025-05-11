@@ -1,8 +1,9 @@
 import re
+from datetime import datetime
 from typing import Any, Self
 
 from email_validator import EmailNotValidError, validate_email
-from pydantic import BaseModel, RootModel, SecretStr, model_validator
+from pydantic import BaseModel, Field, RootModel, SecretStr, model_validator
 
 
 class EmailValidated(RootModel):
@@ -50,3 +51,17 @@ class PasswordValidated(RootModel):
 class UserInDb(BaseModel):
     id: int
     email: EmailValidated
+
+
+class JobBase(BaseModel):
+    id: int
+    creation_timestamp: datetime
+    file_name: str
+    finish_timestamp: datetime | None
+    runner_name: str | None = Field(max_length=40)
+    runner_id: int | None
+    runner_version: str | None
+    runner_git_hash: str | None = Field(max_length=40)
+    runner_source_code_url: str | None
+    downloaded: bool | None
+    error_msg: str | None

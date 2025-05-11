@@ -3,7 +3,7 @@ import hashlib
 import secrets
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import LiteralString
+from typing import AsyncGenerator, LiteralString
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
@@ -18,6 +18,7 @@ from ._version import version, version_tuple
 from .logger import get_logger
 from .models.base import EmailValidated, PasswordValidated
 from .models.internal import (
+    JobSortKey,
     LdapUserInDb,
     LocalUserInDb,
     OidcUserInDb,
@@ -26,7 +27,7 @@ from .models.internal import (
     TokenSecret,
 )
 from .models.request_data import JobSettings
-from .models.response_data import RunnerCreatedInfo, TokenSecretInfo
+from .models.response_data import JobAndSettings, RunnerCreatedInfo, TokenSecretInfo
 from .utils import parse_version_tuple
 
 
@@ -308,6 +309,14 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    async def get_job_settings_by_job_id(self, job_id: int) -> JobSettings | None:
+        """
+        Return the job settings that are the job with the job id job_id has
+        Returns None if no job with id job_id exists
+        """
+        pass
+
+    @abstractmethod
     async def add_new_job(
         self, user_id: int, audio_file: UploadFile, job_settings_id: int | None = None
     ) -> int | None:
@@ -317,6 +326,46 @@ class DatabaseAdapter(ABC):
         Returns None if the user doesn't own job_settings with id job_settings_id
         """
         pass
+
+    @abstractmethod
+    async def get_total_number_of_jobs_of_user(
+        self, user_id: int, excl_finished: bool, excl_downloaded: bool
+    ) -> int:
+        """
+        Get total number of jobs that a user has (after optionally excluding finished and/or downloaded jobs)
+        """
+        pass
+
+    @abstractmethod
+    async def get_top_k_job_ids_of_user(
+        self,
+        user_id: int,
+        k: int,
+        sort_key: JobSortKey,
+        desc: bool,
+        excl_finished: bool,
+        excl_downloaded: bool,
+    ) -> list[int]:
+        """
+        Query the first k jobs sorted by sort_key (descending if desc = True, ascending otherwise) of user_id
+        """
+        pass
+
+    @abstractmethod
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobAndSettings]:
+        """
+        Returns all job metadata (including job settings but excluding audio/audio oid, user_id, job_settings_id and transcript) for all provided job ids that belong to the provided user_id
+        """
+        pass
+
+    @abstractmethod
+    async def get_job_audio(self, job_id: int) -> AsyncGenerator[bytes, None]:
+        """
+        This is a python generator that returns chunks of the binary file (in __file_chunk_size_in_bytes increments)
+        Use this like any other python async generator (i.e. file open-like interface)
+        Binary is only read from database one chunk at a time instead of the whole file at once.
+        """
+        yield b""  # type annotation needs this for some reason even though this is an abstract method
 
     @abstractmethod
     async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
@@ -373,7 +422,7 @@ class PostgresAdapter(DatabaseAdapter):
     apool: AsyncConnectionPool
     schema: LiteralString = "project_w"
     minimal_required_postgres_version = 14  # for both postgres and libpq
-    file_chunk_size_in_bytes = 10240  # 10MiB
+    __file_chunk_size_in_bytes = 10240  # 10MiB
 
     def __init__(self, connection_string: str) -> None:
         self.apool = AsyncConnectionPool(
@@ -1268,6 +1317,19 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
+    async def get_job_settings_by_job_id(self, job_id: int) -> JobSettings | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(JobSettings)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT settings.*
+                        FROM {self.schema}.job_settings settings, {self.schema}.jobs job
+                        WHERE job.id = %s AND job.job_settings_id = settings.id
+                    """,
+                    (job_id,),
+                )
+                return await cur.fetchone()
+
     async def add_new_job(
         self, user_id: int, audio_file: UploadFile, job_settings_id: int | None = None
     ) -> int | None:
@@ -1303,14 +1365,14 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 oid = await cur.fetchone()
                 offset = 0
-                while chunk := await audio_file.read(self.file_chunk_size_in_bytes):
+                while chunk := await audio_file.read(self.__file_chunk_size_in_bytes):
                     await cur.execute(
                         f"""
                             SELECT lo_put(%s, %s, %s)
                         """,
                         (oid, offset, chunk),
                     )
-                    offset += self.file_chunk_size_in_bytes
+                    offset += self.__file_chunk_size_in_bytes
                 await cur.execute(
                     f"""
                         INSERT INTO {self.schema}.jobs (user_id, job_settings_id, file_name, audio_oid)
@@ -1323,6 +1385,123 @@ class PostgresAdapter(DatabaseAdapter):
                     return job_id
                 else:
                     raise Exception("Didn't return id of new job")
+
+    async def get_total_number_of_jobs_of_user(
+        self, user_id: int, excl_finished: bool, excl_downloaded: bool
+    ) -> int:
+        if excl_finished:
+            additional_and = "AND finish_timestamp IS NULL"
+        elif excl_downloaded:
+            additional_and = "AND (downloaded IS NULL OR downloaded = false)"
+        else:
+            additional_and = ""
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT count(*)
+                        FROM {self.schema}.jobs
+                        WHERE user_id = %s
+                        {additional_and}
+                    """,
+                    (user_id,),
+                )
+                if (count := await cur.fetchone()) is None:
+                    raise Exception(f"Couldn't get job count of user {user_id}!")
+                return count
+
+    async def get_top_k_job_ids_of_user(
+        self,
+        user_id: int,
+        k: int,
+        sort_key: JobSortKey,
+        desc: bool,
+        excl_finished: bool,
+        excl_downloaded: bool,
+    ) -> list[int]:
+        if excl_finished:
+            additional_and = "AND finish_timestamp IS NULL"
+        elif excl_downloaded:
+            additional_and = "AND (downloaded IS NULL OR downloaded = false)"
+        else:
+            additional_and = ""
+        if sort_key == JobSortKey.CREATION_TIME:
+            sort_col = "creation_timestamp"
+        elif sort_key == JobSortKey.FILENAME:
+            sort_col = "file_name"
+        if desc:
+            comparison_op = (
+                "<="  # bigger jobs (left) have less jobs which are larger than it (right)
+            )
+        else:
+            comparison_op = (
+                ">="  # bigger jobs (left) have more jobs which are smaller than it (right)
+            )
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                    WITH filtered_jobs AS (
+                        SELECT *
+                        FROM {self.schema}.jobs
+                        WHERE user_id = %s
+                        {additional_and})
+                    SELECT j1.id
+                    FROM filtered_jobs j1, filtered_jobs j2
+                    WHERE j1.{sort_col} {comparison_op} j2.{sort_col}
+                    GROUP BY j1.id
+                    HAVING count(*) <= %s
+                    ORDER BY count(*)
+                    """,
+                    (user_id, k),
+                )
+                return await cur.fetchall()
+
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobAndSettings]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(JobAndSettings)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.job_settings settings, {self.schema}.jobs job
+                        WHERE job.job_settings_id = settings.id
+                        AND job.user_id = %s
+                        AND job.id = ANY(%s)
+                    """,
+                    (user_id, job_ids),
+                )
+                return await cur.fetchall()
+
+    async def get_job_audio(self, job_id: int) -> AsyncGenerator[bytes, None]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT audio_oid
+                        FROM {self.schema}.jobs
+                        WHERE id = %s
+                    """,
+                    (job_id,),
+                )
+                if (audio_oid := await cur.fetchone()) is None:
+                    return
+
+                offset = 0
+                await cur.execute(
+                    f"""
+                        SELECT lo_get(%s, %s, %s)
+                    """,
+                    (audio_oid, offset, self.__file_chunk_size_in_bytes),
+                )
+                while chunk := await cur.fetchone():
+                    yield chunk
+                    offset += self.__file_chunk_size_in_bytes
+                    await cur.execute(
+                        f"""
+                            SELECT lo_get(%s, %s, %s)
+                        """,
+                        (audio_oid, offset, self.__file_chunk_size_in_bytes),
+                    )
 
     async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
         async with self.apool.connection() as conn:

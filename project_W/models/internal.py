@@ -1,9 +1,9 @@
-from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .base import EmailValidated, UserInDb
+from .base import EmailValidated, JobBase, UserInDb
+from .request_data import RunnerRegisterRequest
 from .response_data import TokenSecretInfo, UserTypeEnum
 
 
@@ -63,51 +63,16 @@ class LdapUserInfo(BaseModel):
     email: EmailValidated
 
 
-class JobInDb(BaseModel):
-    id: int
+class JobInDb(JobBase):
     user_id: int
     job_settings_id: int | None
-    creation_timestamp: datetime
-    file_name: str
     audio_oid: int | None
-    finish_timestamp: datetime | None
-    runner_name: str | None = Field(max_length=40)
-    runner_id: int | None
-    runner_version: str | None
-    runner_git_hash: str | None = Field(max_length=40)
-    runner_source_code_url: str | None
-    downloaded: bool | None
     transcript: str | None
-    error_msg: str | None
 
 
-class JobStatus(str, Enum):
-    """
-    Represents all the possible statuses that a
-    job request might have.
-    """
-
-    # The job request has been received by the server,
-    # but is not currently queued for processing.
-    # TODO: Do we even need to support this?
-    NOT_QUEUED = "not_queued"
-    # The backend has received the job request but no
-    # runner has been assigned yet
-    PENDING_RUNNER = "pending_runner"
-    # A runner has been assigned, but has not started processing
-    # the request
-    RUNNER_ASSIGNED = "runner_assigned"
-    # A runner has been assigned, and is currently processing
-    # the request
-    RUNNER_IN_PROGRESS = "runner_in_progress"
-    # The runner successfully completed the job and
-    # the transcript is ready for retrieval
-    SUCCESS = "success"
-    # There was an error during the processing of the request
-    FAILED = "failed"
-    # The job was successfully completed, and the transcript
-    # has been downloaded by the user.
-    DOWNLOADED = "downloaded"
+class JobSortKey(str, Enum):
+    CREATION_TIME = "creation_time"
+    FILENAME = "filename"
 
 
 class InProcessJob(BaseModel):
@@ -124,7 +89,7 @@ class InProcessJob(BaseModel):
     abort: bool = False
 
 
-class OnlineRunner(BaseModel):
+class OnlineRunner(RunnerRegisterRequest):
     """
     Represents one instance of a runner that's currently registered as online. Note
     that this is separate from the Runner class that represents a runner database entry.
@@ -133,10 +98,5 @@ class OnlineRunner(BaseModel):
     """
 
     id: int
-    name: str = Field(max_length=40)
-    version: str
-    git_hash: str = Field(max_length=40)
-    source_code_url: str
-    priority: int
     assigned_job_id: int | None = None
     in_process_job_id: int | None = None
