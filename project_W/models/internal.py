@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 from .base import EmailValidated, InProcessJobBase, UserInDb
-from .request_data import RunnerRegisterRequest
+from .request_data import JobSettings, RunnerRegisterRequest
 from .response_data import TokenSecretInfo, UserTypeEnum
 
 
@@ -28,6 +28,10 @@ class LdapUserInDb(UserInDb):
 class RunnerInDb(BaseModel):
     id: int
     token_hash: str
+
+
+class JobSettingsInDb(BaseModel):
+    settings: JobSettings
 
 
 class AccountActivationTokenData(BaseModel):

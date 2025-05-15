@@ -241,13 +241,13 @@ class RedisAdapter(CachingAdapter):
                 pipe.hgetall(key_name)
                 (runner_dict,) = await pipe.execute()
 
-            online_runner = OnlineRunner.model_validate(runner_dict)
+            online_runner = OnlineRunner.model_validate(runner_dict | {"id": int(runner_id)})
             if online_runner.assigned_job_id is None:
                 online_runner.assigned_job_id = job_id
                 pipe.hset(key_name, mapping=online_runner.model_dump(exclude_none=True))
                 pipe.hset(
                     self.__get_job_key(job_id),
-                    mapping={"runner_id": runner_id, "progress": 0.0, "abort": False},
+                    mapping={"runner_id": runner_id, "progress": 0.0, "abort": 0},
                 )
                 await pipe.execute()
                 return True
@@ -275,7 +275,7 @@ class RedisAdapter(CachingAdapter):
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.hget(self.__get_job_key(job_id), "runner_id")
             (runner_id,) = await pipe.execute()
-            return runner_id
+            return int(runner_id)
 
     async def enqueue_new_job(self, job_id: int, job_priority: int):
         if not (
@@ -305,7 +305,7 @@ class RedisAdapter(CachingAdapter):
             else:
                 job_id = ids_returned[0][0]
                 await pipe.execute()
-                return job_id
+                return int(job_id)
 
     async def get_in_process_job(self, job_id: int) -> InProcessJob | None:
         async with self.client.pipeline(transaction=True) as pipe:

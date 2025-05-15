@@ -3,11 +3,14 @@
 python3Packages.buildPythonPackage rec {
   pname = "project_W";
   version = "0.0.1";
-  format = "setuptools";
+  pyproject = true;
 
   src = ../../.;
 
+  build-system = [ python3Packages.setuptools ];
+
   nativeBuildInputs = with python3Packages; [ setuptools-scm ];
+
   propagatedBuildInputs = with python3Packages; [
     argon2-cffi
     click

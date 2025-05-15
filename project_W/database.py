@@ -19,6 +19,7 @@ from ._version import version, version_tuple
 from .logger import get_logger
 from .models.base import EmailValidated, JobBase, PasswordValidated
 from .models.internal import (
+    JobSettingsInDb,
     JobSortKey,
     LdapUserInDb,
     LocalUserInDb,
@@ -758,8 +759,8 @@ class PostgresAdapter(DatabaseAdapter):
                     id int GENERATED ALWAYS AS IDENTITY,
                     user_id int NOT NULL,
                     is_default bool NOT NULL DEFAULT false,
-                    model text NOT NULL DEFAULT 'large',
-                    language varchar(3),
+                    settings jsonb NOT NULL,
+
                     PRIMARY KEY (id),
                     FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
                 )
@@ -1359,11 +1360,11 @@ class PostgresAdapter(DatabaseAdapter):
                     )
                 await cur.execute(
                     f"""
-                        INSERT INTO {self.schema}.job_settings (user_id, is_default, model, language)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO {self.schema}.job_settings (user_id, is_default, settings)
+                        VALUES (%s, %s, %s)
                         RETURNING id
                     """,
-                    (user_id, is_new_default, job_settings.model, job_settings.language),
+                    (user_id, is_new_default, Jsonb(job_settings.model_dump())),
                 )
                 if job_settings_id := await cur.fetchone():
                     return job_settings_id
@@ -1372,16 +1373,19 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def get_default_job_settings_of_user(self, user_id: int) -> JobSettings | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(JobSettings)) as cur:
+            async with conn.cursor(row_factory=class_row(JobSettingsInDb)) as cur:
                 await cur.execute(
                     f"""
-                        SELECT *
+                        SELECT settings
                         FROM {self.schema}.job_settings
                         WHERE user_id = %s AND is_default = true
                     """,
                     (user_id,),
                 )
-                return await cur.fetchone()
+                if (entry := await cur.fetchone()) is None:
+                    return None
+                else:
+                    return entry.settings
 
     async def get_job_settings_by_job_id(self, job_id: int) -> JobSettings | None:
         async with self.apool.connection() as conn:
@@ -1398,16 +1402,19 @@ class PostgresAdapter(DatabaseAdapter):
                 if await cur.fetchone():
                     return JobSettings()
 
-            async with conn.cursor(row_factory=class_row(JobSettings)) as cur:
+            async with conn.cursor(row_factory=class_row(JobSettingsInDb)) as cur:
                 await cur.execute(
                     f"""
-                        SELECT settings.*
+                        SELECT settings.settings
                         FROM {self.schema}.job_settings settings, {self.schema}.jobs job
                         WHERE job.id = %s AND job.job_settings_id = settings.id
                     """,
                     (job_id,),
                 )
-                return await cur.fetchone()
+                if (entry := await cur.fetchone()) is None:
+                    return None
+                else:
+                    return entry.settings
 
     async def add_new_job(
         self, user_id: int, audio_file: UploadFile, job_settings_id: int | None = None
@@ -1425,10 +1432,10 @@ class PostgresAdapter(DatabaseAdapter):
                     )
                     job_settings_id = await cur.fetchone()
             else:
-                async with conn.cursor(row_factory=class_row(JobSettings)) as cur:
+                async with conn.cursor(row_factory=class_row(JobSettingsInDb)) as cur:
                     await cur.execute(
                         f"""
-                            SELECT *
+                            SELECT settings
                             FROM {self.schema}.job_settings
                             WHERE user_id = %s AND id = %s
                         """,
@@ -1570,7 +1577,7 @@ class PostgresAdapter(DatabaseAdapter):
 
                 await cur.execute(
                     f"""
-                        SELECT *
+                        SELECT job.*, settings.settings
                         FROM {self.schema}.job_settings settings, {self.schema}.jobs job
                         WHERE job.job_settings_id = settings.id
                         AND job.user_id = %s

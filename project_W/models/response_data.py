@@ -48,9 +48,13 @@ class RunnerCreatedInfo(BaseModel):
 
 
 class HeartbeatResponse(BaseModel):
-    error: str | None = None
     abort: bool = False
     job_assigned: bool = False
+
+
+class RunnerJobInfoResponse(BaseModel):
+    id: int
+    settings: JobSettings
 
 
 class JobStatus(str, Enum):
@@ -82,8 +86,8 @@ class JobStatus(str, Enum):
     DOWNLOADED = "downloaded"
 
 
-class JobAndSettings(JobBase, JobSettings):
-    pass
+class JobAndSettings(JobBase):
+    settings: JobSettings
 
 
 class JobInfo(JobAndSettings, InProcessJobBase):

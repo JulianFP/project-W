@@ -343,8 +343,3 @@ class Settings(BaseModel):
     redis_connection: RedisConnection
     security: SecuritySettings
     smtp_server: SMTPServerSettings
-    disable_option_validation: bool = Field(
-        default=False,
-        description="This disables the validation of the provided config file. This means that the server will start and run even though it loaded possibly invalid data which may cause it to crash or not work proberly. Only set this to 'true' for development or testing purposes, never in production!",
-        validate_default=True,
-    )

@@ -8,11 +8,14 @@ import project_W.dependencies as dp
 from ..models.internal import OnlineRunner
 from ..models.request_data import (
     HeartbeatRequest,
-    JobSettings,
     RunnerRegisterRequest,
     RunnerSubmitResultRequest,
 )
-from ..models.response_data import ErrorResponse, HeartbeatResponse
+from ..models.response_data import (
+    ErrorResponse,
+    HeartbeatResponse,
+    RunnerJobInfoResponse,
+)
 from ..security.auth import (
     auth_dependency_responses,
     validate_online_runner,
@@ -45,7 +48,7 @@ async def register(
     Starting from the registration, the runner must periodically send
     heartbeat requests to the manager, or it may be unregistered.
     """
-    if dp.ch.get_online_runner_by_id(runner_id) is not None:
+    if (await dp.ch.get_online_runner_by_id(runner_id)) is not None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This runner is already registered as online!",
@@ -88,7 +91,7 @@ async def unregister_runner(
 )
 async def retrieve_job_info(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
-) -> JobSettings:
+) -> RunnerJobInfoResponse:
     if online_runner.assigned_job_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -101,7 +104,7 @@ async def retrieve_job_info(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="The job id of this runner doesn't appear in the database!",
         )
-    return job_settings
+    return RunnerJobInfoResponse(id=online_runner.assigned_job_id, settings=job_settings)
 
 
 @router.post(

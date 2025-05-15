@@ -10,7 +10,7 @@ import project_W.dependencies as dp
 
 from ._version import __version__
 from .caching import RedisAdapter
-from .config import loadConfig
+from .config import load_config
 from .database import PostgresAdapter
 from .logger import get_logger
 from .models.response_data import AboutResponse
@@ -34,9 +34,9 @@ async def lifespan(app: FastAPI):
         path = Path(config_file_path_from_env)
         if not path.is_dir():
             path = path.parent
-        dp.config = loadConfig(additionalPaths=[path])
+        dp.config = load_config(additional_paths=[path])
     else:
-        dp.config = loadConfig()
+        dp.config = load_config()
 
     # connect to database
     dp.db = PostgresAdapter(str(dp.config.postgres_connection_string))
