@@ -1626,13 +1626,13 @@ class PostgresAdapter(DatabaseAdapter):
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
-                        SELECT transcripts.%s
-                        FROM {self.schema}.transcripts transcripts, {self.schema}.jobs jobs
-                        WHERE transcript.job_id = jobs.id
-                        AND jobs.user_id = %s
-                        AND transcripts.job_id = %s
+                        SELECT transcript.{transcript_type.value}
+                        FROM {self.schema}.transcripts transcript, {self.schema}.jobs job
+                        WHERE transcript.job_id = job.id
+                        AND job.user_id = %s
+                        AND transcript.job_id = %s
                     """,
-                    (transcript_type, user_id, job_id),
+                    (user_id, job_id),
                 )
                 return await cur.fetchone()
 

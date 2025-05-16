@@ -133,7 +133,7 @@ async def retrieve_job_audio(
 
     if online_runner.in_process_job_id is None:
         await dp.ch.set_online_runner(
-            online_runner.id, {"in_process_job": online_runner.assigned_job_id}
+            online_runner.id, {"in_process_job_id": online_runner.assigned_job_id}
         )
 
     return StreamingResponse(

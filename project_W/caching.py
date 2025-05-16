@@ -258,7 +258,7 @@ class RedisAdapter(CachingAdapter):
         assert runner.in_process_job_id is not None
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.delete(self.__get_job_key(runner.in_process_job_id))
-            pipe.hdel(self.__get_runner_key(runner.id), "in_process_job_id assigned_job_id")
+            pipe.hdel(self.__get_runner_key(runner.id), *["in_process_job_id", "assigned_job_id"])
             pipe.zadd(
                 self.__runner_sorted_set_name,
                 {str(runner.id): runner.priority},
@@ -267,9 +267,13 @@ class RedisAdapter(CachingAdapter):
 
     async def unregister_online_runner(self, runner_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
+            pipe.hget(self.__get_runner_key(runner_id), "assigned_job_id")
             pipe.delete(self.__get_runner_key(runner_id))
             pipe.zrem("online_runners_sorted", runner_id)
-            await pipe.execute()
+            (job_id, _, _) = await pipe.execute()
+            if job_id is not None:
+                pipe.delete(self.__get_job_key(job_id))
+                await pipe.execute()
 
     async def get_online_runner_id_by_assigned_job(self, job_id: int) -> int | None:
         async with self.client.pipeline(transaction=True) as pipe:

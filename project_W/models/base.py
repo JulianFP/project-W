@@ -69,5 +69,5 @@ class JobBase(BaseModel):
 
 class InProcessJobBase(BaseModel):
     id: int
-    progress: float = Field(ge=0.0, le=1.0, default=0.0)
+    progress: float = Field(ge=0.0, le=100.0, default=0.0)
     abort: bool = False

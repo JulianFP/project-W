@@ -152,7 +152,9 @@ async def job_info(
             ) is not None and (
                 runner := await dp.ch.get_online_runner_by_id(runner_id)
             ) is not None:
-                data = data | runner.model_dump()  # JobBase optional data
+                runner_dict = runner.model_dump()
+                for key, val in runner_dict.items():
+                    data[f"runner_{key}"] = val  # JobBase optional data
         job_infos.append(JobInfo.model_validate(data))
     return job_infos
 
