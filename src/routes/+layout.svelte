@@ -1,6 +1,8 @@
 <script lang="ts">
+import "../app.css";
+
 import { page } from "$app/state";
-let activeUrl = $derived(page.url.pathname);
+let activeUrl = $derived(page.url.hash);
 
 import { alerts, auth } from "$lib/global_state.svelte";
 import {
@@ -41,20 +43,16 @@ let { children } = $props();
       <DarkMode/>
       {#if auth.loggedIn}
         <Avatar id="avatar-menu" class="cursor-pointer"/>
-        <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={activeUrl} bind:isOpen={dropDownOpen}>
-          <!-- TODO: get userinfo for this/>
-          <DropdownHeader>
-            <span class="block text-sm">Bonnie Green</span>
-            <span class="block truncate text-sm font-medium">name@flowbite.com</span>
-          </DropdownHeader>
-          </!-->
-          <DropdownItem href="#/account" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
-          <DropdownItem href="#/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
-          <DropdownDivider />
-          <DropdownItem onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
-        </Dropdown>
       {/if}
     </div>
+    {#if auth.loggedIn}
+      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={activeUrl} bind:isOpen={dropDownOpen}>
+        <DropdownItem href="#/account" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
+        <DropdownItem href="#/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
+        <DropdownDivider />
+        <DropdownItem onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
+      </Dropdown>
+    {/if}
     <NavUl {activeUrl}>
       <NavLi href="#/">Home</NavLi>
       <NavLi href="#/about">About</NavLi>

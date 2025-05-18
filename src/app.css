@@ -1,7 +1,7 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-#@plugin '@tailwindcss/forms';
-@plugin '@flowbite/plugin'
+@plugin '@tailwindcss/forms';
+@plugin 'flowbite/plugin';
 
 @custom-variant dark (&:where(.dark, .dark *));
 

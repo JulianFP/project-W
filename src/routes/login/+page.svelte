@@ -8,7 +8,6 @@ import WaitingButton from "$lib/waitingSubmitButton.svelte";
 
 import { auth } from "$lib/global_state.svelte";
 import { type BackendResponse, post } from "$lib/httpRequests";
-import { destForward } from "../utils/navigation";
 
 run(() => {
 	if (auth.loggedIn) destForward();

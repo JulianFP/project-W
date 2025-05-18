@@ -5,7 +5,7 @@ class AuthManager {
 	constructor() {
 		//on application start: check localStorage for authHeader and login if it is there
 		const returnVal: string | null = localStorage.getItem("authHeader");
-		this.#authHeader = { Authorization: `Bearer ${returnVal}` };
+		if (returnVal) this.#authHeader = { Authorization: `Bearer ${returnVal}` };
 	}
 
 	setToken(token: string) {
