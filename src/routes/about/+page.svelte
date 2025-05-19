@@ -1,5 +1,5 @@
 <script>
-import CenterPage from "$lib/centerPage.svelte";
+import CenterPage from "$lib/components/centerPage.svelte";
 import { Hr, P, Span } from "flowbite-svelte";
 </script>
 

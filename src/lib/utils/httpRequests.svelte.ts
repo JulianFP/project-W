@@ -1,4 +1,5 @@
-import { alerts, auth } from "$lib/global_state.svelte";
+import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+import { alerts, auth } from "./global_state.svelte";
 
 export type ErrorType =
 	| "serverConfig"
@@ -67,9 +68,7 @@ export async function get(
 
 	try {
 		const response: Response = await fetch(
-			`${
-				import.meta.env.VITE_BACKEND_BASE_URL
-			}/api/${route}?${argsObj.toString()}`,
+			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
 			{
 				method: "GET",
 				headers: headers,
@@ -155,22 +154,17 @@ export async function getLoggedIn(
 
 export async function post(
 	route: string,
-	form: Record<string, string | File> = {},
+	body: Record<string, string | File> = {},
 	headers: Record<string, string> = {},
 ): Promise<BackendResponse> {
-	const formObj: FormData = new FormData();
-	for (const key in form) {
-		formObj.set(key, form[key]);
-	}
-
 	let returnObj: BackendResponse;
 
 	try {
 		const response: Response = await fetch(
-			`${import.meta.env.VITE_BACKEND_BASE_URL}/api/${route}`,
+			`${PUBLIC_BACKEND_BASE_URL}/api/${route}`,
 			{
 				method: "POST",
-				body: formObj,
+				body: JSON.stringify(body),
 				headers: headers,
 			},
 		);

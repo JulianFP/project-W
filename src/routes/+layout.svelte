@@ -1,10 +1,9 @@
 <script lang="ts">
 import "../app.css";
 
-import { page } from "$app/state";
-let activeUrl = $derived(page.url.hash);
+import { routing } from "$lib/utils/global_state.svelte";
 
-import { alerts, auth } from "$lib/global_state.svelte";
+import { alerts, auth } from "$lib/utils/global_state.svelte";
 import {
 	Alert,
 	Avatar,
@@ -46,14 +45,14 @@ let { children } = $props();
       {/if}
     </div>
     {#if auth.loggedIn}
-      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={activeUrl} bind:isOpen={dropDownOpen}>
+      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
         <DropdownItem href="#/account" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
         <DropdownItem href="#/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
         <DropdownDivider />
         <DropdownItem onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
       </Dropdown>
     {/if}
-    <NavUl {activeUrl}>
+    <NavUl activeUrl={routing.location}>
       <NavLi href="#/">Home</NavLi>
       <NavLi href="#/about">About</NavLi>
       <NavLi href="https://project-w.readthedocs.io" target="_blank" rel="noopener noreferrer">Docs</NavLi>
