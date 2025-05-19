@@ -194,7 +194,7 @@ async def abort_jobs(
             await dp.db.finish_failed_job(job.id, "Job was aborted")
 
 
-@router.post(
+@router.delete(
     "/delete",
     responses={
         400: {

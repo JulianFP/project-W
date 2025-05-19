@@ -20,7 +20,7 @@ router = APIRouter(
 )
 
 
-@router.post("/invalidate_token")
+@router.delete("/invalidate_token")
 async def invalidate_token(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
@@ -30,7 +30,7 @@ async def invalidate_token(
     await dp.db.delete_token_secret_of_user(current_user.id, token_id)
 
 
-@router.post("/invalidate_all_tokens")
+@router.delete("/invalidate_all_tokens")
 async def invalidate_all_tokens(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
@@ -94,7 +94,7 @@ async def get_new_api_token(
 async def get_all_token_info(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
-    ]
+    ],
 ) -> list[TokenSecretInfo]:
     return await dp.db.get_info_of_all_tokens_of_user(current_user.id)
 
@@ -103,7 +103,7 @@ async def get_all_token_info(
 async def token_info(
     current_token: Annotated[
         DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=False))
-    ]
+    ],
 ) -> DecodedAuthTokenData:
     return current_token
 
@@ -112,7 +112,7 @@ async def token_info(
 async def user_info(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
-    ]
+    ],
 ) -> User:
     return current_user
 
@@ -121,7 +121,7 @@ async def user_info(
 async def delete_user(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
-    ]
+    ],
 ):
     await dp.db.delete_user(current_user.id)
     return "success!"

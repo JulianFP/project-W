@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 import project_W.dependencies as dp
@@ -54,16 +55,16 @@ async def lifespan(app: FastAPI):
     login_method_exists = False
     if dp.config.security.oidc_providers is not {}:
         login_method_exists = True
-        app.include_router(oidc.router)
+        app.include_router(oidc.router, prefix="/api")
         await oidc_deps.register_with_oidc_providers(dp.config)
     if dp.config.security.ldap_providers is not {}:
         login_method_exists = True
-        app.include_router(ldap.router)
+        app.include_router(ldap.router, prefix="/api")
         ldap_deps.ldap_adapter = ldap_deps.LdapAdapter()
         await ldap_deps.ldap_adapter.open(dp.config.security.ldap_providers)
     if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.DISABLED:
         login_method_exists = True
-        app.include_router(local_account.router)
+        app.include_router(local_account.router, prefix="/api")
         for prov_num, prov_user in dp.config.security.local_account.user_provisioning.items():
             await dp.db.ensure_local_user_is_provisioned(
                 prov_num, prov_user.email, prov_user.password, prov_user.is_admin
@@ -71,6 +72,14 @@ async def lifespan(app: FastAPI):
     if not login_method_exists:
         raise Exception(
             "No login method (one of local_account, ldap or oidc) has been specified in the config!"
+        )
+
+    # include app mount (it is important that this happens after all routers have been included!)
+    if dp.config.client_path is not None:
+        app.mount(
+            "/",
+            StaticFiles(directory=dp.config.client_path.resolve(), html=True),
+            name="client app",
         )
 
     # enqueue all jobs from the database that are not finished yet
@@ -124,16 +133,15 @@ app = FastAPI(
     },
     lifespan=lifespan,
 )
-
 app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))  # for oidc
 
-app.include_router(users.router)
-app.include_router(admins.router)
-app.include_router(jobs.router)
-app.include_router(runners.router)
+app.include_router(users.router, prefix="/api")
+app.include_router(admins.router, prefix="/api")
+app.include_router(jobs.router, prefix="/api")
+app.include_router(runners.router, prefix="/api")
 
 
-@app.get("/about")
+@app.get("/api/about")
 async def about() -> AboutResponse:
     return AboutResponse(
         description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
