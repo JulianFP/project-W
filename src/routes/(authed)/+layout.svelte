@@ -4,9 +4,9 @@ import { auth, routing } from "$lib/utils/global_state.svelte";
 $effect(() => {
 	if (!auth.loggedIn) {
 		const locationVal: string = routing.location;
-		let newParams: Record<string, string> | null = null;
-		if (locationVal && locationVal !== "#/") newParams = { dest: locationVal };
-		routing.set({ destination: "#/login", params: newParams });
+		if (locationVal && locationVal !== "#/")
+			localStorage.setItem("dest", locationVal);
+		routing.set({ destination: "#/auth" });
 	}
 });
 

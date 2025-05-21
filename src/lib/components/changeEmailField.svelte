@@ -1,9 +1,10 @@
 <script lang="ts">
-import { Button, Helper, Input, Label } from "flowbite-svelte";
+import { Helper, Input, Label } from "flowbite-svelte";
 import { LockOpenSolid, LockSolid } from "flowbite-svelte-icons";
 
 import { alerts } from "$lib/global_state.svelte";
 import { type BackendResponse, postLoggedIn } from "$lib/httpRequests";
+import Button from "./button.svelte";
 import ConfirmPasswordModal from "./confirmPasswordModal.svelte";
 
 interface Props {

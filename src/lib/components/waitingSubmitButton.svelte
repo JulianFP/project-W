@@ -1,5 +1,6 @@
 <script lang="ts">
-import { Button, Spinner } from "flowbite-svelte";
+import { Spinner } from "flowbite-svelte";
+import Button from "./button.svelte";
 
 let { waiting = false, disabled = false, children, ...rest } = $props();
 </script>

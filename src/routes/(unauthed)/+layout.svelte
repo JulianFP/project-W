@@ -4,18 +4,21 @@ import { Heading, Span } from "flowbite-svelte";
 
 $effect(() => {
 	if (auth.loggedIn) {
-		const destination: string | null = routing.querystring.get("dest");
+		let destination: string | null = localStorage.getItem("dest");
+		localStorage.removeItem("dest");
 
-		if (destination)
-			routing.set({ destination: destination, removeParams: ["dest"] });
-		else routing.set({ destination: "#/" });
+		if (!destination) {
+			destination = "#/";
+		}
+
+		routing.set({ destination: destination, removeParams: ["token"] });
 	}
 });
 
 let { children } = $props();
 </script>
 <div class="flex flex-col w-full h-full justify-evenly items-center">
-  <Heading tag="h1" class="w-fit text-2xl text-center font-extrabold md:text-5xl lg:text-6xl">
+  <Heading tag="h1" class="w-fit text-2xl text-center font-extrabold sm:text-4xl md:text-5xl lg:text-6xl">
     Welcome to <Span gradient="skyToEmerald">Project W</Span>!
   </Heading>
 
