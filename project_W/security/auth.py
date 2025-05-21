@@ -63,7 +63,7 @@ def get_payload_from_token(token: str) -> dict:
 
 def validate_user(require_verified: bool, require_admin: bool):
     async def user_validation_dep(
-        token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)]
+        token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)],
     ) -> DecodedAuthTokenData:
         # first check how this token was generated without verifying the signature
         token_payload = get_payload_from_token(token.credentials)
@@ -80,7 +80,7 @@ def validate_user(require_verified: bool, require_admin: bool):
                 dp.config, token.credentials, token_payload
             )
         else:
-            token_data = await validate_oidc_token(dp.config, token.credentials, iss)
+            token_data = await validate_oidc_token(token.credentials, iss)
 
         if require_verified and not token_data.is_verified:
             raise HTTPException(
@@ -104,7 +104,7 @@ def validate_user_and_get_from_db(require_verified: bool, require_admin: bool):
     async def user_lookup_dep(
         user_token_data: Annotated[
             DecodedAuthTokenData, Depends(validate_user(require_verified, require_admin))
-        ]
+        ],
     ) -> User:
         if user_token_data.user_type == UserTypeEnum.LOCAL:
             return await lookup_local_user_in_db_from_token(user_token_data)
@@ -119,7 +119,7 @@ def validate_user_and_get_from_db(require_verified: bool, require_admin: bool):
 
 
 async def validate_runner(
-    token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)]
+    token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)],
 ) -> int:
     if (runner_id := await dp.db.get_runner_by_token(token.credentials)) is None:
         raise HTTPException(
@@ -131,7 +131,7 @@ async def validate_runner(
 
 
 async def validate_online_runner(
-    runner_id: Annotated[int, Depends(validate_runner)]
+    runner_id: Annotated[int, Depends(validate_runner)],
 ) -> OnlineRunner:
     if not (online_runner := await dp.ch.get_online_runner_by_id(runner_id)):
         raise HTTPException(

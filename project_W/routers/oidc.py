@@ -43,7 +43,7 @@ async def login(idp_name: str, request: Request) -> RedirectResponse:
         },
     },
 )
-async def auth(idp_name: str, request: Request):
+async def auth(idp_name: str, request: Request) -> RedirectResponse:
     idp_name = idp_name.lower()
     try:
         oidc_response = await getattr(oidc.oauth, idp_name).authorize_access_token(request)
@@ -82,11 +82,11 @@ async def auth(idp_name: str, request: Request):
     # validate id_token before creating user so that possible errors are already displayed here to the user
     # and we don't create accounts in the database for nothing
     # this also verifies email_verified and user_role/admin_role claims
-    await oidc.validate_oidc_token(dp.config, id_token, iss)
+    await oidc.validate_oidc_token(id_token, iss)
 
     await dp.db.ensure_oidc_user_exists(
         iss,
         sub,
         email,
     )
-    return id_token
+    return RedirectResponse(f"{dp.config.client_url}/auth/oidc-accept?token={id_token}")

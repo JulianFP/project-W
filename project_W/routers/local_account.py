@@ -4,8 +4,11 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, st
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import SecretStr, ValidationError
 
-from project_W.models.base import EmailValidated, PasswordValidated
-from project_W.models.settings import LocalAccountOperationModeEnum
+from project_W.models.base import (
+    EmailValidated,
+    LocalAccountOperationModeEnum,
+    PasswordValidated,
+)
 
 from .. import dependencies as dp
 from ..models.internal import (

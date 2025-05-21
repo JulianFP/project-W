@@ -18,7 +18,12 @@ from pydantic import (
 )
 from pydantic_core import Url
 
-from .base import EmailValidated, PasswordValidated
+from .base import (
+    EmailValidated,
+    LocalAccountSettingsBase,
+    PasswordValidated,
+    ProviderSettingsBase,
+)
 
 
 class ProvisionedUser(BaseModel):
@@ -40,40 +45,12 @@ class ProvisionedUser(BaseModel):
     )
 
 
-class LocalAccountOperationModeEnum(str, Enum):
-    DISABLED = "disabled"
-    NO_SIGNUP_HIDDEN = "no-signup_hidden"
-    NO_SIGNUP = "no-signup"
-    ENABLED = "enabled"
-
-
-class LocalAccountSettings(BaseModel):
+class LocalAccountSettings(LocalAccountSettingsBase):
     model_config = ConfigDict(extra="forbid")
-    mode: LocalAccountOperationModeEnum = Field(
-        default=LocalAccountOperationModeEnum.ENABLED,
-        description="""
-        To what extend local accounts should be enabled.
-        - enabled: Both login and signup possible and advertised in frontend to users (default).
-        - no_signup: Login possible and advertised to users, signup not. Thus users can only login using already existing accounts (created through provisioning or by signup before this setting was set). Use this for example if you want users to login using local accounts that you created for them through provisioning.
-        - no_signup_hidden: Login still possible but not advertised to users in the frontend. Especially helpful if the only local accounts should be provisioned admin accounts for administration purposes while normal users should only login using oidc or ldap accounts.
-        - disabled: no login, no signup, no provisioned accounts. Login only through ldap and oidc. Please note that in this case you need to provide admin accounts through ldap or oidc as well!
-        """,
-        validate_default=True,
-    )
     allow_creation_of_api_tokens: bool = Field(
         default=True,
         description="If set to true then users logged in with local accounts can create api tokens with infinite lifetime. They will get invalidated if the user gets deleted.",
     )
-    allowed_email_domains: list[
-        Annotated[
-            str,
-            Field(
-                pattern=r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+$",
-                examples=["uni-heidelberg.de", "stud.uni-heidelberg.de"],
-                description="Allowed domains in email addresses. Users will only be able to sign up/change their email of their local accounts if their email address uses one of these domains (the part after the '@'). If left empty, then all email domains are allowed.",
-            ),
-        ]
-    ] = []
     user_provisioning: Annotated[
         dict[int, ProvisionedUser],
         Field(
@@ -109,17 +86,10 @@ class LocalTokenSettings(BaseModel):
     )
 
 
-class ProviderSettings(BaseModel):
+class ProviderSettings(ProviderSettingsBase):
     allow_creation_of_api_tokens: bool = Field(
         default=False,
         description="If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will not be automatically invalidated if the user gets deleted or looses permissions in the identity provider. This means that with this setting enabled, users that ones have access to Project-W can retain that access possibly forever. Consider if this is a problem for you before enabling this!",
-    )
-    icon_url: HttpUrl | None = Field(
-        default=None,
-        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider",
-        examples=[
-            "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
-        ],
     )
     ca_pem_file_path: FilePath | None = Field(
         default=None,

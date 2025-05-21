@@ -14,8 +14,8 @@ from .caching import RedisAdapter
 from .config import load_config
 from .database import PostgresAdapter
 from .logger import get_logger
-from .models.response_data import AboutResponse
-from .models.settings import LocalAccountOperationModeEnum
+from .models.base import LocalAccountOperationModeEnum
+from .models.response_data import AboutResponse, AuthSettings
 from .routers import admins, jobs, ldap, local_account, oidc, runners, users
 from .security import ldap_deps, oidc_deps
 from .smtp import SmtpClient
@@ -147,4 +147,13 @@ async def about() -> AboutResponse:
         description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
         source_code="https://github.com/JulianFP/project-W",
         version=__version__,
+    )
+
+
+@app.get("/api/auth_settings")
+async def auth_settings() -> AuthSettings:
+    return AuthSettings(
+        local_account=dp.config.security.local_account,
+        oidc_providers=dp.config.security.oidc_providers,
+        ldap_providers=dp.config.security.ldap_providers,
     )

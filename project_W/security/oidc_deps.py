@@ -8,7 +8,7 @@ from httpx import AsyncClient, HTTPError, HTTPStatusError
 
 import project_W.dependencies as dp
 from project_W.logger import get_logger
-from project_W.models.settings import OidcRoleSettings, Settings
+from project_W.models.settings import OidcProviderSettings, OidcRoleSettings, Settings
 
 from ..models.internal import DecodedAuthTokenData
 from ..models.response_data import User, UserTypeEnum
@@ -16,6 +16,9 @@ from ..models.response_data import User, UserTypeEnum
 oauth = OAuth()
 
 oauth_iss_to_name = {}
+local_oidc_prov: dict[str, OidcProviderSettings] = (
+    {}
+)  # local copy of settings with normalized provider names
 
 logger = get_logger("project-W")
 
@@ -26,6 +29,10 @@ async def register_with_oidc_providers(config: Settings):
         raise Exception("Tried to use oidc router even though oidc is disabled in config!")
     for name, idp in oidc_prov.items():
         logger.info(f"Trying to connect with OIDC provider {name}...")
+        # normalize provider name
+        name = name.lower().strip()
+        local_oidc_prov[name] = idp
+
         if idp.ca_pem_file_path:
             cafile = str(idp.ca_pem_file_path)
         else:
@@ -36,7 +43,6 @@ async def register_with_oidc_providers(config: Settings):
         if base_url[-1] != "/":
             base_url += "/"
         async with AsyncClient(verify=ctx) as client:
-            name = name.lower()
             metadata_uri = f"{base_url}.well-known/openid-configuration"
             oauth.register(
                 name,
@@ -67,9 +73,8 @@ def has_role(role_conf: OidcRoleSettings, user) -> bool:
         return role_name == role_conf.name
 
 
-async def validate_oidc_token(config: Settings, token: str, iss: str) -> DecodedAuthTokenData:
-    oidc_prov = config.security.oidc_providers
-    assert oidc_prov is not {}
+async def validate_oidc_token(token: str, iss: str) -> DecodedAuthTokenData:
+    assert local_oidc_prov is not {}
     # get current oidc config name
     name = oauth_iss_to_name.get(iss)
     if name is None:
@@ -101,14 +106,14 @@ async def validate_oidc_token(config: Settings, token: str, iss: str) -> Decoded
     user["user_type"] = UserTypeEnum.OIDC
 
     # check if user is admin
-    admin_role_conf = oidc_prov[name].admin_role
+    admin_role_conf = local_oidc_prov[name].admin_role
     if admin_role_conf is not None and has_role(admin_role_conf, user):
         user["is_admin"] = True
     else:
         user["is_admin"] = False
 
         # check if non-admin user even has permission to access project-W
-        user_role_conf = oidc_prov[name].user_role
+        user_role_conf = local_oidc_prov[name].user_role
         if user_role_conf is not None and not has_role(user_role_conf, user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

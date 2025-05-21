@@ -1,9 +1,10 @@
 import re
 from datetime import datetime
-from typing import Any, Self
+from enum import Enum
+from typing import Annotated, Any, Self
 
 from email_validator import EmailNotValidError, validate_email
-from pydantic import BaseModel, Field, RootModel, SecretStr, model_validator
+from pydantic import BaseModel, Field, HttpUrl, RootModel, SecretStr, model_validator
 
 
 class EmailValidated(RootModel):
@@ -71,3 +72,49 @@ class InProcessJobBase(BaseModel):
     id: int
     progress: float = Field(ge=0.0, le=100.0, default=0.0)
     abort: bool = False
+
+
+class LocalAccountOperationModeEnum(str, Enum):
+    DISABLED = "disabled"
+    NO_SIGNUP_HIDDEN = "no-signup_hidden"
+    NO_SIGNUP = "no-signup"
+    ENABLED = "enabled"
+
+
+class LocalAccountSettingsBase(BaseModel):
+    mode: LocalAccountOperationModeEnum = Field(
+        default=LocalAccountOperationModeEnum.ENABLED,
+        description="""
+        To what extend local accounts should be enabled.
+        - enabled: Both login and signup possible and advertised in frontend to users (default).
+        - no_signup: Login possible and advertised to users, signup not. Thus users can only login using already existing accounts (created through provisioning or by signup before this setting was set). Use this for example if you want users to login using local accounts that you created for them through provisioning.
+        - no_signup_hidden: Login still possible but not advertised to users in the frontend. Especially helpful if the only local accounts should be provisioned admin accounts for administration purposes while normal users should only login using oidc or ldap accounts.
+        - disabled: no login, no signup, no provisioned accounts. Login only through ldap and oidc. Please note that in this case you need to provide admin accounts through ldap or oidc as well!
+        """,
+        validate_default=True,
+    )
+    allowed_email_domains: list[
+        Annotated[
+            str,
+            Field(
+                pattern=r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+$",
+                examples=["uni-heidelberg.de", "stud.uni-heidelberg.de"],
+                description="Allowed domains in email addresses. Users will only be able to sign up/change their email of their local accounts if their email address uses one of these domains (the part after the '@'). If left empty, then all email domains are allowed.",
+            ),
+        ]
+    ] = []
+
+
+class ProviderSettingsBase(BaseModel):
+    hidden: bool = Field(
+        default=False,
+        description="Whether this provider should not be advertised to the user on the frontend. Useful if this provider should only provide admin accounts.",
+        validate_default=True,
+    )
+    icon_url: HttpUrl | None = Field(
+        default=None,
+        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider. Should be a link to a square png with transparent background, or alternatively to a svg",
+        examples=[
+            "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
+        ],
+    )

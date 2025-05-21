@@ -1,8 +1,15 @@
 from enum import Enum
+from typing import Mapping
 
 from pydantic import BaseModel, Field
 
-from .base import InProcessJobBase, JobBase, UserInDb
+from .base import (
+    InProcessJobBase,
+    JobBase,
+    LocalAccountSettingsBase,
+    ProviderSettingsBase,
+    UserInDb,
+)
 from .request_data import JobSettings
 
 
@@ -92,3 +99,9 @@ class JobAndSettings(JobBase):
 
 class JobInfo(JobAndSettings, InProcessJobBase):
     step: JobStatus
+
+
+class AuthSettings(BaseModel):
+    local_account: LocalAccountSettingsBase
+    oidc_providers: Mapping[str, ProviderSettingsBase]
+    ldap_providers: Mapping[str, ProviderSettingsBase]
