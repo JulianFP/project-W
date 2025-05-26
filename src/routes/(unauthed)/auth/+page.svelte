@@ -25,7 +25,7 @@ let { data }: Props = $props();
   {/each}
   {#each Object.entries(data.auth_settings.ldap_providers) as [ldap_name, ldap_sett]}
     {#if !ldap_sett.hidden}
-      <Button color="alternative" class="flex-none h-11 my-2">
+      <Button color="alternative" class="flex-none h-11 my-2" href={`#/auth/ldap-login/${ldap_name}`}>
         <img src={ldap_sett.icon_url} alt="Icon of {ldap_name}" width="32" class="mr-4">
         Login with {ldap_name}
       </Button>
@@ -35,9 +35,9 @@ let { data }: Props = $props();
     {#if Object.keys(data.auth_settings.oidc_providers).length + Object.keys(data.auth_settings.ldap_providers).length > 0}
       <Hr innerDivClass="bg-slate-200 dark:bg-slate-950" class="bg-primary-700 dark:bg-primary-700 w-96 h-1 rounded"><P>or</P></Hr>
     {/if}
-    <Button color="alternative" class="flex-none h-11 my-2" href="#/auth/local-login">Login with Project-W account</Button>
+    <Button color="alternative" class="flex-none h-11 my-2" href="#/auth/local/login">Login with Project-W account</Button>
     {#if data.auth_settings.local_account.mode === "enabled"}
-      <Button color="alternative" class="flex-none h-11 my-2" href="#/auth/local-signup">Signup for Project-W account</Button>
+      <Button color="alternative" class="flex-none h-11 my-2" href="#/auth/local/signup">Signup for Project-W account</Button>
     {/if}
   {/if}
 </div>

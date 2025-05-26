@@ -1,255 +1,179 @@
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import { alerts, auth } from "./global_state.svelte";
+import type { components } from "./schema";
 
-export type ErrorType =
-	| "serverConfig"
-	| "email"
-	| "password"
-	| "invalidRequest"
-	| "permission"
-	| "auth"
-	| "notInDatabase"
-	| "operation";
+type ValidationError = components["schemas"]["ValidationError"];
 
-export type JobStep =
-	| "notReported" //this is not an actual step returned by the backend but a value that I internally assign if the backend doesn't return anything
-	| "aborting" //this also only exists internally and is used to show an animation while the backend aborts a job
-	| "failed"
-	| "notQueued"
-	| "pendingRunner"
-	| "runnerAssigned"
-	| "runnerInProgress"
-	| "success"
-	| "downloaded";
-
-export type JobStatus = {
-	step?: JobStep;
-	runner?: number;
-	progress?: number;
+type HTTPErrorObject = {
+	detail: string | ValidationError[];
 };
 
-export type Job = {
-	jobId?: number;
-	fileName?: string;
-	model?: string;
-	language?: string;
-	error_msg?: string;
-	status?: JobStatus;
-};
-
-type BackendResponseJson = {
-	msg: string;
-	errorType?: ErrorType;
-	transcript?: string;
-	jobId?: number;
-	jobIds?: number[];
-	jobs?: Job[];
-	allowedEmailDomains?: string[];
-	email?: string;
-	isAdmin?: boolean;
-	activated?: boolean;
-	accessToken?: string;
-};
-
-//the following parameters are not part of the json response object but will be added to the final returnObj
-export type BackendResponse = {
-	ok: boolean;
+export class BackendCommError extends Error {
 	status: number;
-} & BackendResponseJson;
 
-export async function get(
+	constructor(status: number, detail: string) {
+		super(detail);
+		this.status = status;
+	}
+}
+
+export async function get<ResponseType>(
 	route: string,
 	args: Record<string, string> = {},
 	headers: Record<string, string> = {},
-): Promise<BackendResponse> {
+	fetch = window.fetch,
+): Promise<ResponseType> {
 	const argsObj: URLSearchParams = new URLSearchParams(args);
-
-	let returnObj: BackendResponse;
-
-	try {
-		const response: Response = await fetch(
-			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
-			{
-				method: "GET",
-				headers: headers,
-			},
-		);
-		const contentType = response.headers.get("content-type");
-		if (!contentType || !contentType.includes("application/json")) {
-			returnObj = {
-				ok: false,
-				status: response.status,
-				msg: `Response not in JSON format. HTTP status code ${response.status.toString()}`,
-			};
-		} else {
-			const responseContent: BackendResponseJson = await response.json();
-			if (responseContent.msg == null) {
-				returnObj = {
-					ok: false,
-					msg: `msg field missing from response json object. HTTP status code ${response.status.toString()}`,
-					status: response.status,
-				};
+	const response: Response = await fetch(
+		`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
+		{
+			method: "GET",
+			headers: headers,
+		},
+	);
+	const contentType = response.headers.get("content-type");
+	let is_json = false;
+	if (contentType?.includes("application/json")) {
+		is_json = true;
+	}
+	if (!response.ok) {
+		let detail = "Unknown backend communication error";
+		if (is_json) {
+			const json_response: HTTPErrorObject = await response.json();
+			if (typeof json_response.detail === "string") {
+				detail = json_response.detail;
 			} else {
-				returnObj = {
-					ok: response.ok,
-					status: response.status,
-					...responseContent,
-				};
+				detail = "";
+				for (let i = 0; i < json_response.detail.length; i++) {
+					detail += `${json_response.detail[i].loc}: ${json_response.detail[i].msg}`;
+					if (i + 1 < json_response.detail.length) {
+						detail += "; ";
+					}
+				}
 			}
 		}
-	} catch (error) {
-		let errorMsg: string;
-		if (
-			error !== null &&
-			typeof error === "object" &&
-			"message" in error &&
-			typeof error.message === "string"
-		) {
-			errorMsg = error.message;
-		} else {
-			errorMsg = "Unknown error";
-		}
-		returnObj = {
-			ok: false,
-			status: 404,
-			msg: errorMsg,
-		};
+		throw new BackendCommError(response.status, detail);
 	}
-
-	//401: Token expired, 422: Token was invalidated
-	if (returnObj.status === 401) {
-		auth.forgetToken();
-		alerts.push({
-			msg: `You have been logged out: ${returnObj.msg}`,
-			color: "red",
-		});
-	} else if (
-		returnObj.status === 422 &&
-		returnObj.msg === "Signature verification failed"
-	) {
-		auth.forgetToken();
-		alerts.push({
-			msg: "You have been logged out: Token was invalidated",
-			color: "red",
-		});
+	if (!is_json) {
+		throw new BackendCommError(
+			response.status,
+			"Backend returned non-json value",
+		);
 	}
-	return returnObj;
+	const result: ResponseType = await response.json();
+	return result;
 }
 
-export async function getLoggedIn(
+export async function getLoggedIn<ResponseType>(
 	route: string,
 	args: Record<string, string> = {},
-): Promise<BackendResponse> {
-	let returnObj: BackendResponse;
-	if (auth.loggedIn) returnObj = await get(route, args, auth.getAuthHeader());
-	else
-		returnObj = {
-			ok: false,
-			status: 401,
-			msg: "not logged in",
-		};
-
-	return returnObj;
+	fetch = window.fetch,
+): Promise<ResponseType> {
+	if (auth.loggedIn) {
+		try {
+			return await get<ResponseType>(route, args, auth.getAuthHeader(), fetch);
+		} catch (error: unknown) {
+			if (error instanceof BackendCommError && error.status === 401) {
+				auth.forgetToken();
+				alerts.push({
+					msg: `You have been logged out: ${error.message}`,
+					color: "red",
+				});
+			}
+			throw error;
+		}
+	} else {
+		throw new BackendCommError(401, "Not logged in");
+	}
 }
 
-export async function post(
+export async function post<ResponseType>(
 	route: string,
-	body: Record<string, string | File> = {},
+	body: Record<string, string> = {},
+	body_as_form_url_encoded = false,
 	headers: Record<string, string> = {},
-): Promise<BackendResponse> {
-	let returnObj: BackendResponse;
-
-	try {
-		const response: Response = await fetch(
-			`${PUBLIC_BACKEND_BASE_URL}/api/${route}`,
-			{
-				method: "POST",
-				body: JSON.stringify(body),
-				headers: headers,
+	fetch = window.fetch,
+): Promise<ResponseType> {
+	let response: Response;
+	if (body_as_form_url_encoded) {
+		const formData = new URLSearchParams(body);
+		response = await fetch(`${PUBLIC_BACKEND_BASE_URL}/api/${route}`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded",
+				...headers,
 			},
-		);
-
-		const contentType = response.headers.get("content-type");
-
-		//catch http 413 error to display an understandable error message to user
-		if (response.status === 413) {
-			returnObj = {
-				ok: false,
-				status: 413,
-				msg: "Submitted file is too large. Please only submit files that are smaller than 1GB.",
-			};
-		} else if (!contentType || !contentType.includes("application/json")) {
-			returnObj = {
-				ok: false,
-				status: response.status,
-				msg: `Response not in JSON format. HTTP status code ${response.status.toString()}`,
-			};
-		} else {
-			const responseContent: BackendResponseJson = await response.json();
-			if (responseContent.msg == null) {
-				returnObj = {
-					ok: false,
-					msg: `msg field missing from response json object. HTTP status code ${response.status.toString()}`,
-					status: response.status,
-				};
+			body: formData,
+		});
+	} else {
+		response = await fetch(`${PUBLIC_BACKEND_BASE_URL}/api/${route}`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				...headers,
+			},
+			body: JSON.stringify(body),
+		});
+	}
+	const contentType = response.headers.get("content-type");
+	let is_json = false;
+	if (contentType?.includes("application/json")) {
+		is_json = true;
+	}
+	if (!response.ok) {
+		let detail = "Unknown backend communication error";
+		if (is_json) {
+			const json_response: HTTPErrorObject = await response.json();
+			if (typeof json_response.detail === "string") {
+				detail = json_response.detail;
 			} else {
-				returnObj = {
-					ok: response.ok,
-					status: response.status,
-					...responseContent,
-				};
+				detail = "";
+				for (let i = 0; i < json_response.detail.length; i++) {
+					detail += `${json_response.detail[i].loc}: ${json_response.detail[i].msg}`;
+					if (i + 1 < json_response.detail.length) {
+						detail += "; ";
+					}
+				}
 			}
 		}
-	} catch (error) {
-		let errorMsg: string;
-		if (
-			error !== null &&
-			typeof error === "object" &&
-			"message" in error &&
-			typeof error.message === "string"
-		) {
-			errorMsg = error.message;
-		} else {
-			errorMsg = "Unknown error";
-		}
-		returnObj = {
-			ok: false,
-			status: 404,
-			msg: errorMsg,
-		};
+		throw new BackendCommError(response.status, detail);
 	}
-
-	//401: Token expired, 422: Token was invalidated
-	if (returnObj.status === 401) {
-		auth.forgetToken();
-		alerts.push({
-			msg: `You have been logged out: ${returnObj.msg}`,
-			color: "red",
-		});
-	} else if (
-		returnObj.status === 422 &&
-		returnObj.msg === "Signature verification failed"
-	) {
-		auth.forgetToken();
-		alerts.push({
-			msg: "You have been logged out: Token was invalidated",
-			color: "red",
-		});
+	if (!is_json) {
+		throw new BackendCommError(
+			response.status,
+			"Backend returned non-json value",
+		);
 	}
-	return returnObj;
+	const result: ResponseType = await response.json();
+	return result;
 }
 
-export async function postLoggedIn(
+export async function postLoggedIn<ResponseType>(
 	route: string,
-	form: Record<string, string | File> = {},
-): Promise<BackendResponse> {
-	let returnObj: BackendResponse;
-	if (auth.loggedIn) returnObj = await post(route, form, auth.getAuthHeader());
-	else
-		returnObj = {
-			ok: false,
-			status: 401,
-			msg: "not logged in",
-		};
-	return returnObj;
+	body: Record<string, string> = {},
+	body_as_form_url_encoded = false,
+	fetch = window.fetch,
+): Promise<ResponseType> {
+	if (auth.loggedIn) {
+		try {
+			return await post<ResponseType>(
+				route,
+				body,
+				body_as_form_url_encoded,
+				auth.getAuthHeader(),
+				fetch,
+			);
+		} catch (error: unknown) {
+			if (error instanceof BackendCommError && error.status === 401) {
+				auth.forgetToken();
+				alerts.push({
+					msg: `You have been logged out: ${error.message}`,
+					color: "red",
+				});
+			}
+			throw error;
+		}
+	} else {
+		throw new BackendCommError(401, "Not logged in");
+	}
 }
