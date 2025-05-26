@@ -9,7 +9,7 @@ repos:
       - id: check-symlinks
   - repo: https://github.com/biomejs/pre-commit
 
-    rev: v0.5.0
+    rev: v2.0.0-beta.5
     hooks:
       - id: biome-check
         additional_dependencies: ["@biomejs/biome@1.9.3"]
