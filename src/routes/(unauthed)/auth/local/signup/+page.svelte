@@ -25,7 +25,7 @@ async function postSignup(event: Event): Promise<void> {
 	//send post request and wait for response
 	try {
 		const signup_response = await post<string>("local-account/signup", {
-			//email: email,
+			email: email,
 			password: password,
 		});
 

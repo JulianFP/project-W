@@ -5,10 +5,13 @@ class AuthManager {
 	#authHeader = $state<Record<string, string>>({});
 	loggedIn = $derived<boolean>("Authorization" in this.#authHeader);
 
-	constructor() {
-		//on application start: check localStorage for authHeader and login if it is there
+	updateTokenFromStorage() {
 		const returnVal: string | null = localStorage.getItem("authHeader");
 		if (returnVal) this.#authHeader = { Authorization: `Bearer ${returnVal}` };
+	}
+
+	constructor() {
+		this.updateTokenFromStorage();
 	}
 
 	setToken(token: string) {

@@ -45,11 +45,11 @@ let { children } = $props();
       {/if}
     </div>
     {#if auth.loggedIn}
-      <Dropdown placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
-        <DropdownItem href="#/account" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
-        <DropdownItem href="#/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
+      <Dropdown simple placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
+        <DropdownItem href="#/account/info" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
+        <DropdownItem href="#/account/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
         <DropdownDivider />
-        <DropdownItem onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
+        <DropdownItem class="cursor-pointer" onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
       </Dropdown>
     {/if}
     <NavUl activeUrl={routing.location}>

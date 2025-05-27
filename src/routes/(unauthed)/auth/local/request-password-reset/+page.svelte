@@ -25,7 +25,7 @@ async function postRequestPasswordReset(event: Event): Promise<void> {
 
 		alerts.push({ msg: response, color: "green" });
 		routing.set({
-			destination: "/",
+			destination: "#/",
 			params: {},
 			overwriteParams: true,
 			history: true,
