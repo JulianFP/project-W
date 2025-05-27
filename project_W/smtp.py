@@ -1,7 +1,7 @@
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 
-from aiosmtplib import SMTP
+from aiosmtplib import SMTP, SMTPServerDisconnected
 
 from project_W.models.base import EmailValidated
 
@@ -55,13 +55,19 @@ class SmtpClient:
         msg["Date"] = formatdate(localtime=True)
         msg.set_content(msg_body)
 
-        await self.client.send_message(msg)
+        try:
+            await self.client.send_message(msg)
+        except SMTPServerDisconnected:
+            # reconnect and try again
+            await self.open()
+            await self.client.send_message(msg)
+
         self.logger.info(f"-> Sent {msg_type} email to {receiver.root}")
 
     async def send_account_activation_email(
         self, receiver: EmailValidated, token: str, client_url: str
     ):
-        url = f"{client_url}/activate?token={token}"
+        url = f"{client_url}/local/activate?token={token}"
         msg_body = (
             f"To activate your Project-W account, "
             f"please confirm your email address by clicking on the following link:\n\n"
@@ -76,7 +82,7 @@ class SmtpClient:
     async def send_password_reset_email(
         self, receiver: EmailValidated, token: str, client_url: str
     ):
-        url = f"{client_url}/resetPassword?token={token}"
+        url = f"{client_url}/auth/local/reset-password?token={token}"
         msg_body = (
             f"To reset the password of your Project-W account, "
             f"please open the following link and enter a new password:\n\n"

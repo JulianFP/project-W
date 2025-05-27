@@ -138,7 +138,7 @@ async def signup(data: SignupData, background_tasks: BackgroundTasks):
     if data.email.get_domain() not in dp.config.security.local_account.allowed_email_domains:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"'{data.email.get_domain()}' is not not an allowed email domain on this server",
+            detail=f"'{data.email.get_domain()}' is not an allowed email domain on this server",
         )
 
     if (user_id := await dp.db.add_local_user(data.email, data.password, False, False)) is None:
@@ -177,12 +177,12 @@ async def activate(token: SecretStr):
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No user with email {payload.old_email} exists",
+            detail=f"No user with email '{payload.old_email.root}' exists",
         )
     if user.is_verified and payload.old_email == payload.new_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Email address {payload.old_email} is already verified",
+            detail=f"Email address '{payload.old_email.root}' is already verified",
         )
 
     await dp.db.verify_local_user(user.id, payload.new_email)

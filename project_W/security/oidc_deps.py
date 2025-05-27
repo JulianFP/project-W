@@ -16,6 +16,7 @@ from ..models.response_data import User, UserTypeEnum
 oauth = OAuth()
 
 oauth_iss_to_name = {}
+oauth_iss_to_nice_name = {}
 local_oidc_prov: dict[str, OidcProviderSettings] = (
     {}
 )  # local copy of settings with normalized provider names
@@ -30,8 +31,8 @@ async def register_with_oidc_providers(config: Settings):
     for name, idp in oidc_prov.items():
         logger.info(f"Trying to connect with OIDC provider {name}...")
         # normalize provider name
-        name = name.lower().strip()
-        local_oidc_prov[name] = idp
+        norm_name = name.lower().strip()
+        local_oidc_prov[norm_name] = idp
 
         if idp.ca_pem_file_path:
             cafile = str(idp.ca_pem_file_path)
@@ -45,7 +46,7 @@ async def register_with_oidc_providers(config: Settings):
         async with AsyncClient(verify=ctx) as client:
             metadata_uri = f"{base_url}.well-known/openid-configuration"
             oauth.register(
-                name,
+                norm_name,
                 client_id=idp.client_id,
                 client_secret=idp.client_secret.get_secret_value(),
                 server_metadata_url=metadata_uri,
@@ -61,7 +62,8 @@ async def register_with_oidc_providers(config: Settings):
                 raise Exception(
                     f"Error occured while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
                 )
-            oauth_iss_to_name[oidc_config["issuer"]] = name
+            oauth_iss_to_nice_name[oidc_config["issuer"]] = name
+            oauth_iss_to_name[oidc_config["issuer"]] = norm_name
         logger.info(f"Connected with OIDC provider {name}")
 
 
@@ -132,7 +134,7 @@ async def lookup_oidc_user_in_db_from_token(user_token_data: DecodedAuthTokenDat
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication successful, but the user was not found in database",
         )
-    provider_name = oauth_iss_to_name.get(oidc_user.iss)
+    provider_name = oauth_iss_to_nice_name.get(oidc_user.iss)
     if not provider_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

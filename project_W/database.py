@@ -691,7 +691,7 @@ class PostgresAdapter(DatabaseAdapter):
                 CREATE TRIGGER rotate_temp_token_secret
                 AFTER DELETE ON {self.schema}.token_secrets
                 FOR EACH ROW
-                WHEN (OLD.temp_token_secret)
+                WHEN (OLD.temp_token_secret AND pg_trigger_depth() < 1)
                 EXECUTE FUNCTION rotatesecret()
                 """
             )
