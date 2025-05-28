@@ -297,14 +297,14 @@ async function invalidateAllTokens(): Promise<void> {
   {data.user_info.user_type !== "oidc" ? "We will invalidate all your session and API tokens thus logging you out from both all your temporary devices (e.g. browsers, including this one) and devices using API tokens. You will have to login again." : "We will invalidate all your API tokens thus logging you out from all devices using API tokens."}
 </ConfirmModal>
 
-<Modal bind:open={createAPITokenModalOpen} autoclose={false}>
+<Modal bind:open={createAPITokenModalOpen} autoclose={false} onclose={() => createdAPIToken = ""}>
   Your newly created API token is:
   <P space="tighter" class="break-all" italic>{createdAPIToken}</P>
   <div class="flex items-end gap-2 w-full">
     <Button color="alternative" onclick={() => navigator.clipboard.writeText(createdAPIToken)}>
       <ClipboardOutline class="mr-2"/>Copy token to clipboard
     </Button>
-    <Button onclick={() => createAPITokenModalOpen = false}>
+    <Button onclick={() => {createAPITokenModalOpen = false; createdAPIToken = "";}}>
       Close
     </Button>
   </div>
