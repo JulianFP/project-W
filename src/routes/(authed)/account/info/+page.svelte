@@ -1,6 +1,7 @@
 <script lang="ts">
-import { Alert, Button, Helper } from "flowbite-svelte";
+import { Alert, Helper } from "flowbite-svelte";
 
+import Button from "$lib/components/button.svelte";
 import CenterPage from "$lib/components/centerPage.svelte";
 import ChangeEmailField from "$lib/components/changeEmailField.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";

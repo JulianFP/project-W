@@ -1171,6 +1171,12 @@ export interface components {
 			 * @default []
 			 */
 			allowed_email_domains: string[];
+			/**
+			 * Allow Creation Of Api Tokens
+			 * @description If set to true then users logged in with local accounts can create api tokens with infinite lifetime. They will get invalidated if the user gets deleted.
+			 * @default true
+			 */
+			allow_creation_of_api_tokens: boolean;
 		};
 		/** PasswordResetData */
 		PasswordResetData: {
@@ -1199,6 +1205,12 @@ export interface components {
 			 * @description URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider. Should be a link to a square png with transparent background, or alternatively to a svg
 			 */
 			icon_url?: string | null;
+			/**
+			 * Allow Creation Of Api Tokens
+			 * @description If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will not be automatically invalidated if the user gets deleted or looses permissions in the identity provider. This means that with this setting enabled, users that ones have access to Project-W can retain that access possibly forever. Consider if this is a problem for you before enabling this!
+			 * @default false
+			 */
+			allow_creation_of_api_tokens: boolean;
 		};
 		/** RunnerCreatedInfo */
 		RunnerCreatedInfo: {

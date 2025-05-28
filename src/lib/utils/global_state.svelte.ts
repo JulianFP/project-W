@@ -78,6 +78,24 @@ class RoutingManager {
 			goto(`${destination}`, { replaceState: !history });
 		}
 	}
+
+	dest_forward() {
+		const locationVal: string = this.location;
+		if (locationVal && locationVal !== "#/")
+			localStorage.setItem("dest", locationVal);
+		this.set({ destination: "#/auth" });
+	}
+
+	login_forward() {
+		let destination: string | null = localStorage.getItem("dest");
+		localStorage.removeItem("dest");
+
+		if (!destination) {
+			destination = "#/";
+		}
+
+		this.set({ destination: destination, removeParams: ["token"] });
+	}
 }
 
 export const auth = new AuthManager();

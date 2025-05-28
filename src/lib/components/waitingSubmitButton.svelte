@@ -6,7 +6,7 @@ let { waiting = false, disabled = false, children, ...rest } = $props();
 </script>
 
 {#if waiting}
-  <Button type="submit" disabled>
+  <Button type="submit" disabled {...rest}>
     <Spinner class="me-3" size="4" color="secondary" />Loading ...
   </Button>
 {:else}

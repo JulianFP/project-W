@@ -4,14 +4,7 @@ import { Heading, Span } from "flowbite-svelte";
 
 $effect(() => {
 	if (auth.loggedIn) {
-		let destination: string | null = localStorage.getItem("dest");
-		localStorage.removeItem("dest");
-
-		if (!destination) {
-			destination = "#/";
-		}
-
-		routing.set({ destination: destination, removeParams: ["token"] });
+		routing.login_forward();
 	}
 });
 

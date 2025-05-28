@@ -1,5 +1,6 @@
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import { alerts, auth } from "./global_state.svelte";
+import { routing } from "./global_state.svelte";
 import type { components } from "./schema";
 
 type ValidationError = components["schemas"]["ValidationError"];
@@ -55,6 +56,7 @@ async function response_parser<ResponseType>(
 
 async function loggedInWrapper<ResponseType>(
 	query_method: () => Promise<ResponseType>,
+	depth = 0,
 ): Promise<ResponseType> {
 	if (auth.loggedIn) {
 		try {
@@ -62,22 +64,29 @@ async function loggedInWrapper<ResponseType>(
 		} catch (error: unknown) {
 			if (error instanceof BackendCommError && error.status === 401) {
 				//update and try again (maybe the user logged in in a different tab?)
-				auth.updateTokenFromStorage();
-				try {
-					return await query_method();
-				} catch (error: unknown) {
-					if (error instanceof BackendCommError && error.status === 401) {
-						auth.forgetToken();
-						alerts.push({
-							msg: `You have been logged out: ${error.message}`,
-							color: "red",
-						});
-					}
+				if (depth < 0) {
+					auth.updateTokenFromStorage();
+					return await loggedInWrapper(query_method, depth + 1);
 				}
+				auth.forgetToken();
+				alerts.push({
+					msg: `You have been logged out: ${error.message}`,
+					color: "red",
+				});
+				routing.dest_forward();
 			}
 			throw error;
 		}
+	} else if (depth < 0) {
+		auth.updateTokenFromStorage();
+		return await loggedInWrapper(query_method, depth + 1);
 	} else {
+		auth.forgetToken();
+		alerts.push({
+			msg: "You are not logged in anymore",
+			color: "red",
+		});
+		routing.dest_forward();
 		throw new BackendCommError(401, "Not logged in");
 	}
 }
