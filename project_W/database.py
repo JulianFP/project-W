@@ -192,6 +192,13 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDb | None:
+        """
+        Return an oidc user with the matching user id, or None if user_id doesn't match any user
+        """
+        pass
+
+    @abstractmethod
     async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
         """
         Return an ldap user with the matching user id, or None if user_id doesn't match any user
@@ -1211,6 +1218,19 @@ class PostgresAdapter(DatabaseAdapter):
                         WHERE iss = %s AND sub = %s
                     """,
                     (iss, sub),
+                )
+                return await cur.fetchone()
+
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDb | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.oidc_accounts
+                        WHERE id = %s
+                    """,
+                    (user_id,),
                 )
                 return await cur.fetchone()
 

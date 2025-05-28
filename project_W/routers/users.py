@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 import project_W.dependencies as dp
 
@@ -54,7 +54,7 @@ async def get_new_api_token(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
     ],
-    name: str,
+    name: Annotated[str, Query(max_length=64)],
 ) -> str:
     # check if current user is from a provider which allows creation of api tokens
     disabled_exc = HTTPException(

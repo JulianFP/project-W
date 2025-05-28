@@ -148,3 +148,26 @@ async def lookup_oidc_user_in_db_from_token(user_token_data: DecodedAuthTokenDat
         is_admin=user_token_data.is_admin,
         is_verified=user_token_data.is_verified,
     )
+
+
+async def lookup_oidc_user_in_db_from_api_token(user_token_data: DecodedAuthTokenData) -> User:
+    oidc_user = await dp.db.get_oidc_user_by_id(int(user_token_data.sub))
+    if not oidc_user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication successful, but the user was not found in database",
+        )
+    provider_name = oauth_iss_to_nice_name.get(oidc_user.iss)
+    if not provider_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authentication successful, but the user was not found in database",
+        )
+    return User(
+        id=oidc_user.id,
+        user_type=UserTypeEnum.OIDC,
+        email=oidc_user.email,
+        provider_name=provider_name,
+        is_admin=user_token_data.is_admin,
+        is_verified=user_token_data.is_verified,
+    )

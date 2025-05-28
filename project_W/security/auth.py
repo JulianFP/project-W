@@ -14,7 +14,11 @@ from ..models.response_data import ErrorResponse, User, UserTypeEnum
 from .ldap_deps import lookup_ldap_user_in_db_from_token
 from .local_account_deps import lookup_local_user_in_db_from_token
 from .local_token import jwt_issuer, validate_local_auth_token
-from .oidc_deps import lookup_oidc_user_in_db_from_token, validate_oidc_token
+from .oidc_deps import (
+    lookup_oidc_user_in_db_from_api_token,
+    lookup_oidc_user_in_db_from_token,
+    validate_oidc_token,
+)
 
 logger = get_logger("project-W")
 
@@ -111,7 +115,10 @@ def validate_user_and_get_from_db(require_verified: bool, require_admin: bool):
         elif user_token_data.user_type == UserTypeEnum.LDAP:
             return await lookup_ldap_user_in_db_from_token(user_token_data)
         elif user_token_data.user_type == UserTypeEnum.OIDC:
-            return await lookup_oidc_user_in_db_from_token(user_token_data)
+            if user_token_data.iss == jwt_issuer:
+                return await lookup_oidc_user_in_db_from_api_token(user_token_data)
+            else:
+                return await lookup_oidc_user_in_db_from_token(user_token_data)
         else:
             raise Exception("Invalid token type encountered!")
 
