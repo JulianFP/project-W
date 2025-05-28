@@ -31,7 +31,7 @@ http_exc = HTTPException(
         401: {"model": ErrorResponse, "description": "Authentication was unsuccessful"},
     },
 )
-async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> str:
 
     if not ldap.ldap_adapter.check_idp_name(idp_name):
         raise HTTPException(

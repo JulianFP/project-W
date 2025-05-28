@@ -47,10 +47,6 @@ class ProvisionedUser(BaseModel):
 
 class LocalAccountSettings(LocalAccountSettingsBase):
     model_config = ConfigDict(extra="forbid")
-    allow_creation_of_api_tokens: bool = Field(
-        default=True,
-        description="If set to true then users logged in with local accounts can create api tokens with infinite lifetime. They will get invalidated if the user gets deleted.",
-    )
     user_provisioning: Annotated[
         dict[int, ProvisionedUser],
         Field(
@@ -87,10 +83,6 @@ class LocalTokenSettings(BaseModel):
 
 
 class ProviderSettings(ProviderSettingsBase):
-    allow_creation_of_api_tokens: bool = Field(
-        default=False,
-        description="If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will not be automatically invalidated if the user gets deleted or looses permissions in the identity provider. This means that with this setting enabled, users that ones have access to Project-W can retain that access possibly forever. Consider if this is a problem for you before enabling this!",
-    )
     ca_pem_file_path: FilePath | None = Field(
         default=None,
         description="Path to the pem certs file that includes the certificates that should be trusted for this provider (alternative certificate verification). Useful if the identity provider uses a self-signed certificate",

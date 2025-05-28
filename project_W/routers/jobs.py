@@ -173,7 +173,7 @@ async def abort_jobs(
         User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
     ],
     job_ids: list[int],
-):
+) -> str:
     jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
@@ -193,6 +193,8 @@ async def abort_jobs(
                 await dp.ch.remove_job_from_queue(job.id)
             await dp.db.finish_failed_job(job.id, "Job was aborted")
 
+    return "Success"
+
 
 @router.delete(
     "/delete",
@@ -208,7 +210,7 @@ async def delete_jobs(
         User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
     ],
     job_ids: list[int],
-):
+) -> str:
     jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
@@ -219,6 +221,8 @@ async def delete_jobs(
             )
 
     await dp.db.delete_jobs_of_user(current_user.id, job_ids)
+
+    return "Success"
 
 
 @router.get(

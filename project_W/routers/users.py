@@ -26,8 +26,9 @@ async def invalidate_token(
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
     ],
     token_id: int,
-):
+) -> str:
     await dp.db.delete_token_secret_of_user(current_user.id, token_id)
+    return "Success"
 
 
 @router.delete("/invalidate_all_tokens")
@@ -35,8 +36,9 @@ async def invalidate_all_tokens(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
     ],
-):
+) -> str:
     await dp.db.delete_all_token_secrets_of_user(int(current_user.id))
+    return "Success"
 
 
 @router.post(
@@ -53,7 +55,7 @@ async def get_new_api_token(
         User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
     ],
     name: str,
-):
+) -> str:
     # check if current user is from a provider which allows creation of api tokens
     disabled_exc = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -122,6 +124,6 @@ async def delete_user(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
     ],
-):
+) -> str:
     await dp.db.delete_user(current_user.id)
-    return "success!"
+    return "Success"

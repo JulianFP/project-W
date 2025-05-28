@@ -20,7 +20,7 @@ router = APIRouter(
 async def create_runner(
     _: Annotated[
         DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
-    ]
+    ],
 ) -> RunnerCreatedInfo:
     return await dp.db.create_runner()
 
@@ -29,6 +29,6 @@ async def create_runner(
 async def admin_test(
     _: Annotated[
         DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=True))
-    ]
-):
+    ],
+) -> str:
     return "Only an admin is allowed to see this"

@@ -70,7 +70,7 @@ async def register(
 @router.post("/unregister")
 async def unregister_runner(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
-):
+) -> str:
     """
     Unregisters an online runner.
     """
@@ -78,6 +78,8 @@ async def unregister_runner(
 
     if online_runner.assigned_job_id is not None:
         await dp.ch.enqueue_new_job(online_runner.assigned_job_id, 0)
+
+    return "Success"
 
 
 @router.get(
@@ -153,7 +155,7 @@ async def retrieve_job_audio(
 async def submit_job_result(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
     submitted_data: RunnerSubmitResultRequest,
-):
+) -> str:
     """
     Handles the submission of a job result by a runner. If the runner is not currently
     processing a job, returns an error message. Otherwise, marks the job as completed/failed
@@ -186,6 +188,8 @@ async def submit_job_result(
         if job_id is None:
             raise Exception("Redis data error: job queue is not empty but popmax returns None")
         await dp.ch.assign_job_to_online_runner(job_id)
+
+    return "Success"
 
 
 @router.post("/heartbeat")

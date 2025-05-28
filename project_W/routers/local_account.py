@@ -90,7 +90,7 @@ router = APIRouter(
     "/login",
     responses={401: {"model": ErrorResponse, "description": "Authentication was unsuccessful"}},
 )
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> str:
     try:
         email = EmailValidated.model_validate(form_data.username)
     except ValidationError:
@@ -128,7 +128,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
         },
     },
 )
-async def signup(data: SignupData, background_tasks: BackgroundTasks):
+async def signup(data: SignupData, background_tasks: BackgroundTasks) -> str:
     if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.ENABLED:
         raise HTTPException(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
@@ -171,7 +171,7 @@ async def signup(data: SignupData, background_tasks: BackgroundTasks):
         401: {"model": ErrorResponse, "description": "Activation token invalid"},
     },
 )
-async def activate(token: SecretStr):
+async def activate(token: SecretStr) -> str:
     payload = validate_account_activation_token(dp.config, token.get_secret_value())
     user = await dp.db.get_local_user_by_email(payload.old_email)
     if user is None:
@@ -190,6 +190,8 @@ async def activate(token: SecretStr):
     # invalidate existing tokens because they contain is_verified and email information
     await dp.db.delete_all_token_secrets_of_user(user.id)
 
+    return "Success"
+
 
 @router.get(
     "/resend_activation_email",
@@ -205,7 +207,7 @@ async def activate(token: SecretStr):
 async def resend_activation_email(
     current_token: Annotated[DecodedAuthTokenData, Depends(validate_token_local_not_provisioned)],
     background_tasks: BackgroundTasks,
-):
+) -> str:
     if current_token.user_type != UserTypeEnum.LOCAL:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -239,7 +241,7 @@ async def resend_activation_email(
         },
     },
 )
-async def request_password_reset(email: str, background_tasks: BackgroundTasks):
+async def request_password_reset(email: str, background_tasks: BackgroundTasks) -> str:
     # cannot have pydantic model as query parameter, so validate email here manually
     try:
         validated_email = EmailValidated.model_validate(email)
@@ -274,13 +276,15 @@ async def request_password_reset(email: str, background_tasks: BackgroundTasks):
         401: {"model": ErrorResponse, "description": "Password reset token invalid"},
     },
 )
-async def reset_password(password_reset: PasswordResetData):
+async def reset_password(password_reset: PasswordResetData) -> str:
     payload = validate_password_reset_token(dp.config, password_reset.token.get_secret_value())
     if not await dp.db.update_local_user_password(payload.email, password_reset.new_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No local user with the email {payload.email} exists",
         )
+
+    return "Success"
 
 
 @router.post(
@@ -300,7 +304,7 @@ async def change_user_email(
         DecodedAuthTokenData, Depends(validate_token_local_not_provisioned_confirmed)
     ],
     background_tasks: BackgroundTasks,
-):
+) -> str:
     if new_email.get_domain() not in dp.config.security.local_account.allowed_email_domains:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -334,6 +338,6 @@ async def change_user_password(
     current_token: Annotated[
         DecodedAuthTokenData, Depends(validate_token_local_not_provisioned_confirmed)
     ],
-):
+) -> str:
     await dp.db.update_local_user_password(current_token.email, new_password)
     return "Successfully updated user password"
