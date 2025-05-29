@@ -93,7 +93,7 @@ async function loggedInWrapper<ResponseType>(
 
 export async function get<ResponseType>(
 	route: string,
-	args: Record<string, string> = {},
+	args: Record<string, string> | string[][] = {},
 	headers: Record<string, string> = {},
 	fetch = window.fetch,
 ): Promise<ResponseType> {
@@ -110,7 +110,7 @@ export async function get<ResponseType>(
 
 export async function getLoggedIn<ResponseType>(
 	route: string,
-	args: Record<string, string> = {},
+	args: Record<string, string> | string[][] = {},
 	fetch = window.fetch,
 ): Promise<ResponseType> {
 	const query_method = async () => {
@@ -121,9 +121,9 @@ export async function getLoggedIn<ResponseType>(
 
 export async function post<ResponseType>(
 	route: string,
-	body: Record<string, string> = {},
+	body = {},
 	body_as_form_url_encoded = false,
-	args: Record<string, string> = {},
+	args: Record<string, string> | string[][] = {},
 	headers: Record<string, string> = {},
 	fetch = window.fetch,
 ): Promise<ResponseType> {
@@ -160,9 +160,9 @@ export async function post<ResponseType>(
 
 export async function postLoggedIn<ResponseType>(
 	route: string,
-	body: Record<string, string> = {},
+	body = {},
 	body_as_form_url_encoded = false,
-	args: Record<string, string> = {},
+	args: Record<string, string> | string[][] = {},
 	fetch = window.fetch,
 ): Promise<ResponseType> {
 	const query_method = async () => {
@@ -180,8 +180,8 @@ export async function postLoggedIn<ResponseType>(
 
 export async function delet<ResponseType>(
 	route: string,
-	body: Record<string, string> = {},
-	args: Record<string, string> = {},
+	body = {},
+	args: Record<string, string> | string[][] = {},
 	headers: Record<string, string> = {},
 	fetch = window.fetch,
 ): Promise<ResponseType> {
@@ -202,8 +202,8 @@ export async function delet<ResponseType>(
 
 export async function deletLoggedIn<ResponseType>(
 	route: string,
-	body: Record<string, string> = {},
-	args: Record<string, string> = {},
+	body = {},
+	args: Record<string, string> | string[][] = {},
 	fetch = window.fetch,
 ): Promise<ResponseType> {
 	const query_method = async () => {
