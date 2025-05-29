@@ -357,10 +357,11 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_top_k_job_ids_of_user(
+    async def get_job_ids_of_user(
         self,
         user_id: int,
-        k: int,
+        start_index: int,
+        end_index: int,
         sort_key: JobSortKey,
         desc: bool,
         excl_finished: bool,
@@ -1516,10 +1517,11 @@ class PostgresAdapter(DatabaseAdapter):
                     raise Exception(f"Couldn't get job count of user {user_id}!")
                 return count
 
-    async def get_top_k_job_ids_of_user(
+    async def get_job_ids_of_user(
         self,
         user_id: int,
-        k: int,
+        start_index: int,
+        end_index: int,
         sort_key: JobSortKey,
         desc: bool,
         excl_finished: bool,
@@ -1556,10 +1558,11 @@ class PostgresAdapter(DatabaseAdapter):
                     FROM filtered_jobs j1, filtered_jobs j2
                     WHERE j1.{sort_col} {comparison_op} j2.{sort_col}
                     GROUP BY j1.id
-                    HAVING count(*) <= %s
+                    HAVING count(*) > %s
+                    AND count(*) <= (%s+1)
                     ORDER BY count(*)
                     """,
-                    (user_id, k),
+                    (user_id, start_index, end_index),
                 )
                 return await cur.fetchall()
 

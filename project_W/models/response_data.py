@@ -94,7 +94,7 @@ class JobStatus(str, Enum):
 
 
 class JobAndSettings(JobBase):
-    settings: JobSettings
+    settings: JobSettings = JobSettings()
 
 
 class JobInfo(JobAndSettings, InProcessJobBase):

@@ -115,19 +115,26 @@ async def job_count(
     )
 
 
-@router.get("/top_k")
-async def top_k_jobs(
+@router.get("/get")
+async def get(
     current_user: Annotated[
         User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
     ],
-    k: int,
+    start_index: int,
+    end_index: int,
     sort_key: JobSortKey,
     descending: bool,
     exclude_finished: bool,
     exclude_downloaded: bool,
 ) -> list[int]:
-    return await dp.db.get_top_k_job_ids_of_user(
-        current_user.id, k, sort_key, descending, exclude_finished, exclude_downloaded
+    return await dp.db.get_job_ids_of_user(
+        current_user.id,
+        start_index,
+        end_index,
+        sort_key,
+        descending,
+        exclude_finished,
+        exclude_downloaded,
     )
 
 

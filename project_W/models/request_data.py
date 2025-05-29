@@ -309,7 +309,11 @@ class JobSettings(BaseModel):
 
     @model_validator(mode="after")
     def alignment_supported_language(self) -> Self:
-        if self.alignment is not None and self.language not in supported_alignment_languages:
+        if (
+            self.alignment is not None
+            and self.language is not None
+            and self.language not in supported_alignment_languages
+        ):
             raise ValueError(
                 f"language {self.language} is not supported for alignment. Either disable alignment or choose another language"
             )
