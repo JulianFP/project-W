@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import AsyncGenerator
 
 import redis.asyncio as redis
 from redis.asyncio.retry import Retry
@@ -58,7 +59,7 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def assign_job_to_online_runner(self, job_id: int) -> bool:
+    async def assign_job_to_online_runner(self, job_id: int, user_id: int) -> bool:
         """
         Assign a job with job_id to an online runner
         Return True if successful
@@ -89,7 +90,7 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def enqueue_new_job(self, job_id: int, job_priority: int):
+    async def enqueue_new_job(self, job_id: int, job_priority: int, user_id: int):
         """
         Push a new job into the job queue
         """
@@ -139,6 +140,14 @@ class CachingAdapter(ABC):
         """
         pass
 
+    @abstractmethod
+    async def event_generator(self, user_id: int) -> AsyncGenerator[str, None]:
+        """
+        This is a Generator method that returns events regarding jobs
+         of user with id user_id in a SSE format
+        """
+        yield ""
+
 
 class RedisAdapter(CachingAdapter):
 
@@ -153,6 +162,9 @@ class RedisAdapter(CachingAdapter):
 
     def __get_job_key(self, job_id: int) -> str:
         return f"in_process_job:{str(job_id)}"
+
+    def __get_pubsub_channel(self, user_id: int) -> str:
+        return f"job_events:{str(user_id)}"
 
     async def open(self, connection_obj: RedisConnection):
         # 3 retries on timeout
@@ -219,7 +231,7 @@ class RedisAdapter(CachingAdapter):
                 return None
             return OnlineRunner.model_validate(runner_dict | {"id": runner_id})
 
-    async def assign_job_to_online_runner(self, job_id: int):
+    async def assign_job_to_online_runner(self, job_id: int, user_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.zpopmax(self.__runner_sorted_set_name)
             (ids_returned,) = await pipe.execute()
@@ -247,8 +259,14 @@ class RedisAdapter(CachingAdapter):
                 pipe.hset(key_name, mapping=online_runner.model_dump(exclude_none=True))
                 pipe.hset(
                     self.__get_job_key(job_id),
-                    mapping={"runner_id": runner_id, "progress": 0.0, "abort": 0},
+                    mapping={
+                        "runner_id": runner_id,
+                        "user_id": user_id,
+                        "progress": 0.0,
+                        "abort": 0,
+                    },
                 )
+                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
                 await pipe.execute()
                 return True
             else:
@@ -257,12 +275,15 @@ class RedisAdapter(CachingAdapter):
     async def finish_job_of_online_runner(self, runner: OnlineRunner):
         assert runner.in_process_job_id is not None
         async with self.client.pipeline(transaction=True) as pipe:
+            pipe.hget(self.__get_job_key(runner.in_process_job_id), "user_id")
+            (user_id,) = await pipe.execute()
             pipe.delete(self.__get_job_key(runner.in_process_job_id))
             pipe.hdel(self.__get_runner_key(runner.id), *["in_process_job_id", "assigned_job_id"])
             pipe.zadd(
                 self.__runner_sorted_set_name,
                 {str(runner.id): runner.priority},
             )
+            pipe.publish(self.__get_pubsub_channel(user_id), runner.in_process_job_id)
             await pipe.execute()
 
     async def unregister_online_runner(self, runner_id: int):
@@ -272,7 +293,10 @@ class RedisAdapter(CachingAdapter):
             pipe.zrem("online_runners_sorted", runner_id)
             (job_id, _, _) = await pipe.execute()
             if job_id is not None:
+                pipe.hget(self.__get_job_key(job_id), "user_id")
+                (user_id,) = await pipe.execute()
                 pipe.delete(self.__get_job_key(job_id))
+                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
                 await pipe.execute()
 
     async def get_online_runner_id_by_assigned_job(self, job_id: int) -> int | None:
@@ -281,9 +305,9 @@ class RedisAdapter(CachingAdapter):
             (runner_id,) = await pipe.execute()
             return int(runner_id)
 
-    async def enqueue_new_job(self, job_id: int, job_priority: int):
+    async def enqueue_new_job(self, job_id: int, job_priority: int, user_id: int):
         if not (
-            await self.assign_job_to_online_runner(job_id)
+            await self.assign_job_to_online_runner(job_id, user_id)
         ):  # try to assign job to a free runner first
             async with self.client.pipeline(transaction=True) as pipe:
                 pipe.zadd(self.__job_queue_sorted_set_name, {str(job_id): job_priority})
@@ -322,7 +346,10 @@ class RedisAdapter(CachingAdapter):
 
     async def set_in_process_job(self, job_id: int, mapping: dict[str, bytes | str | int | float]):
         async with self.client.pipeline(transaction=True) as pipe:
+            pipe.hget(self.__get_job_key(job_id), "user_id")
+            (user_id,) = await pipe.execute()
             pipe.hset(self.__get_job_key(job_id), mapping=mapping)
+            pipe.publish(self.__get_pubsub_channel(user_id), job_id)
             await pipe.execute()
 
     async def get_job_pos_in_queue(self, job_id: int) -> int | None:
@@ -330,3 +357,12 @@ class RedisAdapter(CachingAdapter):
             pipe.zrevrank(self.__job_queue_sorted_set_name, job_id)
             (position,) = await pipe.execute()
             return position
+
+    async def event_generator(self, user_id: int) -> AsyncGenerator[str, None]:
+        async with self.client.pubsub() as pubsub:
+            await pubsub.subscribe(self.__get_pubsub_channel(user_id))
+            async for message in pubsub.listen():
+                data = message["data"]
+                print(data)
+                yield f"event: job_updated\ndata: {data}\n\n"
+        print("exited")

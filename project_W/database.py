@@ -408,10 +408,18 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
+    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
         """
-        Returns all jobs in the database that haven't finished yet (not downloaded, finished, failed).
+        Returns the job id and user id all jobs in the database that haven't finished yet (not downloaded, finished, failed).
         Will be called at startup to enqueue existing jobs
+        """
+        pass
+
+    @abstractmethod
+    async def get_user_id_of_job(self, job_id: int) -> int | None:
+        """
+        Returns the user_id of the user that owns a specific job.
+        Returns None if no job with job_id exists
         """
         pass
 
@@ -1659,17 +1667,30 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
-    async def get_all_ids_of_unfinished_jobs(self) -> list[int]:
+    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                        SELECT id
+                        SELECT id, user_id
                         FROM {self.schema}.jobs
                         WHERE finish_timestamp IS NULL
                     """
                 )
                 return await cur.fetchall()
+
+    async def get_user_id_of_job(self, job_id: int) -> int | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT user_id
+                        FROM {self.schema}.jobs
+                        WHERE id = %s
+                    """,
+                    (job_id,),
+                )
+                return await cur.fetchone()
 
     async def finish_successful_job(self, runner: OnlineRunner, transcript: Transcript):
         async with self.apool.connection() as conn:

@@ -81,6 +81,7 @@ class InProcessJob(InProcessJobBase):
     """
 
     runner_id: int
+    user_id: int
 
 
 class OnlineRunner(RunnerRegisterRequest):

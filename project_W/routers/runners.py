@@ -62,7 +62,12 @@ async def register(
         job_id = await dp.ch.pop_job_with_highest_priority()
         if job_id is None:
             raise Exception("Redis data error: job queue is not empty but popmax returns None")
-        await dp.ch.assign_job_to_online_runner(job_id)
+        user_id = await dp.db.get_user_id_of_job(job_id)
+        if user_id is None:
+            raise Exception(
+                f"Redis/Postgresql data mismatch: Popped job with id {job_id} from redis that doesn't exist in Postgresql!"
+            )
+        await dp.ch.assign_job_to_online_runner(job_id, user_id)
 
     return runner_id
 
@@ -77,7 +82,12 @@ async def unregister_runner(
     await dp.ch.unregister_online_runner(online_runner.id)
 
     if online_runner.assigned_job_id is not None:
-        await dp.ch.enqueue_new_job(online_runner.assigned_job_id, 0)
+        user_id = await dp.db.get_user_id_of_job(online_runner.assigned_job_id)
+        if user_id is None:
+            raise Exception(
+                f"Redis/Postgresql data mismatch: Runner had job {online_runner.assigned_job_id} assigned that doesn't exist in Postgresql!"
+            )
+        await dp.ch.enqueue_new_job(online_runner.assigned_job_id, 0, user_id)
 
     return "Success"
 
@@ -187,7 +197,12 @@ async def submit_job_result(
         job_id = await dp.ch.pop_job_with_highest_priority()
         if job_id is None:
             raise Exception("Redis data error: job queue is not empty but popmax returns None")
-        await dp.ch.assign_job_to_online_runner(job_id)
+        user_id = await dp.db.get_user_id_of_job(job_id)
+        if user_id is None:
+            raise Exception(
+                f"Redis/Postgresql data mismatch: Popped job with id {job_id} from redis that doesn't exist in Postgresql!"
+            )
+        await dp.ch.assign_job_to_online_runner(job_id, user_id)
 
     return "Success"
 

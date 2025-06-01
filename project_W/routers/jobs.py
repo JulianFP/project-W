@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_400_BAD_REQUEST
 
 import project_W.dependencies as dp
@@ -98,7 +99,7 @@ async def submit_job(
             detail=f"The provided job_settings_id of '{job_settings_id}' is invalid",
         )
 
-    await dp.ch.enqueue_new_job(job_id, 0)
+    await dp.ch.enqueue_new_job(job_id, 0, current_user.id)
     return job_id
 
 
@@ -162,6 +163,8 @@ async def job_info(
                 runner_dict = runner.model_dump()
                 for key, val in runner_dict.items():
                     data[f"runner_{key}"] = val  # JobBase optional data
+        elif data["step"] == JobStatus.SUCCESS:
+            data["progress"] = 100
         job_infos.append(JobInfo.model_validate(data))
     return job_infos
 
@@ -259,3 +262,12 @@ async def download_transcript(
         )
     else:
         return transcript
+
+
+@router.get("/events")
+async def events(
+    current_user: Annotated[
+        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+    ],
+) -> StreamingResponse:
+    return StreamingResponse(dp.ch.event_generator(current_user.id), media_type="text/event-stream")
