@@ -1,13 +1,14 @@
 <script lang="ts">
+import { EventSource } from "eventsource";
 import {
 	A,
-	Button,
 	ButtonGroup,
 	Checkbox,
 	P,
 	PaginationNav,
 	Progressbar,
 	Span,
+	Spinner,
 	Table,
 	TableBody,
 	TableBodyCell,
@@ -23,16 +24,20 @@ import {
 	ChevronLeftOutline,
 	ChevronRightOutline,
 	CloseOutline,
+	DownloadSolid,
 	EditSolid,
 	PlusOutline,
+	RefreshOutline,
 	StopSolid,
 	TrashBinSolid,
 } from "flowbite-svelte-icons";
+import { SvelteMap } from "svelte/reactivity";
 
+import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+import Button from "$lib/components/button.svelte";
 import CenterPage from "$lib/components/centerPage.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";
-import Waiting from "$lib/components/waiting.svelte";
-import { alerts } from "$lib/utils/global_state.svelte";
+import { alerts, auth } from "$lib/utils/global_state.svelte";
 import {
 	BackendCommError,
 	deletLoggedIn,
@@ -45,26 +50,25 @@ type SortKey = components["schemas"]["JobSortKey"];
 type Job = components["schemas"]["JobInfo"];
 
 let fetchingJobs = $state(false);
-let jobs: Job[] = $state([]);
+let jobs_ordered_selected: SvelteMap<number, boolean> = $state(new SvelteMap());
+let jobs_info: SvelteMap<number, Job> = $state(new SvelteMap());
 let job_count: number = $state(0);
+let job_count_total: number = $state(0);
 
 //table stuff
 const jobs_per_page = 10;
 let currentPage = $state(1);
 let totalPages = $derived(Math.max(Math.ceil(job_count / jobs_per_page), 1));
 let tableEditMode = $state(false);
-let itemsSelected: Record<number, boolean> = $state({});
-let selectedItems = $derived(
-	Object.entries(itemsSelected)
-		.filter(([_, v]) => v)
-		.map(([k, _]) => Number.parseInt(k)),
+let selectedItems: number[] = $derived(
+	Array.from(jobs_ordered_selected.entries())
+		.filter(([, val]) => val)
+		.map(([key]) => key),
 );
 let headerCheckboxSelected = $state(false);
 let selectedAbortButtonDisabled = $state(true);
 let selectedDeleteButtonDisabled = $state(true);
 let openRow: number | null = $state(null);
-
-$inspect(selectedAbortButtonDisabled);
 
 //modal stuff
 let submitModalOpen = $state(false);
@@ -86,6 +90,10 @@ async function fetch_jobs() {
 			exclude_finished: exclude_finished.toString(),
 			exclude_downloaded: exclude_downloaded.toString(),
 		});
+		job_count_total = await getLoggedIn<number>("jobs/count", {
+			exclude_finished: "false",
+			exclude_downloaded: "false",
+		});
 		if (job_count > 0) {
 			const job_ids = await getLoggedIn<number[]>("jobs/get", {
 				start_index: (jobs_per_page * (currentPage - 1)).toString(),
@@ -95,22 +103,39 @@ async function fetch_jobs() {
 				exclude_finished: exclude_finished.toString(),
 				exclude_downloaded: exclude_downloaded.toString(),
 			});
-			let job_map: Map<number, Job | null> = new Map();
-			let args_formatted: string[][] = [];
+			let jobs_ordered_selected_loc = new Map<number, boolean>();
 			for (const job_id of job_ids) {
-				job_map.set(job_id, null); //to preserve the ordering of the array
-				args_formatted.push(["job_ids", job_id.toString()]);
+				//to preserve the ordering of the jobs
+				jobs_ordered_selected_loc.set(job_id, false);
 			}
-			const jobs_unsorted = await getLoggedIn<Job[]>(
-				"jobs/info",
-				args_formatted,
-			);
-			for (const job of jobs_unsorted) {
-				job_map.set(job.id, job);
+			if (jobs_ordered_selected_loc.size === 0) {
+				jobs_ordered_selected.clear();
+				jobs_info.clear();
+			} else {
+				jobs_ordered_selected = new SvelteMap(jobs_ordered_selected_loc);
+				let args_formatted: string[][] = [];
+				for (const job_id of jobs_ordered_selected_loc.keys()) {
+					if (!jobs_info.has(job_id)) {
+						args_formatted.push(["job_ids", job_id.toString()]);
+					}
+				}
+				if (args_formatted.length > 0) {
+					const jobs_unsorted = await getLoggedIn<Job[]>(
+						"jobs/info",
+						args_formatted,
+					);
+					for (const job of jobs_unsorted) {
+						jobs_info.set(job.id, job);
+					}
+					for (const job_id of jobs_info.keys()) {
+						if (!jobs_ordered_selected_loc.has(job_id))
+							jobs_info.delete(job_id);
+					}
+				}
 			}
-			jobs = Array.from(job_map.values().filter((job) => job !== null));
 		} else {
-			jobs = [];
+			jobs_ordered_selected.clear();
+			jobs_info.clear();
 		}
 	} catch (err: unknown) {
 		let errorMsg = "Error occured while fetching jobs from backend: ";
@@ -125,6 +150,33 @@ async function fetch_jobs() {
 }
 fetch_jobs();
 
+async function update_jobs(job_ids: number[]) {
+	let args_formatted: string[][] = [];
+	for (const job_id of job_ids) {
+		args_formatted.push(["job_ids", job_id.toString()]);
+	}
+	try {
+		const jobs_unsorted = await getLoggedIn<Job[]>("jobs/info", args_formatted);
+		for (const job of jobs_unsorted) {
+			jobs_info.set(job.id, job);
+		}
+	} catch (err: unknown) {
+		let errorMsg = "Error occured while updating job: ";
+		if (err instanceof BackendCommError) {
+			errorMsg += err.message;
+		} else {
+			errorMsg += "Unknown error";
+		}
+		alerts.push({ msg: errorMsg, color: "red" });
+	}
+}
+
+function deselect_all_jobs() {
+	for (let id of jobs_ordered_selected.keys()) {
+		jobs_ordered_selected.set(id, false);
+	}
+}
+
 function sortClickHandler(key: SortKey) {
 	if (sort_key === key) descending = !descending;
 	else sort_key = key;
@@ -134,8 +186,6 @@ function sortClickHandler(key: SortKey) {
 async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
 		await postLoggedIn("jobs/abort", jobIdsToAbort);
-		await fetch_jobs();
-		updateHeaderCheckbox();
 	} catch (err: unknown) {
 		let errorMsg = `Error occured while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;
@@ -143,20 +193,30 @@ async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
 		alerts.push({ msg: errorMsg, color: "red" });
 	}
 }
+async function postAbortJobs(abortedJobIds: number[]): Promise<void> {
+	for (const job_id of abortedJobIds) {
+		jobs_info.delete(job_id);
+	}
+	await update_jobs(abortedJobIds);
+	updateHeaderCheckbox();
+}
+
 async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
 		await deletLoggedIn("jobs/delete", jobIdsToAbort);
-		await fetch_jobs();
-		if (jobs.length > 0) {
-			updateHeaderCheckbox();
-		} else {
-			tableEditMode = false;
-		}
 	} catch (err: unknown) {
 		let errorMsg = `Error occured while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;
 		else errorMsg += "Unknown error";
 		alerts.push({ msg: errorMsg, color: "red" });
+	}
+}
+async function postDeletejobs(): Promise<void> {
+	await fetch_jobs();
+	if (selectedItems.length > 0) {
+		updateHeaderCheckbox();
+	} else {
+		tableEditMode = false;
 	}
 }
 
@@ -186,12 +246,12 @@ function openDeleteModal(jobIds: number[]) {
 
 function updateHeaderCheckbox(job: Job | null = null) {
 	//update headerCheckbox
-	if (job == null || itemsSelected[job.id]) {
+	if (job == null || jobs_ordered_selected.get(job.id)) {
 		let allSelected = true;
-		for (let job of jobs) {
-			if (!itemsSelected[job.id]) {
+		for (let [job_id, selected] of jobs_ordered_selected.entries()) {
+			if (!selected) {
 				allSelected = false;
-				itemsSelected[job.id] = false;
+				jobs_ordered_selected.set(job_id, false);
 			}
 		}
 		headerCheckboxSelected = allSelected;
@@ -206,7 +266,7 @@ function updateHeaderCheckbox(job: Job | null = null) {
 	} else {
 		let includesNotRunning = false;
 		let includesNotDone = false;
-		for (const job of jobs) {
+		for (const job of jobs_info.values()) {
 			if (selectedItems.includes(job.id)) {
 				if (
 					![
@@ -259,89 +319,113 @@ function timeAgo(date: Date): string {
 
 	return `${Math.floor(seconds)} seconds ago`;
 }
+
+// update jobs using SSE (Server-Sent Events)
+const evtSource = new EventSource(
+	`${PUBLIC_BACKEND_BASE_URL}/api/jobs/events`,
+	{
+		withCredentials: true,
+		fetch: (input, init) =>
+			fetch(input, {
+				...init,
+				headers: {
+					...init.headers,
+					...auth.getAuthHeader(),
+				},
+			}),
+	},
+);
+evtSource.addEventListener("job_updated", (event) => {
+	console.log(`Received event: ${event.data}`);
+	const job_id: number = Number.parseInt(event.data);
+	if (jobs_info.has(job_id)) {
+		update_jobs([job_id]);
+	}
+});
 </script>
 
 <CenterPage title="Your transcription jobs">
   <div class="flex flex-col gap-4">
     <div class="flex justify-between items-center">
-      <Checkbox id="hide_finished_jobs" bind:checked={exclude_finished} onchange={fetch_jobs}><P>Hide finished jobs</P></Checkbox>
-      <Checkbox id="hide_downloaded_jobs" bind:checked={exclude_downloaded} disabled={exclude_finished} onchange={fetch_jobs}><P>Hide downloaded jobs</P></Checkbox>
+      <div class="flex items-center gap-4">
+        {#if fetchingJobs}
+          <Button disabled pill size="sm" class="p-2!">
+            <Spinner class="h-6 w-6" size="4" color="secondary" />
+          </Button>
+        {:else}
+          <Button pill size="sm" class="p-2!" onclick={fetch_jobs}><RefreshOutline class="h-6 w-6"/></Button>
+        {/if}
+        <div>
+          <Checkbox id="hide_finished_jobs" bind:checked={exclude_finished} onchange={fetch_jobs}><P>Hide finished jobs</P></Checkbox>
+          <Checkbox id="hide_downloaded_jobs" bind:checked={exclude_downloaded} disabled={exclude_finished} onchange={fetch_jobs}><P>Hide downloaded jobs</P></Checkbox>
+        </div>
+      </div>
       <Button pill onclick={() => openSubmitModal()}><PlusOutline class="mr-2"/>New Job</Button>
     </div>
-    {#if fetchingJobs}
-      <Waiting/>
-    {:else}
-      <Table shadow hoverable={true}>
-        <TableHead>
-          {#if tableEditMode}
-            <TableHeadCell class="!p-4">
-              <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} onchange={() => {jobs.forEach((job) => itemsSelected[job.id] = headerCheckboxSelected); updateHeaderCheckbox();}}/>
-            </TableHeadCell>
-          {/if}
-          <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" onclick={() => sortClickHandler("creation_time")}>
-            <div class="flex">
-              {#if sort_key === "creation_time"}
-                {#if descending}
-                  <CaretDownSolid class="inline mr-2"/>
-                {:else}
-                  <CaretUpSolid class="inline mr-2"/>
-                {/if}
+    <Table shadow hoverable={true}>
+      <TableHead>
+        {#if tableEditMode}
+          <TableHeadCell class="!p-4">
+            <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} onchange={() => {jobs_ordered_selected.forEach((_,job_id) => jobs_ordered_selected.set(job_id, headerCheckboxSelected)); updateHeaderCheckbox();}}/>
+          </TableHeadCell>
+        {/if}
+        <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" onclick={() => sortClickHandler("creation_time")}>
+          <div class="flex">
+            {#if sort_key === "creation_time"}
+              {#if descending}
+                <CaretDownSolid class="inline mr-2"/>
               {:else}
-                <CaretSortSolid class="inline mr-2"/>
+                <CaretUpSolid class="inline mr-2"/>
               {/if}
-              creation time
-            </div>
-          </TableHeadCell>
-          <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" onclick={() => sortClickHandler("filename")}>
-            <div class="flex">
-              {#if sort_key === "filename"}
-                {#if descending}
-                  <CaretDownSolid class="inline mr-2"/>
-                {:else}
-                  <CaretUpSolid class="inline mr-2"/>
-                {/if}
+            {:else}
+              <CaretSortSolid class="inline mr-2"/>
+            {/if}
+            creation time
+          </div>
+        </TableHeadCell>
+        <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" onclick={() => sortClickHandler("filename")}>
+          <div class="flex">
+            {#if sort_key === "filename"}
+              {#if descending}
+                <CaretDownSolid class="inline mr-2"/>
               {:else}
-                <CaretSortSolid class="inline mr-2"/>
+                <CaretUpSolid class="inline mr-2"/>
               {/if}
-              filename
-            </div>
-          </TableHeadCell>
-          <TableHeadCell>progress</TableHeadCell>
-          <TableHeadCell class="text-center" padding="py-1 pr-4">
-            <ButtonGroup class="normal-case">
-              {#if tableEditMode}
-                <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
-                  <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
-                </Button>
-                <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => openDeleteModal(selectedItems)} disabled={selectedDeleteButtonDisabled}>
-                  <TrashBinSolid class="inline mr-1" color="red"/> {selectedItems.length}
-                </Button>
-                <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => tableEditMode = false}>
-                  <CloseOutline/>
-                </Button>
-              {:else if jobs.length > 0}
-                <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => {tableEditMode = true; itemsSelected = {}; updateHeaderCheckbox();}}>
-                  <EditSolid/>
-                </Button>
-              {/if}
-            </ButtonGroup>
-          </TableHeadCell>
-        </TableHead>
-        <TableBody>
-          {#if job_count === 0}
-            <TableBodyRow>
-              <TableBodyCell colspan={tableEditMode ? 5 : 4}>You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
-            </TableBodyRow>
-          {:else if jobs.length === 0}
-            <TableBodyRow>
-              <TableBodyCell colspan={tableEditMode ? 5 : 4}>You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide finished jobs</P> or <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide downloaded jobs</P>, or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
-            </TableBodyRow>
-          {/if}
-          {#each jobs as job, i}
-            <TableBodyRow onclick={() => openRow = openRow === i ? null : i}>
+            {:else}
+              <CaretSortSolid class="inline mr-2"/>
+            {/if}
+            filename
+          </div>
+        </TableHeadCell>
+        <TableHeadCell>progress</TableHeadCell>
+        <TableHeadCell class="text-center" padding="py-1 pr-4">
+          <ButtonGroup class="normal-case">
+            {#if tableEditMode}
+              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
+                <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
+              </Button>
+              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => openDeleteModal(selectedItems)} disabled={selectedDeleteButtonDisabled}>
+                <TrashBinSolid class="inline mr-1" color="red"/> {selectedItems.length}
+              </Button>
+              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => tableEditMode = false}>
+                <CloseOutline/>
+              </Button>
+            {:else if jobs_ordered_selected.size > 0}
+              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => {tableEditMode = true; deselect_all_jobs(); updateHeaderCheckbox();}}>
+                <EditSolid/>
+              </Button>
+            {/if}
+          </ButtonGroup>
+        </TableHeadCell>
+      </TableHead>
+      <TableBody>
+        {#each jobs_ordered_selected.entries() as [job_id,selected] (job_id)}
+          {@const job = jobs_info.get(job_id)}
+          {#if job}
+            <TableBodyRow onclick={() => openRow = openRow === job.id ? null : job.id}>
               {#if tableEditMode}
                 <TableBodyCell class="!p-4">
-                  <Checkbox id="select_job_{job.id}" class="hover:cursor-pointer" bind:checked={itemsSelected[job.id]} onchange={() => updateHeaderCheckbox(job)} onclick={(e) => e.stopPropagation()}/>
+                  <Checkbox id="select_job_{job}" class="hover:cursor-pointer" bind:checked={() => selected, (c: boolean) => jobs_ordered_selected.set(job.id, c)} onchange={() => updateHeaderCheckbox(job)} onclick={(e) => e.stopPropagation()}/>
                 </TableBodyCell>
               {/if}
               <TableBodyCell>
@@ -384,18 +468,14 @@ function timeAgo(date: Date): string {
                     </Button>
                   {/if}
                   {#if (["success", "downloaded"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e) => {e.stopPropagation(); downloadTranscript(job);}} disabled={jobDownloading[job.id]}>
-                      {#if jobDownloading[job.id]}
-                        <Spinner size="5"/>
-                      {:else}
-                        <DownloadSolid/>
-                      {/if}
+                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e) => {e.stopPropagation(); downloadTranscript(job);}}>
+                      <DownloadSolid/>
                     </Button>
                   {/if}
                 </ButtonGroup>
               </TableBodyCell>
             </TableBodyRow>
-            {#if openRow === i}
+            {#if openRow === job.id}
               <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
                 <TableBodyCell colspan={tableEditMode ? 5 : 4}>
                   <div class="grid grid-cols-2 gap-x-8 gap-y-2">
@@ -448,15 +528,33 @@ function timeAgo(date: Date): string {
                 </TableBodyCell>
               </TableBodyRow>
             {/if}
-          {/each}
-        </TableBody>
-      </Table>
-    {/if}
+          {:else}
+            <TableBodyRow>
+              <TableBodyCell colspan={tableEditMode ? 5 : 4}>
+                <div class="flex items-center justify-center">
+                  <Spinner/>
+                </div>
+              </TableBodyCell>
+            </TableBodyRow>
+        {/if}
+        {:else}
+          {#if job_count_total === 0}
+            <TableBodyRow>
+              <TableBodyCell colspan={tableEditMode ? 5 : 4}>You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+            </TableBodyRow>
+          {:else}
+            <TableBodyRow>
+              <TableBodyCell colspan={tableEditMode ? 5 : 4}>You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide finished jobs</P> or <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide downloaded jobs</P>, or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+            </TableBodyRow>
+          {/if}
+        {/each}
+      </TableBody>
+    </Table>
   </div>
 
   <div class="flex flex-col items-center justify-center gap-2">
     <div class="text-sm text-gray-700 dark:text-gray-400">
-      Showing <span class="font-semibold text-gray-900 dark:text-white">{(currentPage-1)*jobs_per_page+(jobs.length === 0 ? 0 : 1)}</span>
+      Showing <span class="font-semibold text-gray-900 dark:text-white">{(currentPage-1)*jobs_per_page+(jobs_ordered_selected.size === 0 ? 0 : 1)}</span>
       to
       <span class="font-semibold text-gray-900 dark:text-white">{Math.min(currentPage*jobs_per_page, job_count)}</span>
       of
@@ -476,7 +574,7 @@ function timeAgo(date: Date): string {
   </div>
 </CenterPage>
 
-<ConfirmModal bind:open={abortModalOpen} action={() => abortJobs(abortModalJobs)}>
+<ConfirmModal bind:open={abortModalOpen} action={() => abortJobs(abortModalJobs)} post_action={() => postAbortJobs(abortModalJobs)}>
   {#if abortModalJobs.length === 1}
     Job {abortModalJobs[0].toString()} will be aborted and its current transcription progress will be lost.
   {:else}
@@ -484,7 +582,7 @@ function timeAgo(date: Date): string {
   {/if}
 </ConfirmModal>
 
-<ConfirmModal bind:open={deleteModalOpen} action={() => deleteJobs(deleteModalJobs)}>
+<ConfirmModal bind:open={deleteModalOpen} action={() => deleteJobs(deleteModalJobs)} post_action={postDeletejobs}>
   {#if deleteModalJobs.length === 1}
     Job {deleteModalJobs[0].toString()} including its audio file and transcription file will be deleted.
   {:else}

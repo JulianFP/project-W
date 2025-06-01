@@ -11,16 +11,23 @@ let waitingForPromise = $state(false);
 interface Props {
 	open?: boolean;
 	action: () => Promise<void>;
+	post_action: () => Promise<void>;
 	children?: import("svelte").Snippet;
 }
 
-let { open = $bindable(false), action, children }: Props = $props();
+let {
+	open = $bindable(false),
+	action,
+	post_action = async () => {},
+	children,
+}: Props = $props();
 
 async function submitAction(): Promise<void> {
 	waitingForPromise = true;
 	await action();
 	open = false;
 	waitingForPromise = false;
+	await post_action();
 }
 </script>
 

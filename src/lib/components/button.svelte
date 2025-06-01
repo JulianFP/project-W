@@ -3,10 +3,20 @@ import { Button } from "flowbite-svelte";
 import type { ButtonProps } from "flowbite-svelte";
 
 const props: ButtonProps = $props();
-const { class: string, ...rest } = props;
-const classes =
-	props.color === "alternative"
-		? `${props.class} border-gray-400 bg-slate-100 hover:bg-slate-50 cursor-pointer`
-		: `${props.class} cursor-pointer`;
+const { class: string, disabled, ...rest } = props;
+let classes = $derived.by(() => {
+	let returnVal: string;
+	if (props.color === "alternative") {
+		returnVal = `${props.class} dark:text-white border-gray-400 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 hover:bg-gray-300 hover:dark:bg-gray-500 hover:dark:border-gray-500`;
+	} else {
+		returnVal = `${props.class}`;
+	}
+	if (disabled) {
+		returnVal += " cursor-not-allowed";
+	} else {
+		returnVal += " cursor-pointer";
+	}
+	return returnVal;
+});
 </script>
-<Button class={classes} {...rest}/>
+<Button class={classes} disabled={disabled} {...rest}/>

@@ -28,5 +28,8 @@
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": ["esbuild"]
+	},
+	"dependencies": {
+		"eventsource": "^4.0.0"
 	}
 }
