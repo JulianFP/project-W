@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from .base import (
     InProcessJobBase,
     JobBase,
+    JobSettingsBase,
     LocalAccountSettingsBase,
     ProviderSettingsBase,
     UserInDb,
@@ -61,7 +62,7 @@ class HeartbeatResponse(BaseModel):
 
 class RunnerJobInfoResponse(BaseModel):
     id: int
-    settings: JobSettings
+    settings: JobSettingsBase
 
 
 class JobStatus(str, Enum):

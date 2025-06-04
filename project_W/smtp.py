@@ -93,3 +93,28 @@ class SmtpClient:
         )
         msg_subject = "Project-W password reset request"
         await self.__send_email(receiver, "reset", msg_subject, msg_body)
+
+    async def send_job_success_email(self, receiver: EmailValidated, job_id: int, client_url: str):
+        url = f"{client_url}/"
+        msg_body = (
+            f"Your Project-W job with id {job_id} has finished successfully!\n"
+            f"You can download the transcript under the following url "
+            f"by clicking on the download button next to the listed job:\n"
+            f"{url}"
+        )
+        msg_subject = f"Project-W: Job {job_id} finished successfully!"
+        await self.__send_email(receiver, "notif-success", msg_subject, msg_body)
+
+    async def send_job_failed_email(
+        self, receiver: EmailValidated, job_id: int, error_msg: str, client_url: str
+    ):
+        url = f"{client_url}/"
+        msg_body = (
+            f"Your Project-W job with id {job_id} was aborted with the following error message:\n\n"
+            f"{error_msg}\n\n"
+            f"You should try to re-submit your job after ensuring that your job settings are valid."
+            f"You can do so under the following url by clicking on the 'New Job' button.\n"
+            f"{url}"
+        )
+        msg_subject = f"Project-W: Job {job_id} failed!"
+        await self.__send_email(receiver, "notif-failed", msg_subject, msg_body)

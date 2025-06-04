@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 import project_W.dependencies as dp
@@ -165,6 +165,7 @@ async def retrieve_job_audio(
 async def submit_job_result(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
     submitted_data: RunnerSubmitResultRequest,
+    background_tasks: BackgroundTasks,
 ) -> str:
     """
     Handles the submission of a job result by a runner. If the runner is not currently
@@ -178,12 +179,31 @@ async def submit_job_result(
             detail="This runner is currently not processing a job!",
         )
 
+    if not (settings := await dp.db.get_job_settings_by_job_id(online_runner.in_process_job_id)):
+        raise Exception("Trying to submit job with an non-existing id!")
+    if not (in_process_job := await dp.ch.get_in_process_job(online_runner.in_process_job_id)):
+        raise Exception("Trying to submit job that doesn't exist in Redis!")
+    if not (user := await dp.db.get_user_by_id(in_process_job.user_id)):
+        raise Exception("Trying to submit a job that belongs to a non-existing user!")
+
     if submitted_data.error_msg is not None:
         await dp.db.finish_failed_job(
             online_runner.in_process_job_id, submitted_data.error_msg, online_runner
         )
+        if settings.email_notification:
+            background_tasks.add_task(
+                dp.smtp.send_job_failed_email,
+                user.email,
+                in_process_job.id,
+                submitted_data.error_msg,
+                dp.config.client_url,
+            )
     elif submitted_data.transcript is not None:
         await dp.db.finish_successful_job(online_runner, submitted_data.transcript)
+        if settings.email_notification:
+            background_tasks.add_task(
+                dp.smtp.send_job_success_email, user.email, in_process_job.id, dp.config.client_url
+            )
     else:
         raise Exception(
             "Pydantic model validation failed, job submission has neither error_msg nor a transcript attached to it"

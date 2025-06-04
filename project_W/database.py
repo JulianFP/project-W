@@ -17,7 +17,7 @@ from pydantic import SecretStr
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .models.base import EmailValidated, JobBase, PasswordValidated
+from .models.base import EmailValidated, JobBase, PasswordValidated, UserInDb
 from .models.internal import (
     JobSettingsInDb,
     JobSortKey,
@@ -174,6 +174,14 @@ class DatabaseAdapter(ABC):
     async def delete_jobs_of_user(self, user_id: int, job_ids: list[int]):
         """
         Delete all provided jobs of the provided user
+        """
+        pass
+
+    @abstractmethod
+    async def get_user_by_id(self, user_id: int) -> UserInDb | None:
+        """
+        Return the user with the specified id, regardless of whether this user is a local, oidc or ldap user.
+        Return None if no such user exists
         """
         pass
 
@@ -1203,6 +1211,49 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                     (job_setting_ids,),
                 )
+
+    async def get_user_by_id(self, user_id: int) -> UserInDb | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(UserInDb)) as cur:
+                # check local_accounts
+                await cur.execute(
+                    f"""
+                    SELECT *
+                    FROM {self.schema}.users USERS, {self.schema}.local_accounts LOCAL
+                    WHERE USERS.id = LOCAL.id
+                    AND USERS.id = %s
+                    """,
+                    (user_id,),
+                )
+                if user := await cur.fetchone():
+                    return user
+                # check oidc_accounts
+                await cur.execute(
+                    f"""
+                    SELECT *
+                    FROM {self.schema}.users USERS, {self.schema}.oidc_accounts OIDC
+                    WHERE USERS.id = OIDC.id
+                    AND USERS.id = %s
+                    """,
+                    (user_id,),
+                )
+                if user := await cur.fetchone():
+                    return user
+                # check ldap_accounts
+                await cur.execute(
+                    f"""
+                    SELECT *
+                    FROM {self.schema}.users USERS, {self.schema}.ldap_accounts LDAP
+                    WHERE USERS.id = LDAP.id
+                    AND USERS.id = %s
+                    """,
+                    (user_id,),
+                )
+                if user := await cur.fetchone():
+                    return user
+
+                # not found
+                return None
 
     async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
         async with self.apool.connection() as conn:
