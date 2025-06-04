@@ -1801,8 +1801,8 @@ class PostgresAdapter(DatabaseAdapter):
             if runner.assigned_job_id != job_id:
                 raise Exception("The provided online runner doesn't fit to the provided job_id!")
             runner_id = runner.id
-            runner_name = runner.id
-            runner_version = runner.id
+            runner_name = runner.name
+            runner_version = runner.version
             runner_git_hash = runner.git_hash
             runner_source_code_url = runner.source_code_url
         else:

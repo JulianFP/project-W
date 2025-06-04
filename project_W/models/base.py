@@ -140,6 +140,9 @@ class JobModelEnum(str, Enum):
     TURBO = "turbo"
     LARGE = "large"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 class JobLangEnum(str, Enum):
     # only support ISO 639 language codes since the full names have duplicates (e.g. Catalan and Valencian or Spanish and Castilian or Dutch and Flemish) and are longer
@@ -244,6 +247,9 @@ class JobLangEnum(str, Enum):
     CANTONESE = "yue"
     MANDARIN = "zh"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 class DiarizationSettings(BaseModel):
     min_speakers: int | None = Field(
@@ -286,6 +292,9 @@ class InterpolateMethodEnum(str, Enum):
     LINEAR = "linear"
     IGNORE = "ignore"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 class AlignmentSettings(BaseModel):
     processing: AlignmentProcessingSettings = AlignmentProcessingSettings()
@@ -296,6 +305,9 @@ class AlignmentSettings(BaseModel):
 class TaskEnum(str, Enum):
     TRANSCRIBE = "transcribe"
     TRANSLATE = "translate"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class VadSettings(BaseModel):
