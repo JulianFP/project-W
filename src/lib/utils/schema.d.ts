@@ -225,15 +225,15 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	"/api/jobs/top_k": {
+	"/api/jobs/get": {
 		parameters: {
 			query?: never;
 			header?: never;
 			path?: never;
 			cookie?: never;
 		};
-		/** Top K Jobs */
-		get: operations["top_k_jobs_api_jobs_top_k_get"];
+		/** Get */
+		get: operations["get_api_jobs_get_get"];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -302,6 +302,23 @@ export interface paths {
 		};
 		/** Download Transcript */
 		get: operations["download_transcript_api_jobs_download_transcript_get"];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	"/api/jobs/events": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** Events */
+		get: operations["events_api_jobs_events_get"];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -926,6 +943,37 @@ export interface components {
 			downloaded: boolean | null;
 			/** Error Msg */
 			error_msg: string | null;
+			/** @default {
+			 *       "task": "transcribe",
+			 *       "model": "large",
+			 *       "alignment": {
+			 *         "interpolate_method": "nearest",
+			 *         "processing": {
+			 *           "highlight_words": false
+			 *         },
+			 *         "return_char_alignments": false
+			 *       },
+			 *       "vad_settings": {
+			 *         "chunk_size": 30,
+			 *         "vad_offset": 0.363,
+			 *         "vad_onset": 0.5
+			 *       },
+			 *       "asr_settings": {
+			 *         "beam_size": 5,
+			 *         "compression_ratio_threshold": 2.4,
+			 *         "length_penalty": 1,
+			 *         "log_prob_threshold": -1,
+			 *         "no_speech_threshold": 0.6,
+			 *         "patience": 1,
+			 *         "suppress_numerals": false,
+			 *         "suppress_tokens": [
+			 *           -1
+			 *         ],
+			 *         "temperature": 0,
+			 *         "temperature_increment_on_fallback": 0.2
+			 *       },
+			 *       "email_notification": false
+			 *     } */
 			settings: components["schemas"]["JobSettings-Output"];
 			step: components["schemas"]["JobStatus"];
 		};
@@ -1086,9 +1134,57 @@ export interface components {
 			 *       "suppress_numerals": false
 			 *     } */
 			asr_settings: components["schemas"]["AsrSettings"];
+			/**
+			 * Email Notification
+			 * @default false
+			 */
+			email_notification: boolean;
 		};
 		/** JobSettings */
 		"JobSettings-Output": {
+			/** @default transcribe */
+			task: components["schemas"]["TaskEnum"];
+			/** @default large */
+			model: components["schemas"]["JobModelEnum"];
+			language?: components["schemas"]["JobLangEnum"] | null;
+			/** @default {
+			 *       "processing": {
+			 *         "highlight_words": false
+			 *       },
+			 *       "return_char_alignments": false,
+			 *       "interpolate_method": "nearest"
+			 *     } */
+			alignment: components["schemas"]["AlignmentSettings"] | null;
+			diarization?: components["schemas"]["DiarizationSettings"] | null;
+			/** @default {
+			 *       "vad_onset": 0.5,
+			 *       "vad_offset": 0.363,
+			 *       "chunk_size": 30
+			 *     } */
+			vad_settings: components["schemas"]["VadSettings"];
+			/** @default {
+			 *       "beam_size": 5,
+			 *       "patience": 1,
+			 *       "length_penalty": 1,
+			 *       "temperature": 0,
+			 *       "temperature_increment_on_fallback": 0.2,
+			 *       "compression_ratio_threshold": 2.4,
+			 *       "log_prob_threshold": -1,
+			 *       "no_speech_threshold": 0.6,
+			 *       "suppress_tokens": [
+			 *         -1
+			 *       ],
+			 *       "suppress_numerals": false
+			 *     } */
+			asr_settings: components["schemas"]["AsrSettings"];
+			/**
+			 * Email Notification
+			 * @default false
+			 */
+			email_notification: boolean;
+		};
+		/** JobSettingsBase */
+		JobSettingsBase: {
 			/** @default transcribe */
 			task: components["schemas"]["TaskEnum"];
 			/** @default large */
@@ -1223,7 +1319,7 @@ export interface components {
 		RunnerJobInfoResponse: {
 			/** Id */
 			id: number;
-			settings: components["schemas"]["JobSettings-Output"];
+			settings: components["schemas"]["JobSettingsBase"];
 		};
 		/** RunnerRegisterRequest */
 		RunnerRegisterRequest: {
@@ -1354,7 +1450,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Validation error of JWT token */
@@ -1403,7 +1499,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Validation error of JWT token */
@@ -1445,7 +1541,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Creation of api tokens is disabled for your identity provider */
@@ -1623,7 +1719,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Validation error of JWT token */
@@ -1703,7 +1799,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Validation error of JWT token */
@@ -1939,10 +2035,11 @@ export interface operations {
 			};
 		};
 	};
-	top_k_jobs_api_jobs_top_k_get: {
+	get_api_jobs_get_get: {
 		parameters: {
 			query: {
-				k: number;
+				start_index: number;
+				end_index: number;
 				sort_key: components["schemas"]["JobSortKey"];
 				descending: boolean;
 				exclude_finished: boolean;
@@ -2064,7 +2161,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description At least one of jobs is not running */
@@ -2126,7 +2223,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description At least one of jobs is running */
@@ -2234,6 +2331,46 @@ export interface operations {
 			};
 		};
 	};
+	events_api_jobs_events_get: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": unknown;
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+		};
+	};
 	register_api_runners_register_post: {
 		parameters: {
 			query?: never;
@@ -2311,7 +2448,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Validation error of JWT token */
@@ -2453,7 +2590,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Runner not processing a job */
@@ -2700,7 +2837,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description idp_name is invalid */
@@ -2751,7 +2888,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Authentication was unsuccessful */
@@ -2793,7 +2930,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Email or password have invalid syntax */
@@ -2842,7 +2979,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Activation token doesn't match any user, or user has already been activated */
@@ -2889,7 +3026,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description User is not a local Project-W user or has been provisioned through the config file */
@@ -2940,7 +3077,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Email invalid */
@@ -2982,7 +3119,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description Password reset token doesn't match any user */
@@ -3033,7 +3170,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description User is not a local Project-W user or has been provisioned through the config file */
@@ -3095,7 +3232,7 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": unknown;
+					"application/json": string;
 				};
 			};
 			/** @description User is not a local Project-W user or has been provisioned through the config file */
@@ -3139,3 +3276,152 @@ export interface operations {
 		};
 	};
 }
+type ReadonlyArray<T> = [Exclude<T, undefined>] extends [unknown[]]
+	? Readonly<Exclude<T, undefined>>
+	: Readonly<Exclude<T, undefined>[]>;
+export const interpolateMethodEnumValues: ReadonlyArray<
+	components["schemas"]["InterpolateMethodEnum"]
+> = ["nearest", "linear", "ignore"];
+export const jobLangEnumValues: ReadonlyArray<
+	components["schemas"]["JobLangEnum"]
+> = [
+	"af",
+	"am",
+	"ar",
+	"as",
+	"az",
+	"ba",
+	"be",
+	"bg",
+	"bn",
+	"bo",
+	"br",
+	"bs",
+	"ca",
+	"cs",
+	"cy",
+	"da",
+	"de",
+	"el",
+	"en",
+	"es",
+	"et",
+	"eu",
+	"fa",
+	"fi",
+	"fo",
+	"fr",
+	"gl",
+	"gu",
+	"ha",
+	"haw",
+	"he",
+	"hi",
+	"hr",
+	"ht",
+	"hu",
+	"hy",
+	"id",
+	"is",
+	"it",
+	"ja",
+	"jw",
+	"ka",
+	"kk",
+	"km",
+	"kn",
+	"ko",
+	"la",
+	"lb",
+	"ln",
+	"lo",
+	"lt",
+	"lv",
+	"mg",
+	"mi",
+	"mk",
+	"ml",
+	"mn",
+	"mr",
+	"ms",
+	"mt",
+	"my",
+	"ne",
+	"nl",
+	"nn",
+	"no",
+	"oc",
+	"pa",
+	"pl",
+	"ps",
+	"pt",
+	"ro",
+	"ru",
+	"sa",
+	"sd",
+	"si",
+	"sk",
+	"sl",
+	"sn",
+	"so",
+	"sq",
+	"sr",
+	"su",
+	"sv",
+	"sw",
+	"ta",
+	"te",
+	"tg",
+	"th",
+	"tk",
+	"tl",
+	"tr",
+	"tt",
+	"uk",
+	"ur",
+	"uz",
+	"vi",
+	"yi",
+	"yo",
+	"yue",
+	"zh",
+];
+export const jobModelEnumValues: ReadonlyArray<
+	components["schemas"]["JobModelEnum"]
+> = [
+	"tiny",
+	"tiny.en",
+	"base",
+	"base.en",
+	"small",
+	"small.en",
+	"medium",
+	"medium.en",
+	"turbo",
+	"large",
+];
+export const jobSortKeyValues: ReadonlyArray<
+	components["schemas"]["JobSortKey"]
+> = ["creation_time", "filename"];
+export const jobStatusValues: ReadonlyArray<
+	components["schemas"]["JobStatus"]
+> = [
+	"not_queued",
+	"pending_runner",
+	"runner_assigned",
+	"runner_in_progress",
+	"success",
+	"failed",
+	"downloaded",
+];
+export const localAccountOperationModeEnumValues: ReadonlyArray<
+	components["schemas"]["LocalAccountOperationModeEnum"]
+> = ["disabled", "no-signup_hidden", "no-signup", "enabled"];
+export const taskEnumValues: ReadonlyArray<components["schemas"]["TaskEnum"]> =
+	["transcribe", "translate"];
+export const transcriptTypeEnumValues: ReadonlyArray<
+	components["schemas"]["TranscriptTypeEnum"]
+> = ["as_txt", "as_srt", "as_tsv", "as_vtt", "as_json"];
+export const userTypeEnumValues: ReadonlyArray<
+	components["schemas"]["UserTypeEnum"]
+> = ["local", "ldap", "oidc"];

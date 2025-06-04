@@ -18,6 +18,7 @@ import {
 	Navbar,
 } from "flowbite-svelte";
 import {
+	AdjustmentsHorizontalSolid,
 	GithubSolid,
 	InfoCircleSolid,
 	LockSolid,
@@ -48,6 +49,7 @@ let { children } = $props();
       <Dropdown simple placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
         <DropdownItem href="#/account/info" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
         <DropdownItem href="#/account/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
+        <DropdownItem href="#/account/default_settings" onclick={() => {dropDownOpen = false}}><AdjustmentsHorizontalSolid class="inline mr-2"/>Default settings</DropdownItem>
         <DropdownDivider />
         <DropdownItem class="cursor-pointer" onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
       </Dropdown>

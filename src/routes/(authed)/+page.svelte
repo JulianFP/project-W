@@ -37,6 +37,7 @@ import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import Button from "$lib/components/button.svelte";
 import CenterPage from "$lib/components/centerPage.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";
+import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
 import {
 	BackendCommError,
@@ -244,6 +245,12 @@ function openDeleteModal(jobIds: number[]) {
 	}
 }
 
+function openSubmitModal() {
+	if (!submitModalOpen && !abortModalOpen && !deleteModalOpen) {
+		submitModalOpen = true;
+	}
+}
+
 function updateHeaderCheckbox(job: Job | null = null) {
 	//update headerCheckbox
 	if (job == null || jobs_ordered_selected.get(job.id)) {
@@ -336,7 +343,6 @@ const evtSource = new EventSource(
 	},
 );
 evtSource.addEventListener("job_updated", (event) => {
-	console.log(`Received event: ${event.data}`);
 	const job_id: number = Number.parseInt(event.data);
 	if (jobs_info.has(job_id)) {
 		update_jobs([job_id]);
@@ -589,3 +595,5 @@ evtSource.addEventListener("job_updated", (event) => {
     The jobs {deleteModalJobs.join(", ")} including their audio files and transcription files will be deleted.
   {/if}
 </ConfirmModal>
+
+<SubmitJobsModal bind:open={submitModalOpen} post_action={fetch_jobs}/>

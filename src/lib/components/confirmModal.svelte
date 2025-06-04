@@ -11,7 +11,7 @@ let waitingForPromise = $state(false);
 interface Props {
 	open?: boolean;
 	action: () => Promise<void>;
-	post_action: () => Promise<void>;
+	post_action?: () => Promise<void>;
 	children?: import("svelte").Snippet;
 }
 

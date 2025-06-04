@@ -1,175 +1,39 @@
 <script lang="ts">
-import { Dropzone, Heading, Label, Modal, Select } from "flowbite-svelte";
-import { createEventDispatcher } from "svelte";
+import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+import { Checkbox, Dropzone, Heading, Label, Modal } from "flowbite-svelte";
 
-import { type BackendResponse, postLoggedIn } from "../utils/httpRequests";
-import { alerts } from "../utils/stores";
+import { alerts, auth } from "$lib/utils/global_state.svelte";
+import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
+import JobSettingsForm from "./jobSettingsForm.svelte";
 import WaitingSubmitButton from "./waitingSubmitButton.svelte";
-
-let models: { value: string; name: string }[] = [
-	{ value: "tiny", name: "Tiny" },
-	{ value: "tiny.en", name: "Tiny - English only" },
-	{ value: "base", name: "Base" },
-	{ value: "base.en", name: "Base - English only" },
-	{ value: "small", name: "Small" },
-	{ value: "small.en", name: "Small - English only" },
-	{ value: "medium", name: "Medium" },
-	{ value: "medium.en", name: "Medium - English only" },
-	{ value: "large", name: "Large" },
-];
-let languages: string[] = [
-	"Automatic language detection",
-	"Afrikaans",
-	"Albanian",
-	"Amharic",
-	"Arabic",
-	"Armenian",
-	"Assamese",
-	"Azerbaijani",
-	"Bashkir",
-	"Basque",
-	"Belarusian",
-	"Bengali",
-	"Bosnian",
-	"Breton",
-	"Bulgarian",
-	"Burmese",
-	"Cantonese",
-	"Castilian",
-	"Catalan",
-	"Chinese",
-	"Croatian",
-	"Czech",
-	"Danish",
-	"Dutch",
-	"English",
-	"Estonian",
-	"Faroese",
-	"Finnish",
-	"Flemish",
-	"French",
-	"Galician",
-	"Georgian",
-	"German",
-	"Greek",
-	"Gujarati",
-	"Haitian",
-	"Haitian Creole",
-	"Hausa",
-	"Hawaiian",
-	"Hebrew",
-	"Hindi",
-	"Hungarian",
-	"Icelandic",
-	"Indonesian",
-	"Italian",
-	"Japanese",
-	"Javanese",
-	"Kannada",
-	"Kazakh",
-	"Khmer",
-	"Korean",
-	"Lao",
-	"Latin",
-	"Latvian",
-	"Letzeburgesch",
-	"Lingala",
-	"Lithuanian",
-	"Luxembourgish",
-	"Macedonian",
-	"Malagasy",
-	"Malay",
-	"Malayalam",
-	"Maltese",
-	"Mandarin",
-	"Maori",
-	"Marathi",
-	"Moldavian",
-	"Moldovan",
-	"Mongolian",
-	"Myanmar",
-	"Nepali",
-	"Norwegian",
-	"Nynorsk",
-	"Occitan",
-	"Panjabi",
-	"Pashto",
-	"Persian",
-	"Polish",
-	"Portuguese",
-	"Punjabi",
-	"Pushto",
-	"Romanian",
-	"Russian",
-	"Sanskrit",
-	"Serbian",
-	"Shona",
-	"Sindhi",
-	"Sinhala",
-	"Sinhalese",
-	"Slovak",
-	"Slovenian",
-	"Somali",
-	"Spanish",
-	"Sundanese",
-	"Swahili",
-	"Swedish",
-	"Tagalog",
-	"Tajik",
-	"Tamil",
-	"Tatar",
-	"Telugu",
-	"Thai",
-	"Tibetan",
-	"Turkish",
-	"Turkmen",
-	"Ukrainian",
-	"Urdu",
-	"Uzbek",
-	"Valencian",
-	"Vietnamese",
-	"Welsh",
-	"Yiddish",
-	"Yoruba",
-];
-
-let files: File[] = $state([]);
-let model = $state("medium");
-let language = $state("Automatic language detection");
-
-let waitingForPromise = $state(false);
 
 interface Props {
 	open?: boolean;
+	post_action: () => Promise<void>;
 }
+let { open = $bindable(false), post_action = async () => {} }: Props = $props();
 
-let { open = $bindable(false) }: Props = $props();
+let files: FileList | null = $state(null);
+$inspect(files);
 
-const dispatchEvent = createEventDispatcher();
+let makeNewDefaults: boolean = $state(false);
+let get_job_settings = $state(() => {
+	return {};
+});
 
-function dropHandle(event: DragEvent): void {
-	files = [];
-	event.preventDefault();
-	if (event.dataTransfer?.files != null) {
-		[...event.dataTransfer.files].forEach((file: File, _) => {
-			files.push(file);
-			files = files; //to trigger reactivity
-		});
-	}
-}
+let waitingForPromise = $state(false);
 
 function handleChange(event: Event): void {
-	files = [];
 	const target = event.target as HTMLInputElement;
-	if (target.files && target.files.length > 0) {
-		[...target.files].forEach((file: File, _) => {
-			files.push(file);
-			files = files; //to trigger reactivity
-		});
-	}
+	files = target.files;
 }
 
-function showFileNames(files: File[]): string {
+function dropHandle(event: DragEvent): void {
+	event.preventDefault();
+	files = event.dataTransfer?.files ?? null;
+}
+
+function showFileNames(files: FileList): string {
 	if (files.length === 1) return files[0].name;
 	let concat = `${files.length.toString()} files: `;
 	for (let file of files) {
@@ -184,102 +48,96 @@ function showFileNames(files: File[]): string {
 	return concat;
 }
 
-function isRejected(
-	input: PromiseFulfilledResult<BackendResponse> | PromiseRejectedResult,
-): input is PromiseRejectedResult {
-	return input.status === "rejected";
+async function postJob(file: File, job_settings_id: number) {
+	let form_data = new FormData();
+	form_data.set("audio_file", file);
+	return await fetch(
+		`${PUBLIC_BACKEND_BASE_URL}/api/jobs/submit_job?job_settings_id=${job_settings_id.toString()}`,
+		{
+			method: "POST",
+			headers: auth.getAuthHeader(),
+			body: form_data,
+		},
+	);
 }
 
 async function submitAction(event: Event): Promise<void> {
-	waitingForPromise = true;
 	event.preventDefault();
 
-	//send all requests at ones and wait for promises in parallel with "allSettled" method
-	//show results to user ones all promises have settled
-	let promises: Promise<BackendResponse>[] = [];
-	for (let file of files) {
-		if (language !== "Automatic language detection") {
-			promises.push(
-				postLoggedIn("jobs/submit", {
-					file: file,
-					model: model,
-					language: language,
-				}),
-			);
-		} else {
-			//null for automatic language detection
-			promises.push(postLoggedIn("jobs/submit", { file: file, model: model }));
-		}
-	}
-	let responses: PromiseSettledResult<BackendResponse>[] =
-		await Promise.allSettled(promises);
+	if (files !== null && files.length > 0) {
+		waitingForPromise = true;
 
-	const successfulJobIds: number[] = [];
-	for (let i = 0; i < files.length; i++) {
-		const response: PromiseSettledResult<BackendResponse> = responses[i];
-		let errorMsg: string;
-		if (isRejected(response) || response.value.msg == null) {
-			errorMsg = "Server response not valid";
-		} else if (!response.value.ok || response.value.jobId == null) {
-			errorMsg = response.value.msg;
-		} else {
-			alerts.add(
-				`You successfully submitted job with ID ${response.value.jobId.toString()} and filename '${
-					files[i].name
-				}'`,
-				"green",
+		//send job settings
+		try {
+			const settings_id = await postLoggedIn<number>(
+				"jobs/submit_settings",
+				get_job_settings(),
+				false,
+				{
+					is_new_default: makeNewDefaults.toString(),
+				},
 			);
-			successfulJobIds.push(response.value.jobId);
-			continue;
-		}
-		alerts.add(
-			`Error occurred while submitting job with filename '${files[i].name}': ${errorMsg}`,
-			"red",
-		);
-	}
 
-	open = false;
+			//send all requests at ones and wait for promises in parallel with "allSettled" method
+			//show results to user ones all promises have settled
+			let promises: Promise<Response>[] = [];
+			for (let file of files) {
+				promises.push(postJob(file, settings_id));
+			}
+			let responses: PromiseSettledResult<Response>[] =
+				await Promise.allSettled(promises);
+
+			for (let i = 0; i < files.length; i++) {
+				const response: PromiseSettledResult<Response> = responses[i];
+				if (response.status === "fulfilled" && response.value.ok) {
+					alerts.push({
+						msg: `You successfully submitted job with filename '${
+							files[i].name
+						}'`,
+						color: "green",
+					});
+				} else {
+					alerts.push({
+						msg: `Error occurred while submitting job with filename '${files[i].name}'`,
+						color: "red",
+					});
+				}
+			}
+		} catch (err: unknown) {
+			let errorMsg = "Error occured while trying to submit job settings: ";
+			if (err instanceof BackendCommError) {
+				errorMsg += err.message;
+			} else {
+				errorMsg += "Unknown error";
+			}
+			alerts.push({ msg: errorMsg, color: "red" });
+		}
+
+		open = false;
+	}
 	waitingForPromise = false;
 
-	if (successfulJobIds.length > 0)
-		dispatchEvent("afterSubmit", { jobIds: successfulJobIds });
+	await post_action();
 }
 </script>
 
-<Modal bind:open={open} autoclose={false} class="w-fit">
-  <form class="flex flex-col space-y-6" onsubmit={submitAction}>
-    <Heading tag="h3">{files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"}</Heading>
-
-    <div>
-      <Label class="mb-2" for="language">Select a language (note that some models only understand English)</Label>
-      <Select id="language" bind:value={language}>
-        {#each languages as value}
-          <option value={value} disabled={model.indexOf("en") != -1 && value != "English"}>{value}</option>
-        {/each}
-      </Select>
-    </div>
-
-    <div>
-      <Label class="mb-2" for="models">Select a model (larger models will return a better result but will take longer)</Label>
-      <Select id="models" bind:value={model}>
-        {#each models as {value, name}}
-          <option value={value} disabled={value.indexOf("en") != -1 && language != "English"}>{name}</option>
-        {/each}
-      </Select>
-    </div>
-
+<Modal bind:open={open} autoclose={false}>
+  <Heading tag="h3">{files !== null && files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"}</Heading>
+  <JobSettingsForm onsubmit={submitAction} bind:get_job_settings={get_job_settings}>
+    <Checkbox bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>
     <div>
       <Label class="mb-2" for="upload_files">Upload one or more audio files. A transcription job will be created for each of the uploaded files</Label>
       <Dropzone
         multiple
         id="upload_files"
-        on:drop={dropHandle}
-        on:dragover={(event) => {
+        bind:files={files}
+        ondrop={dropHandle}
+        ondragover={(event) => {
           event.preventDefault();
         }}
-        on:change={handleChange}>
+        onchange={handleChange}>
         <svg aria-hidden="true" class="mb-3 w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-        {#if files.length === 0}
+        {#if files === null || files.length === 0}
           <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Click to upload</span> or drag and drop</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">Audio files (mp3, m4a, aac, ...)</p>
         {:else}
@@ -288,5 +146,5 @@ async function submitAction(event: Event): Promise<void> {
       </Dropzone>
     </div>
     <WaitingSubmitButton class="w-full1" waiting={waitingForPromise}>Submit</WaitingSubmitButton>
-  </form>
+  </JobSettingsForm>
 </Modal>
