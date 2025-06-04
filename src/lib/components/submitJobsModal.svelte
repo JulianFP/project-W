@@ -1,6 +1,6 @@
 <script lang="ts">
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-import { Checkbox, Dropzone, Heading, Label, Modal } from "flowbite-svelte";
+import { Checkbox, Dropzone, Heading, Label, Modal, P } from "flowbite-svelte";
 
 import { alerts, auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
@@ -124,7 +124,7 @@ async function submitAction(event: Event): Promise<void> {
 <Modal bind:open={open} autoclose={false}>
   <Heading tag="h3">{files !== null && files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"}</Heading>
   <JobSettingsForm onsubmit={submitAction} bind:get_job_settings={get_job_settings}>
-    <Checkbox bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>
+    <Checkbox bind:checked={makeNewDefaults}><P>Make these job settings the new account defaults</P></Checkbox>
     <div>
       <Label class="mb-2" for="upload_files">Upload one or more audio files. A transcription job will be created for each of the uploaded files</Label>
       <Dropzone

@@ -313,11 +313,11 @@ function onTranslationChange() {
     <div class="flex gap-4">
       <div class="w-full">
         <Label class="mb-2" for="diarization_min_speakers">Min speakers</Label>
-        <Input type="number" min="0" id="diarization_min_speakers" bind:value={diarization_min_speakers}/>
+        <Input type="number" min="0" step="1" id="diarization_min_speakers" bind:value={diarization_min_speakers}/>
       </div>
       <div class="w-full">
         <Label class="mb-2" for="diarization_max_speakers">Max speakers</Label>
-        <Input type="number" min="0" id="diarization_max_speakers" bind:value={diarization_max_speakers}/>
+        <Input type="number" min="0" step="1" id="diarization_max_speakers" bind:value={diarization_max_speakers}/>
       </div>
     </div>
   {/if}
@@ -348,11 +348,11 @@ function onTranslationChange() {
           <div class="flex gap-4">
             <div class="w-full">
               <Label class="mb-2" for="aligment_processing_max_line_width">Max line width</Label>
-              <Input type="number" min="1" id="alignment_processing_max_line_width" bind:value={alignment_processing_max_line_width} placeholder="Leave empty for no limit"/>
+              <Input type="number" min="1" step="1" id="alignment_processing_max_line_width" bind:value={alignment_processing_max_line_width} placeholder="Leave empty for no limit"/>
             </div>
             <div class="w-full">
               <Label class="mb-2" for="alignment_processing_max_line_count">Max line count</Label>
-              <Input type="number" min="1" id="alignment_processing_max_line_count" bind:value={alignment_processing_max_line_count} placeholder="Leave empty for no limit"/>
+              <Input type="number" min="1" step="1" id="alignment_processing_max_line_count" bind:value={alignment_processing_max_line_count} placeholder="Leave empty for no limit"/>
             </div>
           </div>
           <div>
@@ -390,11 +390,11 @@ function onTranslationChange() {
         </div>
         <div>
           <Label class="mb-2" for="asr_beam_size">Beam size</Label>
-          <Input type="number" min="1" id="asr_beam_size" bind:value={asr_beam_size}/>
+          <Input type="number" min="1" step="1" id="asr_beam_size" bind:value={asr_beam_size}/>
         </div>
         <div>
           <Label class="mb-2" for="asr_patience">Patience</Label>
-          <Input type="number" min="0.0" id="asr_patience" bind:value={asr_patience}/>
+          <Input type="number" min="0.0" step="0.001" id="asr_patience" bind:value={asr_patience}/>
         </div>
         <div>
           <Label class="mb-2" for="asr_length_penalty">Length penalty</Label>
@@ -403,16 +403,16 @@ function onTranslationChange() {
         <div class="flex gap-4">
           <div class="w-full">
             <Label class="mb-2" for="asr_temperature">Temperature</Label>
-            <Input type="number" min="0.0" id="asr_temperature" bind:value={asr_temperature}/>
+            <Input type="number" min="0.0" step="0.001" id="asr_temperature" bind:value={asr_temperature}/>
           </div>
           <div class="w-full">
             <Label class="mb-2" for="asr_temperature_increment_on_fallback">Temperature increment on fallback</Label>
-            <Input type="number" min="0.0" id="asr_temperature_increment_on_fallback" bind:value={asr_temperature_increment_on_fallback}/>
+            <Input type="number" min="0.0" step="0.001" id="asr_temperature_increment_on_fallback" bind:value={asr_temperature_increment_on_fallback}/>
           </div>
         </div>
         <div>
           <Label class="mb-2" for="asr_compression_ratio_threshold">Compression ratio threshold</Label>
-          <Input type="number" min="0.0" id="asr_compression_ratio_threshold" bind:value={asr_compression_ratio_threshold}/>
+          <Input type="number" min="0.0" step="0.001" id="asr_compression_ratio_threshold" bind:value={asr_compression_ratio_threshold}/>
         </div>
         <div>
           <Label class="mb-2" for="asr_log_prob_threshold">Log prob threshold</Label>
@@ -420,7 +420,7 @@ function onTranslationChange() {
         </div>
         <div>
           <Label class="mb-2" for="asr_no_speech_threshold">No speech threshold</Label>
-          <Input type="number" id="asr_no_speech_threshold" bind:value={asr_no_speech_threshold}/>
+          <Input type="number" step="0.001" id="asr_no_speech_threshold" bind:value={asr_no_speech_threshold}/>
         </div>
         <div>
           <Label class="mb-2" for="asr_suppressed_tokens">Suppressed tokens</Label>

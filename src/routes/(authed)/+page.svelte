@@ -37,6 +37,7 @@ import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import Button from "$lib/components/button.svelte";
 import CenterPage from "$lib/components/centerPage.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";
+import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
 import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
 import {
@@ -73,6 +74,9 @@ let openRow: number | null = $state(null);
 
 //modal stuff
 let submitModalOpen = $state(false);
+let downloadModalOpen = $state(false);
+let downloadJobId: number = $state(-1);
+let downloadFileName: string = $state("");
 let abortModalOpen = $state(false);
 let abortModalJobs: number[] = $state([]);
 let deleteModalOpen = $state(false);
@@ -226,7 +230,8 @@ function openAbortModal(jobIds: number[]) {
 		!abortModalOpen &&
 		jobIds.length > 0 &&
 		!deleteModalOpen &&
-		!submitModalOpen
+		!submitModalOpen &&
+		!downloadModalOpen
 	) {
 		abortModalJobs = jobIds;
 		abortModalOpen = true;
@@ -238,7 +243,8 @@ function openDeleteModal(jobIds: number[]) {
 		!deleteModalOpen &&
 		jobIds.length > 0 &&
 		!abortModalOpen &&
-		!submitModalOpen
+		!submitModalOpen &&
+		!downloadModalOpen
 	) {
 		deleteModalJobs = jobIds;
 		deleteModalOpen = true;
@@ -246,8 +252,26 @@ function openDeleteModal(jobIds: number[]) {
 }
 
 function openSubmitModal() {
-	if (!submitModalOpen && !abortModalOpen && !deleteModalOpen) {
+	if (
+		!submitModalOpen &&
+		!abortModalOpen &&
+		!deleteModalOpen &&
+		!downloadModalOpen
+	) {
 		submitModalOpen = true;
+	}
+}
+
+function openDownloadModal(job_id: number, file_name: string) {
+	if (
+		!submitModalOpen &&
+		!abortModalOpen &&
+		!deleteModalOpen &&
+		!downloadModalOpen
+	) {
+		downloadJobId = job_id;
+		downloadFileName = file_name;
+		downloadModalOpen = true;
 	}
 }
 
@@ -474,7 +498,7 @@ evtSource.addEventListener("job_updated", (event) => {
                     </Button>
                   {/if}
                   {#if (["success", "downloaded"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e) => {e.stopPropagation(); downloadTranscript(job);}}>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e) => {e.stopPropagation(); openDownloadModal(job_id, job.file_name);}}>
                       <DownloadSolid/>
                     </Button>
                   {/if}
@@ -482,7 +506,7 @@ evtSource.addEventListener("job_updated", (event) => {
               </TableBodyCell>
             </TableBodyRow>
             {#if openRow === job.id}
-              <TableBodyRow color="custom" class="bg-slate-100 dark:bg-slate-700">
+              <TableBodyRow class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-100 hover:dark:bg-slate-700">
                 <TableBodyCell colspan={tableEditMode ? 5 : 4}>
                   <div class="grid grid-cols-2 gap-x-8 gap-y-2">
                     <div class="col-span-full">
@@ -597,3 +621,5 @@ evtSource.addEventListener("job_updated", (event) => {
 </ConfirmModal>
 
 <SubmitJobsModal bind:open={submitModalOpen} post_action={fetch_jobs}/>
+
+<DownloadTranscriptModal bind:open={downloadModalOpen} job_id={downloadJobId} job_file_name={downloadFileName}/>
