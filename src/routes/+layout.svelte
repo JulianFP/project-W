@@ -3,6 +3,7 @@ import "../app.css";
 
 import { routing } from "$lib/utils/global_state.svelte";
 
+import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
 import {
 	Alert,
@@ -57,6 +58,7 @@ let { children } = $props();
     <NavUl activeUrl={routing.location}>
       <NavLi href="#/">Home</NavLi>
       <NavLi href="#/about">About</NavLi>
+      <NavLi href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API-docs</NavLi>
       <NavLi href="https://project-w.readthedocs.io" target="_blank" rel="noopener noreferrer">Docs</NavLi>
       <NavLi href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="mx-auto"/></NavLi>
     </NavUl>

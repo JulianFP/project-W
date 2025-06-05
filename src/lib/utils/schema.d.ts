@@ -683,6 +683,7 @@ export interface components {
 			source_code: string;
 			/** Version */
 			version: string;
+			imprint: components["schemas"]["ImprintSettings"] | null;
 		};
 		/** AlignmentProcessingSettings */
 		AlignmentProcessingSettings: {
@@ -900,6 +901,21 @@ export interface components {
 			 * @default false
 			 */
 			job_assigned: boolean;
+		};
+		/** ImprintSettings */
+		ImprintSettings: {
+			/**
+			 * Name
+			 * @description The name of the person/institution hosting this instance
+			 */
+			name: string;
+			/** @description The contact email address of the person/institution hosting this instance */
+			email: components["schemas"]["EmailValidated"];
+			/**
+			 * Additional Imprint Html
+			 * @description Content of the imprint in addition to the other fields
+			 */
+			additional_imprint_html?: string | null;
 		};
 		/**
 		 * InterpolateMethodEnum
