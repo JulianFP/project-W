@@ -287,6 +287,21 @@ class RedisConnection(BaseModel):
         return self
 
 
+class ImprintSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(
+        description="The name of the person/institution hosting this instance",
+    )
+    email: EmailValidated = Field(
+        description="The contact email address of the person/institution hosting this instance",
+    )
+    additional_imprint_html: str | None = Field(
+        description="Content of the imprint in addition to the other fields",
+        default=None,
+        validate_default=True,
+    )
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_path: DirectoryPath | None = Field(
@@ -311,3 +326,8 @@ class Settings(BaseModel):
     redis_connection: RedisConnection
     security: SecuritySettings
     smtp_server: SMTPServerSettings
+    imprint: ImprintSettings | None = Field(
+        description="Set the imprint/impressum of this instance",
+        default=None,
+        validate_default=None,
+    )

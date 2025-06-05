@@ -39,6 +39,14 @@ async def lifespan(app: FastAPI):
     else:
         dp.config = load_config()
 
+    # add imprint info to app attributes (so that it is displayed in OpenAPI docs as well)
+    if dp.config.imprint:
+        app.contact = {
+            "name": dp.config.imprint.name,
+            "email": dp.config.imprint.email.root,
+            "url": f"{dp.config.client_url}/about",
+        }
+
     # connect to database
     dp.db = PostgresAdapter(str(dp.config.postgres_connection_string))
     await dp.db.open()
@@ -147,6 +155,7 @@ async def about() -> AboutResponse:
         description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
         source_code="https://github.com/JulianFP/project-W",
         version=__version__,
+        imprint=dp.config.imprint,
     )
 
 

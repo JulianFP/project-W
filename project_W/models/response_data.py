@@ -12,6 +12,7 @@ from .base import (
     UserInDb,
 )
 from .request_data import JobSettings
+from .settings import ImprintSettings
 
 
 class UserTypeEnum(str, Enum):
@@ -42,6 +43,7 @@ class AboutResponse(BaseModel):
     description: str
     source_code: str
     version: str
+    imprint: ImprintSettings | None
 
 
 class TokenSecretInfo(BaseModel):
