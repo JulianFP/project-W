@@ -6,8 +6,14 @@ class AuthManager {
 	loggedIn = $derived<boolean>("Authorization" in this.#authHeader);
 
 	updateTokenFromStorage() {
-		const returnVal: string | null = localStorage.getItem("authHeader");
-		if (returnVal) this.#authHeader = { Authorization: `Bearer ${returnVal}` };
+		try {
+			//put this in try block because this will throw if executed on the server-side (which is being tested during build)
+			const returnVal: string | null = localStorage.getItem("authHeader");
+			if (returnVal)
+				this.#authHeader = { Authorization: `Bearer ${returnVal}` };
+		} catch (err: unknown) {
+			return;
+		}
 	}
 
 	constructor() {

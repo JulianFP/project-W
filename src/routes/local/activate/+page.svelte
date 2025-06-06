@@ -1,5 +1,6 @@
 <script lang="ts">
-import Waiting from "$lib/components/waiting.svelte";
+import { Spinner } from "flowbite-svelte";
+
 import { alerts, auth, routing } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 
@@ -37,5 +38,7 @@ async function activate(): Promise<void> {
 </script>
 
 {#await activate()}
-  <Waiting/>
+  <div class="flex flex-col w-full h-full justify-evenly items-center my-8">
+    <Spinner class="me-3" size="10" />
+  </div>
 {/await}
