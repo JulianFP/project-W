@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-python -m flask --debug --app 'project_W:create_app()' run
+project_W --development --worker_count 1

@@ -28,30 +28,31 @@ classifiers = [
     "License :: OSI Approved :: GNU Affero General Public License v3",
 ]
 dependencies = [
+    # click cli to pass some hosting options to application which shouldn't be part of config file,
+    "click",
     # Argon2 for password hashing
     "argon2-cffi",
-    # Click for the CLI
-    "click",
-    # Flask for the WSGI server
-    "flask",
-    # JWT Flask plugin for session tokens
-    "flask-jwt-extended",
-    # for setting header for cors support globally
-    "flask-cors",
+    # Fastapi and validation libraries
+    "fastapi",
+    "pydantic",
+    "email-validator",
     # Postgres client library
     "psycopg",
     "psycopg_pool",
+    # Redis client library
     "redis",
-    "pydantic",
-    "email-validator",
-    "fastapi",
-    "uvicorn",
-    "python-multipart",
-    "httpx",
+    # auth & security stuff
     "authlib",
     "pyjwt",
     "bonsai",
+    # async smtp library
     "aiosmtplib",
+    # for deployment
+    "granian",
+    # for multipart streaming
+    "python-multipart",
+    # for making http requests to OIDC provider
+    "httpx",
     # getting platform-independent directories for config and data (follows xdg standard on Linux)
     "platformdirs",
     # parsing config from yaml file and env vars

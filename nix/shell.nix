@@ -54,7 +54,7 @@ pkgs.mkShell {
   buildInputs =
     with pkgs;
     [
-      (python3.withPackages myPythonPackages)
+      (python313.withPackages myPythonPackages)
       sqlite
     ]
     ++ pre-commit-check.enabledPackages;

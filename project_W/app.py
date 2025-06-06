@@ -1,7 +1,5 @@
-import os
 import secrets
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -11,9 +9,7 @@ import project_W.dependencies as dp
 
 from ._version import __version__
 from .caching import RedisAdapter
-from .config import load_config
 from .database import PostgresAdapter
-from .logger import get_logger
 from .models.base import LocalAccountOperationModeEnum
 from .models.response_data import AboutResponse, AuthSettings
 from .routers import admins, jobs, ldap, local_account, oidc, runners, users
@@ -24,21 +20,6 @@ from .smtp import SmtpClient
 # startup database connections before spinning up application
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger = get_logger("project-W")
-
-    # post application version for debug purposes and bug reports
-    logger.info(f"Running application version {__version__}")
-
-    # parse config file
-    config_file_path_from_env = os.environ.get("PROJECT-W_CONFIG-FILE")
-    if config_file_path_from_env:
-        path = Path(config_file_path_from_env)
-        if not path.is_dir():
-            path = path.parent
-        dp.config = load_config(additional_paths=[path])
-    else:
-        dp.config = load_config()
-
     # add imprint info to app attributes (so that it is displayed in OpenAPI docs as well)
     if dp.config.imprint:
         app.contact = {
@@ -83,10 +64,10 @@ async def lifespan(app: FastAPI):
         )
 
     # include app mount (it is important that this happens after all routers have been included!)
-    if dp.config.client_path is not None:
+    if dp.client_path is not None:
         app.mount(
             "/",
-            StaticFiles(directory=dp.config.client_path.resolve(), html=True),
+            StaticFiles(directory=dp.client_path.resolve(), html=True),
             name="client app",
         )
 

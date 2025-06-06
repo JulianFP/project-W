@@ -1,43 +1,38 @@
-{ lib, python3Packages }:
+{ lib, python313Packages }:
 
-python3Packages.buildPythonPackage rec {
+python313Packages.buildPythonPackage rec {
   pname = "project_W";
-  version = "0.0.1";
+  version = "0.3.0";
   pyproject = true;
 
   src = ../../.;
 
-  build-system = [ python3Packages.setuptools ];
+  build-system = [ python313Packages.setuptools ];
 
-  nativeBuildInputs = with python3Packages; [ setuptools-scm ];
+  nativeBuildInputs = with python313Packages; [ setuptools-scm ];
 
-  propagatedBuildInputs = with python3Packages; [
-    argon2-cffi
+  propagatedBuildInputs = with python313Packages; [
     click
-    flask
-    flask-jwt-extended
-    flask-cors
-    flask-sqlalchemy
-    platformdirs
-    pyaml-env
-    authlib
-    httpx
-
+    argon2-cffi
+    itsdangerous
+    fastapi
+    pydantic
+    email-validator
     psycopg
     psycopg-pool
     redis
-    pydantic
-    email-validator
-    fastapi
-    uvicorn
-    python-multipart
-    httpx
+    authlib
     pyjwt
     bonsai
     aiosmtplib
+    granian
+    python-multipart
+    httpx
+    platformdirs
+    pyaml-env
   ];
 
-  nativeCheckInputs = with python3Packages; [
+  nativeCheckInputs = with python313Packages; [
     pytestCheckHook
     pytest-mock
     pytest-cov

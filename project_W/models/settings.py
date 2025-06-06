@@ -4,7 +4,6 @@ from typing import Annotated, Self
 from pydantic import (
     BaseModel,
     ConfigDict,
-    DirectoryPath,
     Field,
     FilePath,
     HttpUrl,
@@ -304,11 +303,6 @@ class ImprintSettings(BaseModel):
 
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    client_path: DirectoryPath | None = Field(
-        description="The path to the directory which contains all static files of the client/frontend that should be served to the users under /. If set to None then this backend will not serve a client to the users.",
-        default=None,
-        validate_default=True,
-    )
     client_url: str = Field(
         pattern=r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?(\/#)?$",
         description="URL under which the frontend is served. It is used for providing the user with clickable links inside of account-activation or password-reset emails. The URL should fullfill the following requirements:\n\n- It has to start with either 'http://' or 'https://'\n\n- It should contain the port number if it is not just 80 (default of http) or 443 (default of https)\n\n- It should contain the root path under which the frontend is served if its not just /\n- It should end with /# if the frontend uses hash based routing (which our frontend does!)",
