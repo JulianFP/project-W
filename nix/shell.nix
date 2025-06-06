@@ -13,7 +13,8 @@ let
     ps: with ps; [
       #all required dependencies + this projects package itself (required for sphinx)
       (dontCheckPythonPkg project-W)
-      fastapi-cli
+      setproctitle
+      watchfiles
 
       #optional dependencies: tests
       pytest
@@ -55,7 +56,6 @@ pkgs.mkShell {
     with pkgs;
     [
       (python313.withPackages myPythonPackages)
-      sqlite
     ]
     ++ pre-commit-check.enabledPackages;
 

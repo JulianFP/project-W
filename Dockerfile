@@ -23,6 +23,6 @@ COPY . .
 RUN --mount=source=.git,target=.git,type=bind \
     pip install --no-cache-dir --upgrade -e .
 
-CMD ["python", "-m", "project_W", "--root_static_files", "/frontend", "--ssl_certificate", "/etc/xdg/project-W/certs/cert", "--ssl_keyfile", "/etc/xdg/project-W/certs/key"]
+CMD ["python", "-m", "project_W", "--root_static_files", "/frontend"]
 
 HEALTHCHECK CMD curl -f https://localhost/api/about || exit 1

@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-project_W --development --worker_count 1
+python -m project_W --development

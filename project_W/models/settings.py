@@ -1,4 +1,5 @@
 from enum import Enum
+from ipaddress import IPv4Interface
 from typing import Annotated, Self
 
 from pydantic import (
@@ -7,6 +8,7 @@ from pydantic import (
     Field,
     FilePath,
     HttpUrl,
+    IPvAnyInterface,
     PostgresDsn,
     RedisDsn,
     RootModel,
@@ -301,6 +303,49 @@ class ImprintSettings(BaseModel):
     )
 
 
+class SslSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cert_file: FilePath = Field(
+        description="Path to the SSL certificate file",
+    )
+    key_file: FilePath = Field(
+        description="Path to the SSL key file",
+    )
+    key_file_password: SecretStr | None = Field(
+        description="Password of the SSL key file",
+        default=None,
+        validate_default=True,
+    )
+
+
+class WebServerSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ssl: SslSettings | None = Field(
+        description="SSL settings to enable https encrypted traffic",
+        default=None,
+        validate_default=True,
+    )
+    no_https: bool = Field(
+        description="Disable https encryption. This will lead to passwords, sensitive data and more to be transmitted unencrypted! Only set this for development or testing purposes!",
+        default=False,
+        validate_default=True,
+    )
+    worker_count: int = Field(
+        description="Amount of workers that should serve the web server simultaneously. Increasing this will allow for more concurrent users as long as it is lower or equal than the amount of CPU cores on your system.",
+        default=4,
+    )
+    address: IPvAnyInterface = Field(
+        description="The address of the interface under which the web server should be served.",
+        default=IPv4Interface("127.0.0.1"),
+    )
+    port: int = Field(
+        ge=0,
+        le=65535,
+        default=8000,
+        description="The port under which the web server should be served",
+    )
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_url: str = Field(
@@ -312,6 +357,11 @@ class Settings(BaseModel):
             "http://localhost:5173/#",
             "http://192.168.1.100:5173/#",
         ],
+    )
+    web_server: WebServerSettings = Field(
+        description="Settings regarding the web server deployment of this application",
+        default=WebServerSettings(),
+        validate_default=True,
     )
     postgres_connection_string: PostgresDsn = Field(
         description="PostgreSQL connection string to connect to the database that should be used by Project-W. See https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING for the syntax.",
