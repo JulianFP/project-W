@@ -3,6 +3,7 @@ import { error } from "@sveltejs/kit";
 import {
 	Accordion,
 	AccordionItem,
+	Badge,
 	Checkbox,
 	Heading,
 	Input,
@@ -10,8 +11,9 @@ import {
 	P,
 	Select,
 	Textarea,
+	Tooltip,
 } from "flowbite-svelte";
-import { RedoOutline } from "flowbite-svelte-icons";
+import { QuestionCircleOutline, RedoOutline } from "flowbite-svelte-icons";
 
 import { BackendCommError, getLoggedIn } from "$lib/utils/httpRequests.svelte";
 import {
@@ -279,14 +281,20 @@ function onTranslationChange() {
 </script>
 
 <form class="flex flex-col gap-4" {onsubmit}>
-  <div>
+  <div class="flex gap-2 items-center">
     <Checkbox id="email_notification" bind:checked={email_notification}>
       <P>Receive an email notification upon job completion</P>
     </Checkbox>
+    <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+    <Tooltip placement="bottom">You will receive an email once the job has finished or failed.</Tooltip>
   </div>
 
   <div>
-    <Label class="mb-2" for="language">Language</Label>
+    <div class="flex gap-2 items-center mb-2">
+      <Label for="language">Language</Label>
+      <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+      <Tooltip placement="bottom">Set the language that is spoken in your audio file. Automatic language detection only works well for audio longer than 30 seconds and might lead to errors if improved timestamp alignment is enabled and it detects a language incompatible with it.</Tooltip>
+    </div>
     <Select id="language" bind:value={language} onchange={onLanguageSelect}>
       <option value="detect">Automatic language detection</option>
       {#each jobLangEnumValues as value}
@@ -295,28 +303,46 @@ function onTranslationChange() {
     </Select>
   </div>
 
-  <Checkbox id="translate" bind:checked={translate} disabled={language === "en"} onchange={onTranslationChange}>
-    <P>Translate into English</P>
-  </Checkbox>
+  <div class="flex gap-2 items-center">
+    <Checkbox id="translate" bind:checked={translate} disabled={language === "en"} onchange={onTranslationChange}>
+      <P>Translate into English</P>
+    </Checkbox>
+    <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+    <Tooltip placement="bottom">Translate the transcription into English (starting from any other language). Currently English is the only supported target language.</Tooltip>
+  </div>
 
-  <Checkbox id="alignment-enabled" bind:checked={alignment} disabled={(language !== "detect" && !supportedAlignmentLangs.includes(language)) || translate}>
-    <P>Enable improved timestamp alignment</P>
-  </Checkbox>
+  <div class="flex gap-2 items-center">
+    <Checkbox id="alignment-enabled" bind:checked={alignment} disabled={(language !== "detect" && !supportedAlignmentLangs.includes(language)) || translate}>
+      <P>Enable improved timestamp alignment</P>
+    </Checkbox>
+    <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+    <Tooltip placement="bottom">This will align each part of the transcript with timestamps at which it was being spoken. Only supported for some languages.</Tooltip>
+  </div>
 
-  <div>
+  <div class="flex gap-2 items-center">
     <Checkbox id="diarization-enable" bind:checked={diarization}>
       <P>Enable speaker diarization</P>
     </Checkbox>
+    <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+    <Tooltip placement="bottom">Adds speaker labels to the transcript that will indicate who was speaking at any given part.</Tooltip>
   </div>
 
   {#if diarization}
     <div class="flex gap-4">
       <div class="w-full">
-        <Label class="mb-2" for="diarization_min_speakers">Min speakers</Label>
+        <div class="flex gap-2 items-center mb-2">
+          <Label for="diarization_min_speakers">Min speakers</Label>
+          <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+          <Tooltip placement="bottom">In the audio are at least this many different people speaking. Set this to the same as 'Max speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
+        </div>
         <Input type="number" min="0" step="1" id="diarization_min_speakers" bind:value={diarization_min_speakers}/>
       </div>
       <div class="w-full">
-        <Label class="mb-2" for="diarization_max_speakers">Max speakers</Label>
+        <div class="flex gap-2 items-center mb-2">
+          <Label for="diarization_max_speakers">Max speakers</Label>
+          <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+          <Tooltip placement="bottom">In the audio are at most this many different people speaking. Set this to the same as 'Min speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
+        </div>
         <Input type="number" min="0" step="1" id="diarization_max_speakers" bind:value={diarization_max_speakers}/>
       </div>
     </div>
@@ -326,7 +352,11 @@ function onTranslationChange() {
     <AccordionItem contentClass="flex flex-col gap-8">
       {#snippet header()}Advanced settings{/snippet}
       <div>
-        <Label class="mb-2" for="models">Select a model</Label>
+        <div class="flex gap-2 items-center mb-2">
+          <Label for="models">Select a model</Label>
+          <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+          <Tooltip placement="bottom">Select the Whisper model to use for transcription. Larger models will be more accurate but will also take longer. Diarization requires a larger model for useful results. The models ending with '.en' only support the English language. The 'turbo' model is a more efficient version of the 'large' model with only small decreases in transcription quality.</Tooltip>
+        </div>
         <Select id="models" bind:value={model}>
           {#each jobModelEnumValues as value}
             <option value={value} disabled={value.indexOf("en") != -1 && language != "en"}>{value}</option>
@@ -338,25 +368,45 @@ function onTranslationChange() {
         <div class="flex flex-col gap-4">
           <Heading tag="h6">Advanced alignment settings</Heading>
           <div class="flex gap-4">
-            <div class="w-full"><Checkbox id="alignment_processing_highlight_words" bind:checked={alignment_processing_highlight_words}>
-              <P>Highlight words</P>
-            </Checkbox></div>
-            <div class="w-full"><Checkbox id="alignment_return_char_alignments" bind:checked={alignment_return_char_alignments}>
-              <P>Return character alignments</P>
-            </Checkbox></div>
+            <div class="w-full flex gap-2 items-center">
+              <Checkbox id="alignment_processing_highlight_words" bind:checked={alignment_processing_highlight_words}>
+                <P>Highlight words</P>
+              </Checkbox>
+              <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+              <Tooltip placement="bottom">Underline each word as it is spoken in the .srt and .vtt outputs. For example if used for subtitles this would mean that the word that is currently being spoken is underlined in the subtitle.</Tooltip>
+            </div>
+            <div class="w-full flex gap-2 items-center">
+              <Checkbox id="alignment_return_char_alignments" bind:checked={alignment_return_char_alignments}>
+                <P>Return character alignments</P>
+              </Checkbox>
+              <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+              <Tooltip placement="bottom">Return character-level alignments/timestamps in the .json output.</Tooltip>
+            </div>
           </div>
           <div class="flex gap-4">
             <div class="w-full">
-              <Label class="mb-2" for="aligment_processing_max_line_width">Max line width</Label>
+              <div class="flex gap-2 items-center mb-2">
+                <Label for="aligment_processing_max_line_width">Max line width</Label>
+                <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+                <Tooltip placement="bottom">The maximum number of characters in a line before breaking the line.</Tooltip>
+              </div>
               <Input type="number" min="1" step="1" id="alignment_processing_max_line_width" bind:value={alignment_processing_max_line_width} placeholder="Leave empty for no limit"/>
             </div>
             <div class="w-full">
-              <Label class="mb-2" for="alignment_processing_max_line_count">Max line count</Label>
+              <div class="flex gap-2 items-center mb-2">
+                <Label for="alignment_processing_max_line_count">Max line count</Label>
+                <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+                <Tooltip placement="bottom">The maximum number of lines in a segment (can only be set if 'Max line width' is also set).</Tooltip>
+              </div>
               <Input type="number" min="1" step="1" id="alignment_processing_max_line_count" bind:value={alignment_processing_max_line_count} placeholder="Leave empty for no limit"/>
             </div>
           </div>
           <div>
-            <Label class="mb-2" for="models">Interpolate method</Label>
+            <div class="flex gap-2 items-center mb-2">
+              <Label for="models">Interpolate method</Label>
+              <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+              <Tooltip placement="bottom">Method to assign timestamps to non-aligned words. Words are not able to be aligned when none of the characters occur in the align model dictionary. "nearest" copies timestamp of the nearest word within the segment. "linear" is linear interpolation. "ignore" removes that word from output.</Tooltip>
+            </div>
             <Select id="alignment_interpolate_method" bind:value={alignment_interpolate_method}>
               {#each interpolateMethodEnumValues as value}
                 <option value={value}>{value}</option>
@@ -367,72 +417,128 @@ function onTranslationChange() {
       {/if}
 
       <div class="flex flex-col gap-4">
-        <Heading tag="h6">Advanced VAD settings</Heading>
+        <Heading tag="h6">Advanced Voice Activation Detection (VAD) settings</Heading>
         <div>
-          <Label class="mb-2" for="vad_onset">VAD onset</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="vad_onset">VAD onset</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Onset threshold for VAD (see pyannote.audio), reduce this if speech is not being detected.</Tooltip>
+          </div>
           <RangeWithField min="0.0" max="1.0" step="0.001" id="vad_onset" bind:value={vad_onset}/>
         </div>
         <div>
-          <Label class="mb-2" for="vad_offset">VAD offset</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="vad_offset">VAD offset</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Offset threshold for VAD (see pyannote.audio), reduce this if speech is not being detected.</Tooltip>
+          </div>
           <RangeWithField min="0.0" max="1.0" step="0.001" id="vad_offset" bind:value={vad_offset}/>
         </div>
         <div>
-          <Label class="mb-2" for="vad_chunk_size">Chunk size</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="vad_chunk_size">Chunk size</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Chunk size for merging VAD segments. Default is 30, reduce this if the chunk is too long.</Tooltip>
+          </div>
           <RangeWithField min="1" max="30" step="1" id="vad_chunk_size" bind:value={vad_chunk_size}/>
         </div>
       </div>
 
       <div class="flex flex-col gap-4">
-        <Heading tag="h6">Advanced ASR settings</Heading>
+        <Heading tag="h6">Advanced Automatic Speech Recognition (ASR) settings</Heading>
         <div>
-          <Label class="mb-2" for="asr_initial_prompt">Initial prompt</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_initial_prompt">Initial prompt</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Optional text to provide as a prompt for the first window.</Tooltip>
+          </div>
           <Textarea id="asr_initial_prompt" bind:value={asr_initial_prompt} placeholder="Enter prompt here"/>
         </div>
         <div>
-          <Label class="mb-2" for="asr_beam_size">Beam size</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_beam_size">Beam size</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Number of beams in beam search, only applicable when temperature is zero.</Tooltip>
+          </div>
           <Input type="number" min="1" step="1" id="asr_beam_size" bind:value={asr_beam_size}/>
         </div>
         <div>
-          <Label class="mb-2" for="asr_patience">Patience</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_patience">Patience</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Optional patience value to use in beam decoding, the default (1.0) is equivalent to conventional beam search.</Tooltip>
+          </div>
           <Input type="number" min="0.0" step="0.001" id="asr_patience" bind:value={asr_patience}/>
         </div>
         <div>
-          <Label class="mb-2" for="asr_length_penalty">Length penalty</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_length_penalty">Length penalty</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Optional token length penalty coefficient (alpha), uses simple length normalization by default.</Tooltip>
+          </div>
           <RangeWithField min="0.0" max="1.0" step="0.001" id="asr_length_penalty" bind:value={asr_length_penalty}/>
         </div>
         <div class="flex gap-4">
           <div class="w-full">
-            <Label class="mb-2" for="asr_temperature">Temperature</Label>
+            <div class="flex gap-2 items-center mb-2">
+              <Label for="asr_temperature">Temperature</Label>
+              <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+              <Tooltip placement="bottom">Temperature to use for sampling.</Tooltip>
+            </div>
             <Input type="number" min="0.0" step="0.001" id="asr_temperature" bind:value={asr_temperature}/>
           </div>
           <div class="w-full">
-            <Label class="mb-2" for="asr_temperature_increment_on_fallback">Temperature increment on fallback</Label>
+            <div class="flex gap-2 items-center mb-2">
+              <Label for="asr_temperature_increment_on_fallback">Temperature increment on fallback</Label>
+              <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+              <Tooltip placement="bottom">Temperature to increase when falling back when the decoding fails to meet either of the thresholds below.</Tooltip>
+            </div>
             <Input type="number" min="0.0" step="0.001" id="asr_temperature_increment_on_fallback" bind:value={asr_temperature_increment_on_fallback}/>
           </div>
         </div>
         <div>
-          <Label class="mb-2" for="asr_compression_ratio_threshold">Compression ratio threshold</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_compression_ratio_threshold">Compression ratio threshold</Label>
+              <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+              <Tooltip placement="bottom">If the gzip compression ratio is higher than this value, treat the decoding as failed.</Tooltip>
+          </div>
           <Input type="number" min="0.0" step="0.001" id="asr_compression_ratio_threshold" bind:value={asr_compression_ratio_threshold}/>
         </div>
         <div>
-          <Label class="mb-2" for="asr_log_prob_threshold">Log prob threshold</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_log_prob_threshold">Log prob threshold</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">If the average log probability is lower than this value, treat the decoding as failed.</Tooltip>
+          </div>
           <Input type="number" id="asr_log_prob_threshold" bind:value={asr_log_prob_threshold}/>
         </div>
         <div>
-          <Label class="mb-2" for="asr_no_speech_threshold">No speech threshold</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_no_speech_threshold">No speech threshold</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">If the probability of the &lt;&#124;nospeech&#124;&gt; token is higher than this value AND the decoding has failed due to 'Log prob threshold', consider the segment as silence.</Tooltip>
+          </div>
           <Input type="number" step="0.001" id="asr_no_speech_threshold" bind:value={asr_no_speech_threshold}/>
         </div>
         <div>
-          <Label class="mb-2" for="asr_suppressed_tokens">Suppressed tokens</Label>
+          <div class="flex gap-2 items-center mb-2">
+            <Label for="asr_suppressed_tokens">Suppressed tokens</Label>
+            <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+            <Tooltip placement="bottom">Comma-separated list of token ids to suppress during sampling; '-1' will suppress most special characters except common punctuations.</Tooltip>
+          </div>
           <Input type="text" id="asr_suppressed_tokens" bind:value={asr_suppressed_tokens}/>
         </div>
-        <Checkbox id="asr_suppress_numerals" bind:checked={asr_suppress_numerals}>
-          <P>Suppress numerals</P>
-        </Checkbox>
+        <div class="flex gap-2 items-center">
+          <Checkbox id="asr_suppress_numerals" bind:checked={asr_suppress_numerals}>
+            <P>Suppress numerals</P>
+          </Checkbox>
+          <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+          <Tooltip placement="bottom">Whether to suppress numeric symbols and currency symbols during sampling, since wav2vec2 cannot align them correctly.</Tooltip>
+        </div>
       </div>
     </AccordionItem>
   </Accordion>
-  <WaitingSubmitButton type="button" color="alternative" onclick={setToDefault} waiting={wait_for_reset}><RedoOutline class="mr-2"/>Reset selected values to account defaults</WaitingSubmitButton>
+  <WaitingSubmitButton type="button" color="alternative" onclick={setToDefault} waiting={wait_for_reset}><RedoOutline class="mr-2"/>Reset values to account defaults</WaitingSubmitButton>
 
   {@render children?.()}
 </form>
