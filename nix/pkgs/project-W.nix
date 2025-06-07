@@ -32,11 +32,6 @@ python313Packages.buildPythonPackage rec {
     pyaml-env
   ];
 
-  nativeCheckInputs = with python313Packages; [
-    pytestCheckHook
-    pytest-mock
-    pytest-cov
-  ];
   pythonImportsCheck = [ pname ];
 
   #hardcode version so that setuptools-scm works without .git folder:

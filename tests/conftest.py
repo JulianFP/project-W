@@ -1,68 +1,104 @@
-import os
-import sys
-from io import BytesIO
+import json
+import secrets
+import subprocess
+import time
+from pathlib import Path
 
+import psycopg
 import pytest
+import redis
+import requests
+from pydantic import PostgresDsn, RedisDsn, SecretStr
 
-from project_W import create_app
-from tests import get_auth_headers
+from project_W.models.base import EmailValidated, PasswordValidated
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "helpers"))
+from ..project_W.models.settings import (
+    LocalAccountSettings,
+    LocalTokenSettings,
+    ProvisionedUser,
+    RedisConnection,
+    SecuritySettings,
+    Settings,
+    SMTPSecureEnum,
+    SMTPServerSettings,
+    SslSettings,
+    WebServerSettings,
+)
 
-import flask_test_utils as ftu
+BACKEND_BASE_URL = "https://localhost:8443"
+CONFIG_PATH = "backend-config/config.yml"
 
 
-# client fixture requires the following param: (str, str)
-# the strings will be the config values of 'allowedEmailDomains' and 'disableSignup' respectively and thus have to be written in yaml syntax
+@pytest.fixture(scope="session")
+def secret_key():
+    return secrets.token_hex(32)
+
+
+def wait_for_backend(timeout=30):
+    for _ in range(timeout):
+        try:
+            requests.get(f"{BACKEND_BASE_URL}/api/about", verify=False)
+            return
+        except requests.exceptions.RequestException:
+            time.sleep(1)
+    raise TimeoutError("Server did not become healthy in time.")
+
+
 @pytest.fixture(scope="function")
-def client(request, tmp_path):
-    # patch config.yml file
-    temp_config_path = str(tmp_path / "config.yml")
-    temp_db_dir = str(tmp_path)
-    configFile = open(temp_config_path, "w")
-    configFile.write(
-        f"clientURL: 'https://example.com'\n"
-        f"databasePath: '{temp_db_dir}'\n"
-        f"loginSecurity:\n"
-        f"    sessionSecretKey: 'abcdefghijklmnopqrstuvwxyz'\n"
-        f"    allowedEmailDomains: {request.param[0]}\n"
-        f"    disableSignup: {request.param[1]}\n"
-        f"smtpServer:\n"
-        f"    domain: 'smtp.example.com'\n"
-        f"    port: 587\n"
-        f"    secure: 'unencrypted'\n"
-        f"    senderEmail: 'alice@example.com'\n"
-        f"    username: 'alice@example.com'\n"
-        f"    password: 'thisisabadpassword'"
+def backend(request, smtpd, secret_key):
+    smtpd.config.use_starttls = True
+
+    postgres_connection = PostgresDsn("postgresql://test:test@localhost:5432/test_db")
+    redis_connection = RedisDsn("redis://localhost:6379/project-W")
+
+    settings: Settings = Settings(
+        client_url=f"{BACKEND_BASE_URL}/#",
+        web_server=WebServerSettings(
+            port=8443,
+            ssl=SslSettings(
+                cert_file=Path("/etc/xdg/project-W/certs/cert.pem"),
+                key_file=Path("/etc/xdg/project-W/certs/key.pem"),
+            ),
+        ),
+        smtp_server=SMTPServerSettings(
+            hostname=smtpd.hostname,
+            port=smtpd.port,
+            secure=SMTPSecureEnum.STARTTLS,
+            sender_email=EmailValidated("ci@example.org"),
+        ),
+        postgres_connection_string=postgres_connection,
+        redis_connection=RedisConnection(connection_string=redis_connection),
+        security=SecuritySettings(
+            local_token=LocalTokenSettings(session_secret_key=secret_key),
+            local_account=LocalAccountSettings(
+                user_provisioning={
+                    0: ProvisionedUser(
+                        email=EmailValidated("admin@example.org"),
+                        password=PasswordValidated(SecretStr("Password1234")),
+                        is_admin=True,
+                    )
+                }
+            ),
+        ),
+        imprint=request.param[0],
     )
-    configFile.close()
 
-    app = create_app(configFile.name)
-    ftu.add_test_users(app)
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(settings.model_dump(), f)
 
-    yield app.test_client()
+    subprocess.run(["docker" "compose" "restart" "project-w"], check=True)
+    wait_for_backend()
 
+    yield (f"{BACKEND_BASE_URL}/api/", smtpd)
 
-@pytest.fixture()
-def mockedSMTP(mocker):
-    mock_SMTP = mocker.MagicMock(name="project_W.model.SMTP")
-    mocker.patch("project_W.model.SMTP", new=mock_SMTP)
+    with psycopg.connect(str(postgres_connection)) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DROP SCHEMA project_w CASCADE
+            """
+            )
 
-    yield mock_SMTP
-
-
-def _auth_fixture(email, password):
-    @pytest.fixture()
-    def auth(client):
-        return get_auth_headers(client, email, password)
-
-    return auth
-
-
-user = _auth_fixture("user@test.com", "userPassword1!")
-admin = _auth_fixture("admin@test.com", "adminPassword1!")
-
-
-@pytest.fixture()
-def audio():
-    return (BytesIO(b""), "test.mp3")
+    r = redis.Redis()
+    redis_client = r.from_url(str(redis_connection))
+    redis_client.flushdb()

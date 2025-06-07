@@ -4,7 +4,9 @@ WORKDIR /frontend-code
 
 RUN npm install -g pnpm
 
-RUN git clone https://github.com/JulianFP/project-W-frontend.git .
+ARG FRONTEND_BRANCH_NAME=main
+
+RUN git clone -b ${BRANCH_NAME} https://github.com/JulianFP/project-W-frontend.git .
 
 RUN pnpm install
 

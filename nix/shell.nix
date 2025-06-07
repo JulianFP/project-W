@@ -16,10 +16,10 @@ let
       setproctitle
       watchfiles
 
-      #optional dependencies: tests
+      #for the tests: tests
       pytest
-      pytest-mock
-      pytest-cov
+      smtpdfix
+      requests
 
       #optional dependencies: docs
       sphinx
