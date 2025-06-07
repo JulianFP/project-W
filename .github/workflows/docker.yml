@@ -18,7 +18,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/Julianfp/project-w_backend
+            ghcr.io/JulianFP/Project-W
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}

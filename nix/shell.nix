@@ -13,11 +13,13 @@ let
     ps: with ps; [
       #all required dependencies + this projects package itself (required for sphinx)
       (dontCheckPythonPkg project-W)
+      setproctitle
+      watchfiles
 
-      #optional dependencies: tests
+      #for the tests: tests
       pytest
-      pytest-mock
-      pytest-cov
+      smtpdfix
+      requests
 
       #optional dependencies: docs
       sphinx
@@ -53,8 +55,7 @@ pkgs.mkShell {
   buildInputs =
     with pkgs;
     [
-      (python3.withPackages myPythonPackages)
-      sqlite
+      (python313.withPackages myPythonPackages)
     ]
     ++ pre-commit-check.enabledPackages;
 

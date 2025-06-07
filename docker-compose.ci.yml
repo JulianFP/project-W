@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:${REDIS_VERSION}
+    ports:
+      - "6379:6379"
+
+  project-w:
+    build:
+      context: .
+      args:
+        FRONTEND_BRANCH_NAME: ${FRONTEND_BRANCH_NAME}
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./backend-config:/etc/xdg/project-W
+    depends_on:
+      - postgres
+      - redis
