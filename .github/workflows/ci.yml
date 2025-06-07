@@ -1,4 +1,4 @@
-name: CI Pipeline (system/integration testing)
+name: "CI: system & integration tests"
 
 on:
   # We run CI on pushes to the main branch
@@ -17,12 +17,16 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        postgres_version: [ 14, 15, 16, 17 ] #14 is minimal required version
-        redis_version: [ 6, 7, 8 ]
+        #test all components with the oldest and newest supported version
+        postgres_version: [ 14, 17 ] #14 is minimal required version
+        redis_version: [ 6, 8 ]
+        python_version: ["3.11", "3.13"]
 
     env:
+      PYTHON_VERSION: ${{ matrix.python_version }}
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
       REDIS_VERSION: ${{ matrix.redis_version }}
       FRONTEND_BRANCH_NAME: ${{ github.ref_name }} #pull frontend from branch with the same name as backend is currently on
@@ -31,10 +35,13 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python_version }}
+
     - name: Install test requirements
       run: |
-        python -m venv .venv
-        source .venv/bin/activate
         python -m pip install -r tests/requirements.txt
 
     - name: Setup SSL certificates
@@ -42,11 +49,15 @@ jobs:
         mkdir -p ./backend-config/certs
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ./backend-config/certs/key.pem -out ./backend-config/certs/cert.pem -subj "/CN=localhost"
 
-    - name: Setup docker compose
+    - name: Build Project-W docker image
       run: |
-        docker compose -f docker-compose.ci.yml up -d --build
+        docker compose -f docker-compose.ci.yml --profile app build
+
+    - name: Start all docker containers except Project-W container
+      run: |
+        docker compose -f docker-compose.ci.yml up -d
 
     - name: Run test suite
       run: |
-        source .venv/bin/activate
-        pytest tests/
+        docker compose -f docker-compose.ci.yml --profile app logs -f &
+        python -m pytest tests/

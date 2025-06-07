@@ -20,7 +20,7 @@ maintainers = [
     { name = "Markus Everling", email = "your@email.com"}
 ]
 dynamic = ["version"]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = { text = "AGPLv3" }
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -37,18 +37,18 @@ dependencies = [
     "pydantic",
     "email-validator",
     # Postgres client library
-    "psycopg",
-    "psycopg_pool",
+    "psycopg[binary,pool]",
     # Redis client library
     "redis",
     # auth & security stuff
     "authlib",
     "pyjwt",
+    "itsdangerous", #required by starlette's SessionMiddleware
     "bonsai",
     # async smtp library
     "aiosmtplib",
     # for deployment
-    "granian",
+    "granian[pname]",
     # for multipart streaming
     "python-multipart",
     # for making http requests to OIDC provider
@@ -62,13 +62,7 @@ dependencies = [
 [project.optional-dependencies]
 development_mode = [
     # granian extra packages
-    "setproctitle",
-    "watchfiles",
-]
-tests = [
-    "pytest",
-    "pytest-mock",
-    "pytest-cov"
+    "granian[pname,reload]",
 ]
 docs = [
     #sphinx documentation engine
@@ -102,9 +96,3 @@ packages = [
 version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
 version_file = "project_W/_version.py"
-
-# The following is the configuration for the pytest test suite
-[tool.pytest.ini_options]
-testpaths = [
-    "tests"
-]

@@ -17,11 +17,14 @@ services:
     build:
       context: .
       args:
+        PYTHON_VERSION: ${PYTHON_VERSION}
         FRONTEND_BRANCH_NAME: ${FRONTEND_BRANCH_NAME}
+    network_mode: "host" #for smtpdfix
     ports:
       - "8443:8443"
     volumes:
-      - ./backend-config:/etc/xdg/project-W
+      - ./backend-config:/etc/xdg/project-W/
     depends_on:
       - postgres
       - redis
+    profiles: [ app ]

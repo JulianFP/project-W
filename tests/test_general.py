@@ -1,20 +1,16 @@
 import pytest
 import requests
 
-from project_W.models.base import EmailValidated
-
-from ..project_W.models.settings import ImprintSettings
-
 
 @pytest.mark.parametrize(
     "backend",
     [
         (
-            ImprintSettings(
-                name="CI",
-                email=EmailValidated("ci@example.org"),
-                additional_imprint_html="<div>hello</div>",
-            ),
+            {
+                "name": "CI",
+                "email": "ci@example.org",
+                "additional_imprint_html": "<div>hello</div>",
+            },
         ),
         (None,),
     ],
@@ -39,12 +35,12 @@ def test_about(backend):
     "backend",
     [
         (
-            ImprintSettings(
-                name="CI",
-                email=EmailValidated("ci@example.org"),
-                additional_imprint_html="<div>hello</div>",
-            ),
-        )
+            {
+                "name": "CI",
+                "email": "ci@example.org",
+                "additional_imprint_html": "<div>hello</div>",
+            },
+        ),
     ],
     indirect=True,
 )

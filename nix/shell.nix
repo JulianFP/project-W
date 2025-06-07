@@ -13,13 +13,12 @@ let
     ps: with ps; [
       #all required dependencies + this projects package itself (required for sphinx)
       (dontCheckPythonPkg project-W)
-      setproctitle
       watchfiles
 
       #for the tests: tests
+      requests
       pytest
       smtpdfix
-      requests
 
       #optional dependencies: docs
       sphinx

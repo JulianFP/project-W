@@ -1,3 +1,4 @@
+import platform
 from pathlib import Path
 
 import click
@@ -54,6 +55,7 @@ def main(
 
     # post application version for debug purposes and bug reports
     logger.info(f"Running application version {__version__}")
+    logger.info(f"Python version: {platform.python_version()}")
 
     dp.client_path = root_static_files
 

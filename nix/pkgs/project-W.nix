@@ -14,7 +14,6 @@ python313Packages.buildPythonPackage rec {
   propagatedBuildInputs = with python313Packages; [
     click
     argon2-cffi
-    itsdangerous
     fastapi
     pydantic
     email-validator
@@ -23,9 +22,11 @@ python313Packages.buildPythonPackage rec {
     redis
     authlib
     pyjwt
+    itsdangerous
     bonsai
     aiosmtplib
     granian
+    setproctitle
     python-multipart
     httpx
     platformdirs

@@ -1,20 +1,25 @@
+ARG PYTHON_VERSION=3.13
+
 FROM node:24-slim AS builder
 
 WORKDIR /frontend-code
+
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates
 
 RUN npm install -g pnpm
 
 ARG FRONTEND_BRANCH_NAME=main
 
-RUN git clone -b ${BRANCH_NAME} https://github.com/JulianFP/project-W-frontend.git .
+RUN git clone -b ${FRONTEND_BRANCH_NAME} https://github.com/JulianFP/project-W-frontend.git .
 
 RUN pnpm install
 
 RUN pnpm build
 
-FROM python:3.13-slim
+FROM python:${PYTHON_VERSION}-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends git curl
+# gcc, libldap and libsas are required to compile bonsai (the ldap library we use) since it doesn't have any wheels on pypi
+RUN apt-get update && apt-get install -y --no-install-recommends git curl gcc libldap2-dev libsasl2-dev
 
 COPY --from=builder /frontend-code/build /frontend
 
