@@ -71,6 +71,20 @@ def backend(request, smtpd, secret_key):
     with open(CONFIG_PATH, "w") as f:
         json.dump(settings, f)
 
+    # can't use restart because at first run the container isn't running yet and restart doesn't start non-running containers
+    subprocess.run(
+        [
+            "docker",
+            "compose",
+            "-f",
+            "docker-compose.ci.yml",
+            "--profile",
+            "app",
+            "stop",
+            "project-w",
+        ],
+        check=True,
+    )
     subprocess.run(
         [
             "docker",
