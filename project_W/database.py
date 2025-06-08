@@ -501,6 +501,9 @@ class PostgresAdapter(DatabaseAdapter):
         self.logger.info("Successfully connected to database. Preparing database now...")
 
         async with self.apool.connection() as conn:
+            # get lock first to prevent race conditions. Otherwise multiple workers/pods would try to create the database/tables at the same time which would throw errors due to violated uniqueness constraints once the first worker/pod commits their transaction
+            await self.__acquire_advisory_lock(conn)
+
             # ensure that the postgresql database version is at least the minimal supported one
             await self.__ensure_postgresql_version(conn)
 
@@ -548,6 +551,14 @@ class PostgresAdapter(DatabaseAdapter):
     async def close(self):
         self.logger.info("Closing PostgreSQL connections...")
         await self.apool.close()
+
+    async def __acquire_advisory_lock(self, conn: AsyncConnection):
+        async with conn.cursor(row_factory=scalar_row) as cur:
+            await cur.execute(
+                """
+                    SELECT pg_advisory_xact_lock(42);
+                """
+            )
 
     async def __ensure_postgresql_version(self, conn: AsyncConnection):
         async with conn.cursor(row_factory=scalar_row) as cur:
@@ -978,6 +989,10 @@ class PostgresAdapter(DatabaseAdapter):
         is_admin: bool = False,
     ) -> int:
         async with self.apool.connection() as conn:
+            # acquire lock here because multiple workers/pods might try to do this at the same time
+            # the if condition below is susceptible to race conditions
+            await self.__acquire_advisory_lock(conn)
+
             async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
                 await cur.execute(
                     f"""
