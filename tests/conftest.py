@@ -3,10 +3,10 @@ import secrets
 import subprocess
 import time
 
+import httpx
 import psycopg
 import pytest
 import redis
-import requests
 
 BACKEND_BASE_URL = "https://localhost:8443"
 CONFIG_PATH = "backend-config/config.yml"
@@ -20,9 +20,9 @@ def secret_key():
 def wait_for_backend(timeout=30):
     for _ in range(timeout):
         try:
-            requests.get(f"{BACKEND_BASE_URL}/api/about", verify=False)
+            httpx.get(f"{BACKEND_BASE_URL}/api/about", verify=False).raise_for_status()
             return
-        except requests.exceptions.RequestException:
+        except httpx.HTTPError:
             time.sleep(1)
     raise TimeoutError("Server did not become healthy in time.")
 

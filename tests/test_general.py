@@ -1,5 +1,5 @@
+import httpx
 import pytest
-import requests
 
 
 @pytest.mark.parametrize(
@@ -19,8 +19,8 @@ import requests
 def test_about(backend):
     (base_url, _) = backend
 
-    response = requests.get(f"{base_url}about", verify=False)
-    assert response.status_code == 200
+    response = httpx.get(f"{base_url}about", verify=False)
+    assert response.status_code == httpx.codes.OK
     assert response.headers.get("Content-Type") == "application/json"
     content = response.json()
     assert (
@@ -47,8 +47,8 @@ def test_about(backend):
 def test_about_imprint(backend):
     (base_url, _) = backend
 
-    response = requests.get(f"{base_url}about", verify=False)
-    assert response.status_code == 200
+    response = httpx.get(f"{base_url}about", verify=False)
+    assert response.status_code == httpx.codes.OK
     assert response.headers.get("Content-Type") == "application/json"
     content = response.json()
     assert content.get("imprint").get("name") == "CI"

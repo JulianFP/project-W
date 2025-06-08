@@ -2,7 +2,7 @@ import platform
 from pathlib import Path
 
 import click
-from granian.constants import HTTPModes, Interfaces
+from granian.constants import Interfaces
 from granian.log import LogLevels
 from granian.server import Server
 
@@ -74,7 +74,6 @@ def main(
     }
 
     if dp.config.web_server.ssl:
-        granian_options["http"] = HTTPModes.http2
         granian_options["ssl_cert"] = dp.config.web_server.ssl.cert_file.absolute()
         granian_options["ssl_key"] = dp.config.web_server.ssl.key_file.absolute()
         if dp.config.web_server.ssl.key_file_password:

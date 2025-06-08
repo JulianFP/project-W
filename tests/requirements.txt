@@ -1,4 +1,4 @@
-requests
+httpx
 pytest
 smtpdfix
 psycopg

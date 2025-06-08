@@ -16,7 +16,6 @@ let
       watchfiles
 
       #for the tests: tests
-      requests
       pytest
       smtpdfix
 
