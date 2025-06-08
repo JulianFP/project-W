@@ -1,6 +1,8 @@
 import json
+import os
 import secrets
 import subprocess
+import sys
 import time
 
 import httpx
@@ -9,7 +11,6 @@ import pytest
 import redis
 
 BACKEND_BASE_URL = "https://localhost:8443"
-CONFIG_PATH = "backend-config/config.yml"
 
 
 @pytest.fixture(scope="session")
@@ -68,40 +69,44 @@ def backend(request, smtpd, secret_key):
         "imprint": request.param[0],
     }
 
-    with open(CONFIG_PATH, "w") as f:
+    with open("./backend-config/config.yml", "w") as f:
         json.dump(settings, f)
 
-    # can't use restart because at first run the container isn't running yet and restart doesn't start non-running containers
     subprocess.run(
         [
             "docker",
-            "compose",
-            "-f",
-            "docker-compose.ci.yml",
-            "--profile",
-            "app",
-            "stop",
-            "project-w",
-        ],
-        check=True,
-    )
-    subprocess.run(
-        [
-            "docker",
-            "compose",
-            "-f",
-            "docker-compose.ci.yml",
-            "--profile",
-            "app",
-            "up",
+            "run",
+            "--name",
+            "Project-W",
+            "--rm",
+            "--network",
+            "host",
+            "-v",
+            "./backend-config:/etc/xdg/project-W/",
             "-d",
             "project-w",
         ],
         check=True,
     )
-    wait_for_backend()
+    with subprocess.Popen(
+        ["docker", "logs", "-f", "Project-W"],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    ) as process:
+        wait_for_backend()
 
-    yield (f"{BACKEND_BASE_URL}/api/", smtpd)
+        yield (f"{BACKEND_BASE_URL}/api/", smtpd)
+
+        process.terminate()
+
+    subprocess.run(
+        [
+            "docker",
+            "stop",
+            "Project-W",
+        ],
+        check=True,
+    )
 
     with psycopg.connect(postgres_conn) as conn:
         with conn.cursor() as cur:
@@ -114,3 +119,70 @@ def backend(request, smtpd, secret_key):
     r = redis.Redis()
     redis_client = r.from_url(redis_conn)
     redis_client.flushdb()
+
+
+@pytest.fixture(scope="function")
+def runner():
+
+    created_runners = []
+
+    def _runner_factory(name: str, priority: int):
+        wait_for_backend()
+        response = httpx.post(f"{BACKEND_BASE_URL}/api/admins/create_runner")
+        content = response.json()
+
+        settings = {
+            "backend_url": BACKEND_BASE_URL,
+            "runner_name": name,
+            "runner_priority": priority,
+            "runner_token": content["token"],
+            "whisper_settings": {
+                "model_cache_dir": "/models",
+                "hf_token": "",
+                "torch_device": "cpu",
+                "compute_type": "int8",
+                "batch_size": 4,
+            },
+        }
+
+        runner_config_path = f"runner-{name}-config/config.yml"
+
+        os.makedirs(os.path.dirname(runner_config_path), exist_ok=True)
+        with open(runner_config_path, "w") as f:
+            json.dump(settings, f)
+
+        container_name = f"runner-{name}"
+        created_runners.append(container_name)
+        os.makedirs("./runner-models", exist_ok=True)
+        subprocess.run(
+            [
+                "docker",
+                "run",
+                "--name",
+                container_name,
+                "--rm",
+                "--network",
+                "host",
+                "-v",
+                f"./runner-{name}-config:/etc/xdg/project-W-runner/",
+                "-v",
+                "./runner-models:/models/",
+                "-d",
+                "project-w_runner",
+            ],
+            check=True,
+        )
+
+        return content["id"]
+
+    yield _runner_factory
+
+    for container_name in created_runners:
+        subprocess.run(
+            [
+                "docker",
+                "stop",
+                container_name,
+            ],
+            check=True,
+        )
