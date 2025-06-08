@@ -52,5 +52,5 @@ def test_about_imprint(backend):
     assert response.headers.get("Content-Type") == "application/json"
     content = response.json()
     assert content.get("imprint").get("name") == "CI"
-    assert content.get("email").get("name") == "ci@example.org"
-    assert content.get("email").get("additional_imprint_html") == "<div>hello</div>"
+    assert content.get("imprint").get("email") == "ci@example.org"
+    assert content.get("imprint").get("additional_imprint_html") == "<div>hello</div>"
