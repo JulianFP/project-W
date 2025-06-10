@@ -5,13 +5,48 @@ import shutil
 import ssl
 import subprocess
 import sys
+import time
 
 import httpx
 import psycopg
 import pytest
 import redis
 
-from .utils import wait_for_backend
+
+class HelperFunctions:
+    def wait_for_backend(self, base_url: str, timeout: int = 30):
+        for _ in range(timeout):
+            try:
+                httpx.get(f"{base_url}/api/about", verify=False).raise_for_status()
+                return
+            except httpx.HTTPError:
+                time.sleep(1)
+        raise TimeoutError("Server did not become healthy in time.")
+
+    def wait_for_job_assignment(self, job_id: int, client: httpx.Client, timeout: int = 30):
+        for _ in range(timeout):
+            response = client.get(f"/api/jobs/info?job_ids={job_id}")
+            response.raise_for_status()
+            job_info = response.json()
+            if job_info.get("runner_id"):
+                return
+            time.sleep(1)
+        raise TimeoutError("Runner was not assigned to the job in time.")
+
+    def wait_for_job_completion(self, job_id: int, client: httpx.Client, timeout: int = 30):
+        for _ in range(timeout):
+            response = client.get(f"/api/jobs/info?job_ids={job_id}")
+            response.raise_for_status()
+            job_info = response.json()
+            if job_info.get("step") == "success":
+                return
+            time.sleep(1)
+        raise TimeoutError("Job was not completed in time.")
+
+
+@pytest.fixture(scope="session")
+def helper_functions():
+    return HelperFunctions
 
 
 @pytest.fixture(scope="session")
@@ -20,7 +55,7 @@ def secret_key():
 
 
 @pytest.fixture(scope="function")
-def backend(request, smtpd, secret_key):
+def backend(request, smtpd, secret_key, helper_functions):
     BACKEND_BASE_URL = "https://localhost:8443"
 
     postgres_conn = "postgresql://test:test@localhost:5432/test_db"
@@ -91,7 +126,7 @@ def backend(request, smtpd, secret_key):
         stdout=sys.stdout,
         stderr=sys.stderr,
     ) as process:
-        wait_for_backend(BACKEND_BASE_URL)
+        helper_functions.wait_for_backend(BACKEND_BASE_URL)
 
         yield (f"{BACKEND_BASE_URL}", smtpd)
 

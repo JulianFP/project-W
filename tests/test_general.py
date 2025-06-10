@@ -3,8 +3,6 @@ from io import BytesIO
 import pytest
 from httpx import codes
 
-from .utils import wait_for_job_assignment, wait_for_job_completion
-
 
 @pytest.mark.parametrize(
     "backend",
@@ -63,7 +61,7 @@ def test_about_imprint(client):
     ],
     indirect=True,
 )
-def test_full_workflow_simple(get_runner, get_logged_in_client):
+def test_full_workflow_simple(get_runner, get_logged_in_client, helper_functions):
     runner_name = "runner 1"
     runner_id = get_runner(runner_name, 100)
     client = get_logged_in_client()
@@ -93,7 +91,7 @@ def test_full_workflow_simple(get_runner, get_logged_in_client):
     assert type(job_info.get("creation_timestamp")) == str
     assert 0 <= job_info.get("progress") <= 100
 
-    wait_for_job_assignment(job_id, client)
+    helper_functions.wait_for_job_assignment(job_id, client)
     response = client.get(f"/api/jobs/info?job_ids={job_id}")
     assert response.status_code == codes.OK
     job_info = response.json()
@@ -104,7 +102,7 @@ def test_full_workflow_simple(get_runner, get_logged_in_client):
     assert type(job_info.get("runner_version")) == str
     assert type(job_info.get("runner_git_hash")) == str
 
-    wait_for_job_completion(job_id, client)
+    helper_functions.wait_for_job_completion(job_id, client)
     response = client.get(f"/api/jobs/info?job_ids={job_id}")
     assert response.status_code == codes.OK
     job_info = response.json()

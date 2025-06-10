@@ -106,18 +106,18 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/julianfp/project-w:buildcache
           cache-to: type=registry,ref=ghcr.io/julianfp/project-w:buildcache,mode=max
 
-       - name: Build Project-W Runner docker image
-         uses: docker/build-push-action@v6
-         with:
-           context: https://github.com/julianfp/project-w-runner.git#${{ env.RUNNER_BRANCH_NAME }}
-           file: {context}/Dockerfile.dummy
-           tags: project-w_runner_dummy:latest
-           build-args: |
-             BUILDKIT_CONTEXT_KEEP_GIT_DIR=1
-           push: false
-           load: true
-           cache-from: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache
-           cache-to: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache,mode=max
+      - name: Build Project-W Runner docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: https://github.com/julianfp/project-w-runner.git#${{ env.RUNNER_BRANCH_NAME }}
+          file: ./Dockerfile.dummy
+          tags: project-w_runner_dummy:latest
+          build-args: |
+            BUILDKIT_CONTEXT_KEEP_GIT_DIR=1
+          push: false
+          load: true
+          cache-from: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache
+          cache-to: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache,mode=max
 
       - name: Run test suite
         run: |
