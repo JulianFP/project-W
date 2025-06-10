@@ -17,6 +17,7 @@ let
 
       #for the tests: tests
       pytest
+      pytest-timeout
       smtpdfix
 
       #optional dependencies: docs

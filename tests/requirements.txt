@@ -1,5 +1,6 @@
-httpx
 pytest
+pytest-timeout
+httpx
 smtpdfix
 psycopg
 redis
