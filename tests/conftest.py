@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import secrets
 import shutil
 import ssl
@@ -28,7 +29,7 @@ class HelperFunctions:
             response = client.get(f"/api/jobs/info?job_ids={job_id}")
             response.raise_for_status()
             job_info = response.json()
-            if job_info.get("runner_id"):
+            if job_info[0].get("runner_id"):
                 return
             time.sleep(1)
         raise TimeoutError("Runner was not assigned to the job in time.")
@@ -38,7 +39,7 @@ class HelperFunctions:
             response = client.get(f"/api/jobs/info?job_ids={job_id}")
             response.raise_for_status()
             job_info = response.json()
-            if job_info.get("step") == "success":
+            if job_info[0].get("step") == "success":
                 return
             time.sleep(1)
         raise TimeoutError("Job was not completed in time.")
@@ -46,7 +47,7 @@ class HelperFunctions:
 
 @pytest.fixture(scope="session")
 def helper_functions():
-    return HelperFunctions
+    return HelperFunctions()
 
 
 @pytest.fixture(scope="session")
@@ -155,20 +156,32 @@ def backend(request, smtpd, secret_key, helper_functions):
 
 
 @pytest.fixture(scope="function")
-def client(backend):
-    cafile = "./backend-config/certs/cert.pem"
-    ctx = ssl.create_default_context(cafile=cafile)
-    with httpx.Client(base_url=backend[0], verify=ctx) as client:
-        yield client
+def get_client(backend):
+    clients = []
+
+    def _client_factory(headers: dict[str, str] = {}):
+        cafile = "./backend-config/certs/cert.pem"
+        ctx = ssl.create_default_context(cafile=cafile)
+        client = httpx.Client(base_url=backend[0], headers=headers, verify=ctx)
+        clients.append(client)
+        return client
+
+    yield _client_factory
+
+    for client in clients:
+        client.close()
 
 
 @pytest.fixture(scope="function")
-def get_logged_in_client(client: httpx.Client):
-    def _client_factory(
-        email: str = "user@example.org", password: str = "Password-1234", as_admin: bool = False
-    ):
+def get_logged_in_client(get_client):
+    def _client_factory(as_admin: bool = False):
+        password = "Password-1234"
         if as_admin:
             email = "admin@example.org"
+        else:
+            email = "user@example.org"
+
+        client = get_client()
         response = client.post(
             "/api/local-account/login",
             data={
@@ -178,8 +191,9 @@ def get_logged_in_client(client: httpx.Client):
                 "scope": "admin" if as_admin else "",
             },
         )
-        client.headers = {"Authorization": f"Bearer: {response.text}"}
-        return client
+        response.raise_for_status()
+        headers = {"Authorization": f"Bearer {response.json()}"}
+        return get_client(headers)
 
     return _client_factory
 
@@ -192,6 +206,7 @@ def get_runner(backend, get_logged_in_client):
     def _runner_factory(name: str, priority: int):
         client = get_logged_in_client(as_admin=True)
         response = client.post("/api/admins/create_runner")
+        response.raise_for_status()
         content = response.json()
 
         settings = {
@@ -215,7 +230,8 @@ def get_runner(backend, get_logged_in_client):
         with open(f"{runner_config_dir}/config.yml", "w") as f:
             json.dump(settings, f)
 
-        container_name = f"runner-{name}"
+        normalized_name = re.sub("[^a-zA-Z0-9_.-]", "_", name)
+        container_name = f"runner-{normalized_name}"
         created_runners.append(container_name)
         subprocess.run(
             [

@@ -18,7 +18,8 @@ from httpx import codes
     ],
     indirect=True,
 )
-def test_about(client):
+def test_about(get_client):
+    client = get_client()
     response = client.get("/api/about")
     assert response.status_code == codes.OK
     assert response.headers.get("Content-Type") == "application/json"
@@ -44,7 +45,8 @@ def test_about(client):
     ],
     indirect=True,
 )
-def test_about_imprint(client):
+def test_about_imprint(get_client):
+    client = get_client()
     response = client.get("/api/about")
     assert response.status_code == codes.OK
     assert response.headers.get("Content-Type") == "application/json"
@@ -68,14 +70,14 @@ def test_full_workflow_simple(get_runner, get_logged_in_client, helper_functions
 
     dummy_file = BytesIO(b"dummy data")
 
-    files = {"audio-file": (dummy_file, "audio/aac")}
+    files = {"audio_file": ("dummy-file", dummy_file, "audio/aac")}
     response = client.post("/api/jobs/submit_job", files=files)
     assert response.status_code == codes.OK
-    job_id = int(response.text)
+    job_id = response.json()
 
     response = client.get("/api/jobs/count?exclude_finished=false&exclude_downloaded=false")
     assert response.status_code == codes.OK
-    assert int(response.text) == 1
+    assert response.json() == 1
 
     response = client.get(
         "/api/jobs/get?start_index=0&end_index=9&sort_key=creation_time&descending=true&exclude_finished=false&exclude_downloaded=false"
@@ -86,38 +88,42 @@ def test_full_workflow_simple(get_runner, get_logged_in_client, helper_functions
     response = client.get(f"/api/jobs/info?job_ids={job_id}")
     assert response.status_code == codes.OK
     job_info = response.json()
-    assert job_info.get("file_name") == "audio-file"
-    assert type(job_info.get("settings")) == dict
-    assert type(job_info.get("creation_timestamp")) == str
-    assert 0 <= job_info.get("progress") <= 100
+    assert job_info[0].get("file_name") == "dummy-file"
+    assert type(job_info[0].get("settings")) == dict
+    assert type(job_info[0].get("creation_timestamp")) == str
+    assert 0 <= job_info[0].get("progress") <= 100
 
     helper_functions.wait_for_job_assignment(job_id, client)
     response = client.get(f"/api/jobs/info?job_ids={job_id}")
     assert response.status_code == codes.OK
     job_info = response.json()
-    assert 0 <= job_info.get("progress") <= 100
-    assert job_info.get("runner_id") == runner_id
-    assert job_info.get("runner_name") == runner_name
-    assert job_info.get("runner_source_code_url") == "https://github.com/JulianFP/project-W-runner"
-    assert type(job_info.get("runner_version")) == str
-    assert type(job_info.get("runner_git_hash")) == str
+    assert 0 <= job_info[0].get("progress") <= 100
+    assert job_info[0].get("runner_id") == runner_id
+    assert job_info[0].get("runner_name") == runner_name
+    assert (
+        job_info[0].get("runner_source_code_url") == "https://github.com/JulianFP/project-W-runner"
+    )
+    assert type(job_info[0].get("runner_version")) == str
+    assert type(job_info[0].get("runner_git_hash")) == str
 
     helper_functions.wait_for_job_completion(job_id, client)
     response = client.get(f"/api/jobs/info?job_ids={job_id}")
     assert response.status_code == codes.OK
     job_info = response.json()
-    assert job_info.get("progress") == 100
-    assert type(job_info.get("finish_timestamp")) == str
-    assert job_info.get("runner_id") == runner_id
-    assert job_info.get("runner_name") == runner_name
-    assert job_info.get("runner_source_code_url") == "https://github.com/JulianFP/project-W-runner"
-    assert type(job_info.get("runner_version")) == str
-    assert type(job_info.get("runner_git_hash")) == str
+    assert job_info[0].get("progress") == 100
+    assert type(job_info[0].get("finish_timestamp")) == str
+    assert job_info[0].get("runner_id") == runner_id
+    assert job_info[0].get("runner_name") == runner_name
+    assert (
+        job_info[0].get("runner_source_code_url") == "https://github.com/JulianFP/project-W-runner"
+    )
+    assert type(job_info[0].get("runner_version")) == str
+    assert type(job_info[0].get("runner_git_hash")) == str
 
     response = client.get(f"/api/jobs/download_transcript?job_id={job_id}&transcript_type=as_txt")
     assert response.status_code == codes.OK
     assert (
-        response.text
+        response.json()
         == """
     Space, the final frontier.
     These are the voyages of the starship Enterprise.
