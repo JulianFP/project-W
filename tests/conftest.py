@@ -1,16 +1,17 @@
 import json
 import os
 import secrets
+import shutil
+import ssl
 import subprocess
 import sys
-import time
 
 import httpx
 import psycopg
 import pytest
 import redis
 
-BACKEND_BASE_URL = "https://localhost:8443"
+from .utils import wait_for_backend
 
 
 @pytest.fixture(scope="session")
@@ -18,18 +19,10 @@ def secret_key():
     return secrets.token_hex(32)
 
 
-def wait_for_backend(timeout=30):
-    for _ in range(timeout):
-        try:
-            httpx.get(f"{BACKEND_BASE_URL}/api/about", verify=False).raise_for_status()
-            return
-        except httpx.HTTPError:
-            time.sleep(1)
-    raise TimeoutError("Server did not become healthy in time.")
-
-
 @pytest.fixture(scope="function")
 def backend(request, smtpd, secret_key):
+    BACKEND_BASE_URL = "https://localhost:8443"
+
     postgres_conn = "postgresql://test:test@localhost:5432/test_db"
     redis_conn = "redis://localhost:6379/project-W"
 
@@ -62,7 +55,12 @@ def backend(request, smtpd, secret_key):
                         "email": "admin@example.org",
                         "password": "Password-1234",
                         "is_admin": True,
-                    }
+                    },
+                    1: {
+                        "email": "user@example.org",
+                        "password": "Password-1234",
+                        "is_admin": False,
+                    },
                 },
             },
         },
@@ -93,9 +91,9 @@ def backend(request, smtpd, secret_key):
         stdout=sys.stdout,
         stderr=sys.stderr,
     ) as process:
-        wait_for_backend()
+        wait_for_backend(BACKEND_BASE_URL)
 
-        yield (f"{BACKEND_BASE_URL}/api/", smtpd)
+        yield (f"{BACKEND_BASE_URL}", smtpd)
 
         process.terminate()
 
@@ -122,38 +120,68 @@ def backend(request, smtpd, secret_key):
 
 
 @pytest.fixture(scope="function")
-def runner():
+def client(backend):
+    cafile = "./backend-config/certs/cert.pem"
+    ctx = ssl.create_default_context(cafile=cafile)
+    with httpx.Client(base_url=backend[0], verify=ctx) as client:
+        yield client
+
+
+@pytest.fixture(scope="function")
+def get_logged_in_client(client: httpx.Client):
+    def _client_factory(
+        email: str = "user@example.org", password: str = "Password-1234", as_admin: bool = False
+    ):
+        if as_admin:
+            email = "admin@example.org"
+        response = client.post(
+            "/api/local-account/login",
+            data={
+                "grant_type": "password",
+                "username": email,
+                "password": password,
+                "scope": "admin" if as_admin else "",
+            },
+        )
+        client.headers = {"Authorization": f"Bearer: {response.text}"}
+        return client
+
+    return _client_factory
+
+
+@pytest.fixture(scope="function")
+def get_runner(backend, get_logged_in_client):
 
     created_runners = []
 
     def _runner_factory(name: str, priority: int):
-        wait_for_backend()
-        response = httpx.post(f"{BACKEND_BASE_URL}/api/admins/create_runner")
+        client = get_logged_in_client(as_admin=True)
+        response = client.post("/api/admins/create_runner")
         content = response.json()
 
         settings = {
-            "backend_url": BACKEND_BASE_URL,
-            "runner_name": name,
-            "runner_priority": priority,
-            "runner_token": content["token"],
+            "runner_attributes": {
+                "name": name,
+                "priority": priority,
+            },
+            "backend_settings": {
+                "url": backend[0],
+                "auth_token": content["token"],
+                "ca_pem_file_path": "/etc/xdg/project-W-runner/backend-cert.pem",
+            },
             "whisper_settings": {
-                "model_cache_dir": "/models",
-                "hf_token": "",
-                "torch_device": "cpu",
-                "compute_type": "int8",
-                "batch_size": 4,
+                "hf_token": "abcd",
             },
         }
 
-        runner_config_path = f"runner-{name}-config/config.yml"
-
-        os.makedirs(os.path.dirname(runner_config_path), exist_ok=True)
-        with open(runner_config_path, "w") as f:
+        runner_config_dir = f"runner-{name}-config"
+        os.makedirs(runner_config_dir, exist_ok=True)
+        shutil.copyfile("./backend-config/certs/cert.pem", f"{runner_config_dir}/backend-cert.pem")
+        with open(f"{runner_config_dir}/config.yml", "w") as f:
             json.dump(settings, f)
 
         container_name = f"runner-{name}"
         created_runners.append(container_name)
-        os.makedirs("./runner-models", exist_ok=True)
         subprocess.run(
             [
                 "docker",
@@ -165,10 +193,8 @@ def runner():
                 "host",
                 "-v",
                 f"./runner-{name}-config:/etc/xdg/project-W-runner/",
-                "-v",
-                "./runner-models:/models/",
                 "-d",
-                "project-w_runner",
+                "project-w_runner_dummy",
             ],
             check=True,
         )

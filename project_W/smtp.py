@@ -112,7 +112,7 @@ class SmtpClient:
         msg_body = (
             f"Your Project-W job with id {job_id} was aborted with the following error message:\n\n"
             f"{error_msg}\n\n"
-            f"You should try to re-submit your job after ensuring that your job settings are valid."
+            f"You can try to re-submit your job after ensuring that your job settings are valid. "
             f"You can do so under the following url by clicking on the 'New Job' button.\n"
             f"{url}"
         )

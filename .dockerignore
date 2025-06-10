@@ -5,6 +5,7 @@ nix/
 .gitignore
 README.md
 flake.*
-*.yml
-*.yaml
-*.sh
+**.yml
+**.yaml
+**.sh
+**/__pycache__/
