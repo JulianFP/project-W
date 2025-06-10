@@ -7,6 +7,7 @@ import ssl
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 
 import httpx
 import psycopg
@@ -29,7 +30,7 @@ class HelperFunctions:
             response = client.get(f"/api/jobs/info?job_ids={job_id}")
             response.raise_for_status()
             job_info = response.json()
-            if job_info[0].get("runner_id"):
+            if job_info[0].get("runner_id") is not None:
                 return
             time.sleep(1)
         raise TimeoutError("Runner was not assigned to the job in time.")
@@ -199,10 +200,8 @@ def get_logged_in_client(get_client):
 
 
 @pytest.fixture(scope="function")
-def get_runner(backend, get_logged_in_client):
-
-    created_runners = []
-
+def runner(backend, get_logged_in_client):
+    @contextmanager
     def _runner_factory(name: str, priority: int):
         client = get_logged_in_client(as_admin=True)
         response = client.post("/api/admins/create_runner")
@@ -232,7 +231,6 @@ def get_runner(backend, get_logged_in_client):
 
         normalized_name = re.sub("[^a-zA-Z0-9_.-]", "_", name)
         container_name = f"runner-{normalized_name}"
-        created_runners.append(container_name)
         subprocess.run(
             [
                 "docker",
@@ -250,11 +248,14 @@ def get_runner(backend, get_logged_in_client):
             check=True,
         )
 
-        return content["id"]
+        with subprocess.Popen(
+            ["docker", "logs", "-f", container_name],
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        ) as process:
+            yield _runner_factory
+            process.terminate()
 
-    yield _runner_factory
-
-    for container_name in created_runners:
         subprocess.run(
             [
                 "docker",
@@ -263,3 +264,5 @@ def get_runner(backend, get_logged_in_client):
             ],
             check=True,
         )
+
+    return _runner_factory
