@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 
 import redis.asyncio as redis
+from pydantic import ValidationError
 from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 
@@ -229,7 +230,10 @@ class RedisAdapter(CachingAdapter):
             (runner_dict,) = await pipe.execute()
             if not runner_dict:
                 return None
-            return OnlineRunner.model_validate(runner_dict | {"id": runner_id})
+            try:
+                return OnlineRunner.model_validate(runner_dict | {"id": runner_id})
+            except ValidationError:
+                return None
 
     async def assign_job_to_online_runner(self, job_id: int, user_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
@@ -303,6 +307,8 @@ class RedisAdapter(CachingAdapter):
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.hget(self.__get_job_key(job_id), "runner_id")
             (runner_id,) = await pipe.execute()
+            if not runner_id:
+                return None
             return int(runner_id)
 
     async def enqueue_new_job(self, job_id: int, job_priority: int, user_id: int):
@@ -332,16 +338,17 @@ class RedisAdapter(CachingAdapter):
                 return None
             else:
                 job_id = ids_returned[0][0]
-                await pipe.execute()
                 return int(job_id)
 
     async def get_in_process_job(self, job_id: int) -> InProcessJob | None:
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.hgetall(self.__get_job_key(job_id))
             (job_dict,) = await pipe.execute()
-            if job_dict:
+            if not job_dict:
+                return None
+            try:
                 return InProcessJob.model_validate(job_dict | {"id": job_id})
-            else:
+            except ValidationError:
                 return None
 
     async def set_in_process_job(self, job_id: int, mapping: dict[str, bytes | str | int | float]):
@@ -356,7 +363,9 @@ class RedisAdapter(CachingAdapter):
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.zrevrank(self.__job_queue_sorted_set_name, job_id)
             (position,) = await pipe.execute()
-            return position
+            if not position:
+                return None
+            return int(position)
 
     async def event_generator(self, user_id: int) -> AsyncGenerator[str, None]:
         async with self.client.pubsub() as pubsub:
