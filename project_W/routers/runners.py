@@ -43,8 +43,7 @@ async def register(
     runner_data: RunnerRegisterRequest,
 ) -> int:
     """
-    Registers the given runner as online. Returns False if the
-    runner is already registered as online or True otherwise.
+    Registers the given runner as online.
     Starting from the registration, the runner must periodically send
     heartbeat requests to the manager, or it may be unregistered.
     """

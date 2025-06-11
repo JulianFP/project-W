@@ -90,7 +90,6 @@ def main(
         granian_options["log_access"] = True
         granian_options["reload"] = True
         granian_options["reload_paths"] = [Path(__file__).parent.absolute()]
-        print(granian_options["reload_paths"])
 
     Server(**granian_options).serve()
 

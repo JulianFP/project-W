@@ -75,17 +75,31 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert response.status_code == codes.OK
         job_id = response.json()
 
-        response = client.get("/api/jobs/count?exclude_finished=false&exclude_downloaded=false")
+        response = client.get(
+            "/api/jobs/count",
+            params={
+                "exclude_finished": False,
+                "exclude_downloaded": False,
+            },
+        )
         assert response.status_code == codes.OK
         assert response.json() == 1
 
         response = client.get(
-            "/api/jobs/get?start_index=0&end_index=9&sort_key=creation_time&descending=true&exclude_finished=false&exclude_downloaded=false"
+            "/api/jobs/get",
+            params={
+                "start_index": 0,
+                "end_index": 9,
+                "sort_key": "creation_time",
+                "descending": True,
+                "exclude_finished": False,
+                "exclude_downloaded": False,
+            },
         )
         assert response.status_code == codes.OK
         assert response.json() == [job_id]
 
-        response = client.get(f"/api/jobs/info?job_ids={job_id}")
+        response = client.get("/api/jobs/info", params={"job_ids": job_id})
         assert response.status_code == codes.OK
         job_info = response.json()
         assert job_info[0].get("file_name") == "dummy-file"
@@ -94,7 +108,7 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert 0 <= job_info[0].get("progress") <= 100
 
         helper_functions.wait_for_job_assignment(job_id, client)
-        response = client.get(f"/api/jobs/info?job_ids={job_id}")
+        response = client.get("/api/jobs/info", params={"job_ids": job_id})
         assert response.status_code == codes.OK
         job_info = response.json()
         assert 0 <= job_info[0].get("progress") <= 100
@@ -108,7 +122,7 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert type(job_info[0].get("runner_git_hash")) == str
 
         helper_functions.wait_for_job_completion(job_id, client)
-        response = client.get(f"/api/jobs/info?job_ids={job_id}")
+        response = client.get("/api/jobs/info", params={"job_ids": job_id})
         assert response.status_code == codes.OK
         job_info = response.json()
         assert job_info[0].get("progress") == 100
@@ -123,7 +137,11 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert type(job_info[0].get("runner_git_hash")) == str
 
         response = client.get(
-            f"/api/jobs/download_transcript?job_id={job_id}&transcript_type=as_txt"
+            "/api/jobs/download_transcript",
+            params={
+                "job_id": job_id,
+                "transcript_type": "as_txt",
+            },
         )
         assert response.status_code == codes.OK
         assert (

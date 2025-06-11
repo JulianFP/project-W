@@ -230,9 +230,13 @@ class RedisAdapter(CachingAdapter):
             (runner_dict,) = await pipe.execute()
             if not runner_dict:
                 return None
+            runner_dict["id"] = runner_id
             try:
-                return OnlineRunner.model_validate(runner_dict | {"id": runner_id})
+                return OnlineRunner.model_validate(runner_dict)
             except ValidationError:
+                self.logger.error(
+                    f"Validation error occured while reading from redis! The following data was read instead of an OnlineRunner object: {runner_dict}. Continuing..."
+                )
                 return None
 
     async def assign_job_to_online_runner(self, job_id: int, user_id: int):
@@ -346,9 +350,13 @@ class RedisAdapter(CachingAdapter):
             (job_dict,) = await pipe.execute()
             if not job_dict:
                 return None
+            job_dict["id"] = job_id
             try:
-                return InProcessJob.model_validate(job_dict | {"id": job_id})
+                return InProcessJob.model_validate(job_dict)
             except ValidationError:
+                self.logger.error(
+                    f"Validation error occured while reading from redis! The following data was read instead of an InProcessJob object: {job_dict}. Continuing..."
+                )
                 return None
 
     async def set_in_process_job(self, job_id: int, mapping: dict[str, bytes | str | int | float]):
@@ -372,6 +380,4 @@ class RedisAdapter(CachingAdapter):
             await pubsub.subscribe(self.__get_pubsub_channel(user_id))
             async for message in pubsub.listen():
                 data = message["data"]
-                print(data)
                 yield f"event: job_updated\ndata: {data}\n\n"
-        print("exited")
