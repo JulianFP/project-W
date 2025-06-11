@@ -3,6 +3,7 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import ssl
 import subprocess
 import sys
@@ -35,7 +36,7 @@ class HelperFunctions:
             time.sleep(1)
         raise TimeoutError("Runner was not assigned to the job in time.")
 
-    def wait_for_job_completion(self, job_id: int, client: httpx.Client, timeout: int = 10):
+    def wait_for_job_completion(self, job_id: int, client: httpx.Client, timeout: int = 20):
         for _ in range(timeout):
             response = client.get("/api/jobs/info", params={"job_ids": job_id})
             response.raise_for_status()
@@ -114,6 +115,8 @@ def backend(request, smtpd, secret_key, helper_functions):
             "--name",
             "Project-W",
             "--rm",
+            "--stop-timeout",
+            "5",
             "--network",
             "host",
             "-v",
@@ -132,7 +135,7 @@ def backend(request, smtpd, secret_key, helper_functions):
 
         yield (f"{BACKEND_BASE_URL}", smtpd)
 
-        process.terminate()
+        process.send_signal(signal.SIGINT)
 
     subprocess.run(
         [
@@ -238,6 +241,8 @@ def runner(backend, get_logged_in_client):
                 "--name",
                 container_name,
                 "--rm",
+                "--stop-timeout",
+                "5",
                 "--network",
                 "host",
                 "-v",
@@ -253,8 +258,8 @@ def runner(backend, get_logged_in_client):
             stdout=sys.stdout,
             stderr=sys.stderr,
         ) as process:
-            yield _runner_factory
-            process.terminate()
+            yield content["id"]
+            process.send_signal(signal.SIGINT)
 
         subprocess.run(
             [

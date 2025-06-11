@@ -121,7 +121,7 @@ jobs:
 
       - name: Run test suite
         run: |
-          python -m pytest --timeout=30 tests/
+          python -m pytest --timeout=45 tests/
 
   docker-build-push:
     #don't push docker image on a PR

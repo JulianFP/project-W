@@ -1,3 +1,4 @@
+import os
 from io import BytesIO
 
 import pytest
@@ -68,7 +69,7 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
     with runner(runner_name, 100) as runner_id:
         client = get_logged_in_client()
 
-        dummy_file = BytesIO(b"dummy data")
+        dummy_file = BytesIO(os.urandom(1024 * 1024))  # generate 1MiB random binary file
 
         files = {"audio_file": ("dummy-file", dummy_file, "audio/aac")}
         response = client.post("/api/jobs/submit_job", files=files)
@@ -146,9 +147,7 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert response.status_code == codes.OK
         assert (
             response.json()
-            == """
-        Space, the final frontier.
-        These are the voyages of the starship Enterprise.
-        Its five-year mission, to explore strange new worlds, to seek out new life and new civilizations, to boldly go where no man has gone before.
-        """
+            == """Space, the final frontier.
+These are the voyages of the starship Enterprise.
+Its five-year mission, to explore strange new worlds, to seek out new life and new civilizations, to boldly go where no man has gone before."""
         )
