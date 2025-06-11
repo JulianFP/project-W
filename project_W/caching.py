@@ -172,14 +172,18 @@ class RedisAdapter(CachingAdapter):
     async def open(self, connection_obj: RedisConnection):
         # 3 retries on timeout
         retry = Retry(ExponentialBackoff(), 3)
+        redis_extra_args = {
+            "retry": retry,
+            "retry_on_timeout": True,
+            "decode_responses": True,
+        }
         self.client = redis.StrictRedis(
-            unix_socket_path=str(connection_obj.unix_socket_path),
-            retry=retry,
-            retry_on_timeout=True,
-            decode_responses=True,
+            unix_socket_path=str(connection_obj.unix_socket_path), **redis_extra_args
         )  # implicitly creates connection pool
         if connection_obj.connection_string is not None:
-            self.client = self.client.from_url(str(connection_obj.connection_string))
+            self.client = self.client.from_url(
+                str(connection_obj.connection_string), **redis_extra_args
+            )
 
         if not await self.client.ping():
             raise Exception(
