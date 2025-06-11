@@ -12,7 +12,8 @@ Setup instructions
 Backend
 ```````
 
-1. You have to have Python, pip and git installed. The project is written to be compatible with Python 3.8 and newer however we mostly used Python 3.11 during development.
+1. You have to have Python, pip and git installed. The project is written to be compatible with Python 3.11 and newer however we mostly used Python 3.12 and 3.13 during development.
+
 2. Clone the repository and enter it
 
    .. code-block:: console
@@ -35,14 +36,15 @@ Backend
 
    .. code-block:: console
 
-      python -m pip install .[tests,docs]
+      python -m pip install .[development_mode,docs]
 
 You are now ready to go!
 
 Frontend
 ````````
 
-1. You have to have nodejs, pnpm and git installed. We used nodejs 20 and 21 for development.
+1. You have to have nodejs, pnpm and git installed. We used nodejs 24 for development.
+
 2. Clone the repository and enter it
 
    .. code-block:: console
@@ -83,10 +85,10 @@ Runner
 
    .. code-block:: bash
 
-      python -m pip install .[tests,docs]
+      python -m pip install .[not_dummy,tests]
 
 You are now ready to go! Note that by default, Whisper caches downloaded models in ``$HOME/.cache/whisper/``. If you would like
-the runner to download the models into a different directory, set ``modelCacheDir`` in your ``config.yml`` to the desired directory.
+the runner to download the models into a different directory, set ``whisper_settings.model_cache_dir`` in your ``config.yml`` to the desired directory.
 
 .. _nix_develop-label:
 
@@ -150,3 +152,5 @@ You can use the ``run.sh`` script to start the runner:
       ./run.sh
 
 Note that the runner will exit immediately if you don't provide a valid runner token as returned by ``/api/runners/create`` or if it can't access the backend at the provided URL. For more info on the runner configuration, refer to :ref:`description_runner_config-label`.
+
+Alternatively if you don't want to run the whisperx component of the runner you can also add the `--dummy` CLI option to the command inside `run.sh`. This will result in the runner not doing any actual transcribing but can be a good option for testing purposes.

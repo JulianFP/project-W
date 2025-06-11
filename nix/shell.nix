@@ -22,8 +22,9 @@ let
 
       #optional dependencies: docs
       sphinx
-      sphinxcontrib-httpdomain
-      sphinx-jsonschema
+      sphinxcontrib-openapi
+      autodoc-pydantic
+      gitpython
       sphinx-mdinclude
       sphinx-rtd-theme
     ];

@@ -4,11 +4,10 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-
 # -- Project information -----------------------------------------------------
 
 project = "Project-W"
-copyright = "2023, Julian Partanen & Markus Everling"
+copyright = "2023-2025, Julian Partanen & Markus Everling"
 author = "Julian Partanen, Markus Everling"
 
 # -- General configuration ---------------------------------------------------
@@ -17,10 +16,8 @@ author = "Julian Partanen, Markus Everling"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "sphinxcontrib.httpdomain",
-    "sphinx-jsonschema",
-    "sphinxcontrib.autohttp.flask",
-    "sphinxcontrib.autohttp.flaskqref",
+    "sphinxcontrib.openapi",
+    "sphinxcontrib.autodoc_pydantic",
     "sphinx_mdinclude",
     "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
@@ -53,3 +50,24 @@ html_css_files = [
     # refer to https://stackoverflow.com/questions/69359978/grid-table-does-not-word-wrap
     "css/custom.css",
 ]
+
+# -- API autodoc setup -------------------------------------------------------
+
+import json
+from pathlib import Path
+
+from project_W.app import app
+from project_W.routers import ldap, local_account, oidc
+
+app.include_router(oidc.router, prefix="/api")
+app.include_router(ldap.router, prefix="/api")
+app.include_router(local_account.router, prefix="/api")
+
+openapi_file = Path(__file__).parent / "openapi.json"
+openapi_file.write_text(json.dumps(app.openapi()))
+
+# -- Config file autodoc setup -----------------------------------------------
+autodoc_pydantic_model_show_field_summary = False
+autodoc_pydantic_model_show_config_summary = False
+autodoc_pydantic_model_show_validator_members = False
+autodoc_pydantic_model_show_validator_summary = False

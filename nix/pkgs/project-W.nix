@@ -1,17 +1,17 @@
-{ lib, python313Packages }:
+{ lib, python3Packages }:
 
-python313Packages.buildPythonPackage rec {
+python3Packages.buildPythonPackage rec {
   pname = "project_W";
   version = "0.3.0";
   pyproject = true;
 
   src = ../../.;
 
-  build-system = [ python313Packages.setuptools ];
+  build-system = [ python3Packages.setuptools ];
 
-  nativeBuildInputs = with python313Packages; [ setuptools-scm ];
+  nativeBuildInputs = with python3Packages; [ setuptools-scm ];
 
-  propagatedBuildInputs = with python313Packages; [
+  propagatedBuildInputs = with python3Packages; [
     click
     argon2-cffi
     fastapi

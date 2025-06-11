@@ -248,7 +248,7 @@ class SMTPServerSettings(BaseModel):
     )
     secure: SMTPSecureEnum = Field(
         default=SMTPSecureEnum.STARTTLS,
-        description="Whether to use ssl, starttls or no encryption with the smtp server.",
+        description="Whether to use 'ssl', 'starttls' or no encryption ('plain') with the smtp server.",
     )
     sender_email: EmailValidated = Field(
         description="Email address from which emails will be sent to the users.",
