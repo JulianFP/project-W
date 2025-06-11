@@ -39,7 +39,7 @@ dependencies = [
     # Postgres client library
     "psycopg[binary,pool]",
     # Redis client library
-    "redis",
+    "redis[hiredis]",
     # auth & security stuff
     "authlib",
     "pyjwt",

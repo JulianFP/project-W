@@ -2,5 +2,5 @@ pytest
 pytest-timeout
 httpx
 smtpdfix
-psycopg
-redis
+psycopg[binary,pool]
+redis[hiredis]

@@ -23,9 +23,9 @@ jobs:
     strategy:
       matrix:
         #test all components with the oldest and newest supported version
-        postgres_version: [ 14, 17 ] #14 is minimal required version
-        redis_version: [ 6, 8 ]
-        python_version: ["3.11", "3.13"]
+        postgres_version: [ "14", "17" ] #14 is minimal required version
+        redis_version: [ "7.2", "8" ] #7.2 is minimal required version
+        python_version: ["3.11", "3.13"] #3.11 is minimal required version
 
     outputs:
       frontend-branch-name: ${{ steps.branch-names.outputs.frontend-branch-name }}

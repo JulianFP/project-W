@@ -152,6 +152,8 @@ class CachingAdapter(ABC):
 
 class RedisAdapter(CachingAdapter):
 
+    minimal_required_redis_version = [7, 2]
+
     __heartbeat_timeout = 60
 
     __runner_sorted_set_name = "online_runners_sorted"
@@ -189,10 +191,19 @@ class RedisAdapter(CachingAdapter):
         self.logger.info("Successfully connected to Redis")
 
     async def __check_server_version(self):
-        query_result = await self.client.execute_command("INFO")
+        query_result = await self.client.info("server")
         if query_result is None:
             raise Exception("Could not check Redis server version")
         redis_version = query_result["redis_version"]
+        redis_version_split = list(map(int, str(redis_version).split(".")))
+        for i in range(min(len(self.minimal_required_redis_version), len(redis_version_split))):
+            if redis_version_split[i] < self.minimal_required_redis_version[i]:
+                raise Exception(
+                    f"The version of the specified Redis instance is {redis_version} while the minimal required version is {'.'.join(map(str, self.minimal_required_redis_version))}"
+                )
+            elif redis_version_split[i] > self.minimal_required_redis_version[i]:
+                break
+
         self.logger.info(f"Redis server is on version {redis_version}")
 
     async def close(self):

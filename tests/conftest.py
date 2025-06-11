@@ -16,7 +16,7 @@ import redis
 
 
 class HelperFunctions:
-    def wait_for_backend(self, base_url: str, timeout: int = 30):
+    def wait_for_backend(self, base_url: str, timeout: int = 10):
         for _ in range(timeout):
             try:
                 httpx.get(f"{base_url}/api/about", verify=False).raise_for_status()
@@ -25,9 +25,9 @@ class HelperFunctions:
                 time.sleep(1)
         raise TimeoutError("Server did not become healthy in time.")
 
-    def wait_for_job_assignment(self, job_id: int, client: httpx.Client, timeout: int = 30):
+    def wait_for_job_assignment(self, job_id: int, client: httpx.Client, timeout: int = 10):
         for _ in range(timeout):
-            response = client.get(f"/api/jobs/info?job_ids={job_id}")
+            response = client.get("/api/jobs/info", params={"job_ids": job_id})
             response.raise_for_status()
             job_info = response.json()
             if job_info[0].get("runner_id") is not None:
@@ -35,9 +35,9 @@ class HelperFunctions:
             time.sleep(1)
         raise TimeoutError("Runner was not assigned to the job in time.")
 
-    def wait_for_job_completion(self, job_id: int, client: httpx.Client, timeout: int = 30):
+    def wait_for_job_completion(self, job_id: int, client: httpx.Client, timeout: int = 10):
         for _ in range(timeout):
-            response = client.get(f"/api/jobs/info?job_ids={job_id}")
+            response = client.get("/api/jobs/info", params={"job_ids": job_id})
             response.raise_for_status()
             job_info = response.json()
             if job_info[0].get("step") == "success":
