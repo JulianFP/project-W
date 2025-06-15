@@ -8,10 +8,16 @@ import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
 interface Props {
 	open?: boolean;
+	post_action?: () => Promise<void>;
 	job_id: number;
 	job_file_name: string;
 }
-let { open = $bindable(false), job_id, job_file_name }: Props = $props();
+let {
+	open = $bindable(false),
+	post_action = async () => {},
+	job_id,
+	job_file_name,
+}: Props = $props();
 
 let waiting: boolean = $state(false);
 let error: boolean = $state(false);
@@ -95,6 +101,7 @@ async function downloadTranscript(): Promise<void> {
 	}
 
 	waiting = false;
+	await post_action();
 }
 </script>
 

@@ -14,7 +14,10 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post?: never;
-		/** Invalidate Token */
+		/**
+		 * Invalidate Token
+		 * @description Invalidate the local token with the provided id. Doesn't work for OIDC tokens. After calling this route the token with the provided id can't be used anymore.
+		 */
 		delete: operations["invalidate_token_api_users_invalidate_token_delete"];
 		options?: never;
 		head?: never;
@@ -31,7 +34,10 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post?: never;
-		/** Invalidate All Tokens */
+		/**
+		 * Invalidate All Tokens
+		 * @description Invalidate all local tokens of the logged in user account. Doesn't work for OIDC tokens. After calling this route all local tokens of the logged in user account won't work anymore.
+		 */
 		delete: operations["invalidate_all_tokens_api_users_invalidate_all_tokens_delete"];
 		options?: never;
 		head?: never;
@@ -47,7 +53,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Get New Api Token */
+		/**
+		 * Get New Api Token
+		 * @description Create a new API token. The main difference between API tokens and the JWT tokens that you get after login is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfuly response contains the newly created token.
+		 */
 		post: operations["get_new_api_token_api_users_get_new_api_token_post"];
 		delete?: never;
 		options?: never;
@@ -62,7 +71,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Get All Token Info */
+		/**
+		 * Get All Token Info
+		 * @description Get a list of all token id's and names currently in use by this account. Temporary tokens created by the login route all share the same id and this id is marked as such. All other id's/names refer to API tokens that the user explicitly created using the get_new_api_token route.
+		 */
 		get: operations["get_all_token_info_api_users_get_all_token_info_get"];
 		put?: never;
 		post?: never;
@@ -79,25 +91,11 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Token Info */
-		get: operations["token_info_api_users_info_get"];
-		put?: never;
-		post?: never;
-		delete?: never;
-		options?: never;
-		head?: never;
-		patch?: never;
-		trace?: never;
-	};
-	"/api/users/info_db": {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		/** User Info */
-		get: operations["user_info_api_users_info_db_get"];
+		/**
+		 * User Info
+		 * @description This route returns all information about the currently logged in user. In addition to the information that is encoded in the JWT token itself (which the client could just extract on its own) it also returns information from the database and replaces iss/sub information with the provider name and account type of the user (local/ldap/oidc).
+		 */
+		get: operations["user_info_api_users_info_get"];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -116,7 +114,10 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post?: never;
-		/** Delete User */
+		/**
+		 * Delete User
+		 * @description Deletes the currently logged in user and all information related to it (like jobs, tokens, etc.)
+		 */
 		delete: operations["delete_user_api_users_delete_delete"];
 		options?: never;
 		head?: never;
@@ -132,25 +133,11 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Create Runner */
+		/**
+		 * Create Runner
+		 * @description Create a new global runner that can be used by all users of this instance. Returns the id and the runner token of the newly created runner. Put this token into the config file of the runner that you are trying to host. Create a new runner token for each new runner that you want to host using this route!
+		 */
 		post: operations["create_runner_api_admins_create_runner_post"];
-		delete?: never;
-		options?: never;
-		head?: never;
-		patch?: never;
-		trace?: never;
-	};
-	"/api/admins/test": {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		/** Admin Test */
-		get: operations["admin_test_api_admins_test_get"];
-		put?: never;
-		post?: never;
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -166,7 +153,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Submit Settings */
+		/**
+		 * Submit Settings
+		 * @description Submit a new job settings object to the backend. If is_new_default is set to True this set of job settings will become the new default for this account and if no job settings object is specified during job submission this set of settings will be used. If it is set to False then this set of settings will only be used if specified explicitly during job submission. Returns the id of the newly created job settings object which can then be used to reference these job settings during job submission.
+		 */
 		post: operations["submit_settings_api_jobs_submit_settings_post"];
 		delete?: never;
 		options?: never;
@@ -181,7 +171,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Get Default Settings */
+		/**
+		 * Get Default Settings
+		 * @description Returns the default job settings of the current account. If no job settings id is explicitly specified during job submission then these job settings will be used for the job. These job settings where either set previously using the submit_settings route or are the application defaults.
+		 */
 		get: operations["get_default_settings_api_jobs_default_settings_get"];
 		put?: never;
 		post?: never;
@@ -200,7 +193,12 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Submit Job */
+		/**
+		 * Submit Job
+		 * @description Submit a new transcription job. If the job_settings_id is omitted the account defaults will be used.
+		 *     If you want to define the job settings then create a job settings object using the submit_settings route and then set job_settings_id here to the returned integer.
+		 *     Returns the id of the newly created job.
+		 */
 		post: operations["submit_job_api_jobs_submit_job_post"];
 		delete?: never;
 		options?: never;
@@ -215,7 +213,11 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Job Count */
+		/**
+		 * Job Count
+		 * @description Returns the total amount of jobs this user has after applying the provided filter options.
+		 *     exclude_finished excludes finished jobs (both successful and aborted) while exclude_downloaded excludes finished jobs where the transcript was already downloaded at least ones.
+		 */
 		get: operations["job_count_api_jobs_count_get"];
 		put?: never;
 		post?: never;
@@ -232,7 +234,11 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Get */
+		/**
+		 * Get
+		 * @description Returns a list of job ids sorted and filtered by the specified criteria.
+		 *     start_index and end_index specify which jobs to return from the sorted list, e.g. a start_index of 0 and end_index of 9 will return the first 10 jobs, while a start_index of 10 and and end_index of 19 will return the next 10 and so on.
+		 */
 		get: operations["get_api_jobs_get_get"];
 		put?: never;
 		post?: never;
@@ -249,7 +255,11 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Job Info */
+		/**
+		 * Job Info
+		 * @description Returns a list of job objects containing all information related to each of the specified jobs.
+		 *     Note that job infos will be returned in no specific order, please use the get route to get an ordering of jobs by id and only use this route to get additional information about these jobs.
+		 */
 		get: operations["job_info_api_jobs_info_get"];
 		put?: never;
 		post?: never;
@@ -268,7 +278,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Abort Jobs */
+		/**
+		 * Abort Jobs
+		 * @description Aborts a currently running job. This will put the job into a failed state with an error message saying that the job was aborted. Any processing of this job will be canceled.
+		 */
 		post: operations["abort_jobs_api_jobs_abort_post"];
 		delete?: never;
 		options?: never;
@@ -286,7 +299,10 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post?: never;
-		/** Delete Jobs */
+		/**
+		 * Delete Jobs
+		 * @description Deletes a completed (aborted/successfully finished) job. To delete a currently running job please use the abort route first and then delete it using this route.
+		 */
 		delete: operations["delete_jobs_api_jobs_delete_delete"];
 		options?: never;
 		head?: never;
@@ -300,7 +316,11 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Download Transcript */
+		/**
+		 * Download Transcript
+		 * @description Downloads the transcript of a successfully finished job. The transcript can be downloaded in multiple formats.
+		 *     Returns the transcript as a string.
+		 */
 		get: operations["download_transcript_api_jobs_download_transcript_get"];
 		put?: never;
 		post?: never;
@@ -317,7 +337,11 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Events */
+		/**
+		 * Events
+		 * @description This is a special route for subscribing to server-sent events (SSE).
+		 *     Currently there is only one type of event called 'job_updated'. It returns the job id of a currently running job which attributes (e.g. processing step, progress, assigned runner, ...) have changed. This event can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs.
+		 */
 		get: operations["events_api_jobs_events_get"];
 		put?: never;
 		post?: never;
@@ -338,10 +362,10 @@ export interface paths {
 		put?: never;
 		/**
 		 * Register
-		 * @description Registers the given runner as online. Returns False if the
-		 *     runner is already registered as online or True otherwise.
+		 * @description Registers the runner with the given runner_id as online.
 		 *     Starting from the registration, the runner must periodically send
 		 *     heartbeat requests to the manager, or it may be unregistered.
+		 *     Returns the runner id on success.
 		 */
 		post: operations["register_api_runners_register_post"];
 		delete?: never;
@@ -361,7 +385,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Unregister Runner
-		 * @description Unregisters an online runner.
+		 * @description Unregisters an online runner. This will mark the runner as offline and no heartbeat or similar request will be possible anymore until another register request was performed.
 		 */
 		post: operations["unregister_runner_api_runners_unregister_post"];
 		delete?: never;
@@ -377,7 +401,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Retrieve Job Info */
+		/**
+		 * Retrieve Job Info
+		 * @description The runner can retrieve metadata about the job that was assigned to it. This includes e.g. the job settings. The runner should call this route BEFORE it calls retrieve_job_audio to first make sure it can process the job. retrieve_job_info doesn't mark the job as running yet, only retrieve_job_audio will do that.
+		 */
 		get: operations["retrieve_job_info_api_runners_retrieve_job_info_get"];
 		put?: never;
 		post?: never;
@@ -398,10 +425,9 @@ export interface paths {
 		put?: never;
 		/**
 		 * Retrieve Job Audio
-		 * @description For a given online runner, retrieves the job that it has been assigned.
-		 *     Additionally, if the runner wasn't marked as processing the job yet, it
-		 *     marks it as such. If the runner has not been assigned a job, it returns
-		 *     None and does nothing.
+		 * @description The runner streams the audio binary data of the job it got assigned over this route.
+		 *     Additionally this route will mark the job a currently being processed by this runner.
+		 *     Before callling this route the runner should have called retrieve_job_info first.
 		 */
 		post: operations["retrieve_job_audio_api_runners_retrieve_job_audio_post"];
 		delete?: never;
@@ -421,10 +447,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Submit Job Result
-		 * @description Handles the submission of a job result by a runner. If the runner is not currently
-		 *     processing a job, returns an error message. Otherwise, marks the job as completed/failed
-		 *     by setting either the transcript or the error_msg field of the job, marks the runner as
-		 *     available and returns None.
+		 * @description The runner submits the result of processing the job it got assigned over this route. The result can either be that the job failed (in which case the runner submits an error message) or that the job was successful (in which case the runner submits the transcript in all possible formats). This route will mark the job as failed or successful and notify the user over email if they activated email notifications for this job.
 		 */
 		post: operations["submit_job_result_api_runners_submit_job_result_post"];
 		delete?: never;
@@ -442,7 +465,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Heartbeat */
+		/**
+		 * Heartbeat
+		 * @description The heartbeat route that the runner has to periodically call to not be unregistered automatically by the backend. Over the response of this route the runner will also be notified about a new job that it got assigned or an abort request for a job the runner is currently processing.
+		 */
 		post: operations["heartbeat_api_runners_heartbeat_post"];
 		delete?: never;
 		options?: never;
@@ -457,7 +483,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** About */
+		/**
+		 * About
+		 * @description Returns a brief description of Project-W, a link to the backend's GitHub repository, the backend's version currently running on the system as well as the imprint of this instance (if it was configured by the instance's admin).
+		 */
 		get: operations["about_api_about_get"];
 		put?: never;
 		post?: never;
@@ -474,7 +503,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Auth Settings */
+		/**
+		 * Auth Settings
+		 * @description Returns all information required by the client regarding which account types and identity providers this instance supports, whether account signup of local accounts is allowed, whether the creation of API tokens is allowed for each account type and so on.
+		 */
 		get: operations["auth_settings_api_auth_settings_get"];
 		put?: never;
 		post?: never;
@@ -491,7 +523,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Oidc-Redirect */
+		/**
+		 * Oidc-Redirect
+		 * @description Start an OIDC login flow. This route will redirect you to the login page of the identity provider 'idp_name'. This name was specified by the admin in the config of this instance. Use the /api/auth_settings route to get the authentication-related configuration of this instance.
+		 */
 		get: operations["oidc_redirect_api_oidc_login__idp_name__get"];
 		put?: never;
 		post?: never;
@@ -508,7 +543,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Oidc-Auth */
+		/**
+		 * Oidc-Auth
+		 * @description Landing route: After authenticating on the login page of the identity provider the provider will redirect you to this route so that the backend can process the IdP's response. This route will then redirect you to the official client's page (as set by the instance's admin) so that the client can get and store the OIDC id_token.
+		 */
 		get: operations["oidc_auth_api_oidc_auth__idp_name__get"];
 		put?: never;
 		post?: never;
@@ -527,7 +565,11 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Login */
+		/**
+		 * Login
+		 * @description Log in with an LDAP user queried from the LDAP server with the name 'idp_name'. This name was specified by the admin in the config of this instance. Use the /api/auth_settings route to get the authentication-related configuration of this instance.
+		 *     If logging in with an admin account the returned JWT token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
+		 */
 		post: operations["login_api_ldap_login__idp_name__post"];
 		delete?: never;
 		options?: never;
@@ -544,7 +586,11 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Login */
+		/**
+		 * Login
+		 * @description Log in to an existing local Project-W account. This is an OAuth2 compliant password request form where the username is the user's email address. A successful response will contain a token that needs to be attached in the authentication header of responses for routes that require the user to be logged in.
+		 *     If logging in with an admin account the returned JWT token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
+		 */
 		post: operations["login_api_local_account_login_post"];
 		delete?: never;
 		options?: never;
@@ -561,7 +607,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Signup */
+		/**
+		 * Signup
+		 * @description Create a new local Project-W account. The provided email must be valid and the password must adhere to certain criteria (must contain at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total) and the email can't already be in use by another account.
+		 */
 		post: operations["signup_api_local_account_signup_post"];
 		delete?: never;
 		options?: never;
@@ -578,7 +627,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Activate */
+		/**
+		 * Activate
+		 * @description Activate a local Project-W account, meaning validate it's email address. The token was sent to the user on account creation, email address change or when they specifically requested an email with the resend_activation_email route. Only activated users are able to submit transcription jobs and actually use this service.
+		 */
 		post: operations["activate_api_local_account_activate_post"];
 		delete?: never;
 		options?: never;
@@ -593,7 +645,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Resend Activation Email */
+		/**
+		 * Resend Activation Email
+		 * @description This will resend an activation email to the user like the one the user got when their account was created. Useful if they forgot to click on the link and lost the old email. Can only be requested if the user is not verified yet.
+		 */
 		get: operations["resend_activation_email_api_local_account_resend_activation_email_get"];
 		put?: never;
 		post?: never;
@@ -610,7 +665,10 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Request Password Reset */
+		/**
+		 * Request Password Reset
+		 * @description Requests a password reset email that will be sent to the user containing a link to a password reset page. The provided email address must belong to an existing local Project-W account.
+		 */
 		get: operations["request_password_reset_api_local_account_request_password_reset_get"];
 		put?: never;
 		post?: never;
@@ -629,7 +687,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Reset Password */
+		/**
+		 * Reset Password
+		 * @description Resets the password of an account to the provided password. The token is the one from the password reset email that can be requested with the /request_password_reset route.
+		 */
 		post: operations["reset_password_api_local_account_reset_password_post"];
 		delete?: never;
 		options?: never;
@@ -646,7 +707,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Change User Email */
+		/**
+		 * Change User Email
+		 * @description Change the email address of a local Project-W account. This change will only take effect after the user has clicked on the link in the activation email that this route sends to the new email address.
+		 */
 		post: operations["change_user_email_api_local_account_change_user_email_post"];
 		delete?: never;
 		options?: never;
@@ -663,7 +727,10 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Change User Password */
+		/**
+		 * Change User Password
+		 * @description Change the password of a local Project-W account. In contrary to requesting a password reset email this route is authenticated meaning that to use this route the user must still be able to log in into their account, but it changes the password immediately without going through a link in an email first.
+		 */
 		post: operations["change_user_password_api_local_account_change_user_password_post"];
 		delete?: never;
 		options?: never;
@@ -841,21 +908,6 @@ export interface components {
 			 * Format: binary
 			 */
 			audio_file: string;
-		};
-		/** DecodedAuthTokenData */
-		DecodedAuthTokenData: {
-			user_type: components["schemas"]["UserTypeEnum"];
-			/** Sub */
-			sub: string;
-			email: components["schemas"]["EmailValidated"];
-			/** Is Verified */
-			is_verified: boolean;
-			/** Token Id */
-			token_id?: number | null;
-			/** Is Admin */
-			is_admin: boolean;
-			/** Iss */
-			iss: string;
 		};
 		/** DiarizationSettings */
 		DiarizationSettings: {
@@ -1640,47 +1692,7 @@ export interface operations {
 			};
 		};
 	};
-	token_info_api_users_info_get: {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		requestBody?: never;
-		responses: {
-			/** @description Successful Response */
-			200: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["DecodedAuthTokenData"];
-				};
-			};
-			/** @description Validation error of JWT token */
-			401: {
-				headers: {
-					"WWW-Authenticate"?: unknown;
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["ErrorResponse"];
-				};
-			};
-			/** @description Token doesn't grand enough permissions */
-			403: {
-				headers: {
-					"WWW-Authenticate"?: unknown;
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["ErrorResponse"];
-				};
-			};
-		};
-	};
-	user_info_api_users_info_db_get: {
+	user_info_api_users_info_get: {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -1776,46 +1788,6 @@ export interface operations {
 				};
 				content: {
 					"application/json": components["schemas"]["RunnerCreatedInfo"];
-				};
-			};
-			/** @description Validation error of JWT token */
-			401: {
-				headers: {
-					"WWW-Authenticate"?: unknown;
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["ErrorResponse"];
-				};
-			};
-			/** @description Token doesn't grand enough permissions */
-			403: {
-				headers: {
-					"WWW-Authenticate"?: unknown;
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["ErrorResponse"];
-				};
-			};
-		};
-	};
-	admin_test_api_admins_test_get: {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		requestBody?: never;
-		responses: {
-			/** @description Successful Response */
-			200: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": string;
 				};
 			};
 			/** @description Validation error of JWT token */

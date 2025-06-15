@@ -622,4 +622,4 @@ evtSource.addEventListener("job_updated", (event) => {
 
 <SubmitJobsModal bind:open={submitModalOpen} post_action={fetch_jobs}/>
 
-<DownloadTranscriptModal bind:open={downloadModalOpen} job_id={downloadJobId} job_file_name={downloadFileName}/>
+<DownloadTranscriptModal bind:open={downloadModalOpen} job_id={downloadJobId} job_file_name={downloadFileName} post_action={async () => await update_jobs([downloadJobId])}/>

@@ -7,7 +7,7 @@ type User = components["schemas"]["User"];
 
 export const load: LayoutLoad = async ({ fetch }) => {
 	try {
-		const user_info = await getLoggedIn<User>("users/info_db", {}, fetch);
+		const user_info = await getLoggedIn<User>("users/info", {}, fetch);
 		return { user_info: user_info };
 	} catch (err: unknown) {
 		if (err instanceof BackendCommError) {
