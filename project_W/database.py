@@ -406,7 +406,7 @@ class DatabaseAdapter(ABC):
         yield b""  # type annotation needs this for some reason even though this is an abstract method
 
     @abstractmethod
-    async def get_job_transcript_of_user(
+    async def get_job_transcript_of_user_set_downloaded(
         self, user_id: int, job_id: int, transcript_type: TranscriptTypeEnum
     ) -> str | dict | None:
         """
@@ -858,6 +858,26 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE INDEX ON {self.schema}.jobs (user_id)
             """
+            )
+            # make sure that large objects containing the audio will be deleted when the job gets deleted (also on cascade, e.g. when a user gets deleted)
+            await cur.execute(
+                """
+                CREATE OR REPLACE FUNCTION deleteaudio() RETURNS TRIGGER AS $$
+                BEGIN
+                    PERFORM lo_unlink(OLD.audio_oid);
+                    RETURN NULL;
+                END;
+                $$ LANGUAGE plpgsql
+                """
+            )
+            await cur.execute(
+                f"""
+                CREATE TRIGGER delete_audio
+                AFTER DELETE ON {self.schema}.jobs
+                FOR EACH ROW
+                WHEN (OLD.audio_oid IS NOT NULL)
+                EXECUTE FUNCTION deleteaudio()
+                """
             )
 
             self.logger.info("Creating transcripts table")
@@ -1716,7 +1736,7 @@ class PostgresAdapter(DatabaseAdapter):
                         (audio_oid, offset, self.__file_chunk_size_in_bytes),
                     )
 
-    async def get_job_transcript_of_user(
+    async def get_job_transcript_of_user_set_downloaded(
         self, user_id: int, job_id: int, transcript_type: TranscriptTypeEnum
     ) -> str | dict | None:
         async with self.apool.connection() as conn:
@@ -1731,7 +1751,19 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                     (user_id, job_id),
                 )
-                return await cur.fetchone()
+                if (transcript := await cur.fetchone()) is not None:
+                    await cur.execute(
+                        f"""
+                            UPDATE {self.schema}.jobs
+                            SET downloaded = true
+                            WHERE user_id = %s
+                            AND id = %s
+                        """,
+                        (user_id, job_id),
+                    )
+                    return transcript
+                else:
+                    return None
 
     async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
         async with self.apool.connection() as conn:

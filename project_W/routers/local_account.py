@@ -91,6 +91,10 @@ router = APIRouter(
     responses={401: {"model": ErrorResponse, "description": "Authentication was unsuccessful"}},
 )
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> str:
+    """
+    Log in to an existing local Project-W account. This is an OAuth2 compliant password request form where the username is the user's email address. A successful response will contain a token that needs to be attached in the authentication header of responses for routes that require the user to be logged in.
+    If logging in with an admin account the returned JWT token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
+    """
     try:
         email = EmailValidated.model_validate(form_data.username)
     except ValidationError:
@@ -129,6 +133,9 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> s
     },
 )
 async def signup(data: SignupData, background_tasks: BackgroundTasks) -> str:
+    """
+    Create a new local Project-W account. The provided email must be valid and the password must adhere to certain criteria (must contain at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total) and the email can't already be in use by another account.
+    """
     if dp.config.security.local_account.mode != LocalAccountOperationModeEnum.ENABLED:
         raise HTTPException(
             status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
@@ -172,6 +179,9 @@ async def signup(data: SignupData, background_tasks: BackgroundTasks) -> str:
     },
 )
 async def activate(token: SecretStr) -> str:
+    """
+    Activate a local Project-W account, meaning validate it's email address. The token was sent to the user on account creation, email address change or when they specifically requested an email with the resend_activation_email route. Only activated users are able to submit transcription jobs and actually use this service.
+    """
     payload = validate_account_activation_token(dp.config, token.get_secret_value())
     user = await dp.db.get_local_user_by_email(payload.old_email)
     if user is None:
@@ -208,6 +218,9 @@ async def resend_activation_email(
     current_token: Annotated[DecodedAuthTokenData, Depends(validate_token_local_not_provisioned)],
     background_tasks: BackgroundTasks,
 ) -> str:
+    """
+    This will resend an activation email to the user like the one the user got when their account was created. Useful if they forgot to click on the link and lost the old email. Can only be requested if the user is not verified yet.
+    """
     if current_token.user_type != UserTypeEnum.LOCAL:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -242,6 +255,9 @@ async def resend_activation_email(
     },
 )
 async def request_password_reset(email: str, background_tasks: BackgroundTasks) -> str:
+    """
+    Requests a password reset email that will be sent to the user containing a link to a password reset page. The provided email address must belong to an existing local Project-W account.
+    """
     # cannot have pydantic model as query parameter, so validate email here manually
     try:
         validated_email = EmailValidated.model_validate(email)
@@ -277,6 +293,9 @@ async def request_password_reset(email: str, background_tasks: BackgroundTasks) 
     },
 )
 async def reset_password(password_reset: PasswordResetData) -> str:
+    """
+    Resets the password of an account to the provided password. The token is the one from the password reset email that can be requested with the /request_password_reset route.
+    """
     payload = validate_password_reset_token(dp.config, password_reset.token.get_secret_value())
     if not await dp.db.update_local_user_password(payload.email, password_reset.new_password):
         raise HTTPException(
@@ -305,6 +324,9 @@ async def change_user_email(
     ],
     background_tasks: BackgroundTasks,
 ) -> str:
+    """
+    Change the email address of a local Project-W account. This change will only take effect after the user has clicked on the link in the activation email that this route sends to the new email address.
+    """
     if new_email.get_domain() not in dp.config.security.local_account.allowed_email_domains:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -339,5 +361,8 @@ async def change_user_password(
         DecodedAuthTokenData, Depends(validate_token_local_not_provisioned_confirmed)
     ],
 ) -> str:
+    """
+    Change the password of a local Project-W account. In contrary to requesting a password reset email this route is authenticated meaning that to use this route the user must still be able to log in into their account, but it changes the password immediately without going through a link in an email first.
+    """
     await dp.db.update_local_user_password(current_token.email, new_password)
     return "Successfully updated user password"

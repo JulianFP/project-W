@@ -32,6 +32,10 @@ http_exc = HTTPException(
     },
 )
 async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> str:
+    """
+    Log in with an LDAP user queried from the LDAP server with the name 'idp_name'. This name was specified by the admin in the config of this instance. Use the /api/auth_settings route to get the authentication-related configuration of this instance.
+    If logging in with an admin account the returned JWT token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
+    """
 
     if not ldap.ldap_adapter.check_idp_name(idp_name):
         raise HTTPException(

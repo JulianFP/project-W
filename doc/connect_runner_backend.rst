@@ -157,6 +157,8 @@ The default login through the frontend as well as API tokens don't have admin pr
 
 The important part for requesting admin privileges is the `scope=admin` parameter. This request will of course only be granted if the user is an admin user. Please also remember to URL-escape any special characters in your email and password (e.g. the escape code for '@' is '%40', a space must be substituted with '%20'). We will use the resulting token in the next step.
 
+.. _get_a_runner_token-label:
+
 Get a new runner token
 ----------------------
 
@@ -217,4 +219,4 @@ If a runner token got leaked or if you just don't use this runner anymore and wa
 
       .quit
 
-The runner is now removed and the token is therefore now revoked. Next you probably want to recreate that runner to get a new Token. Refer to :ref:`get_a_runner_token-label` for how to do that.
+The runner is now removed and the token is therefore now revoked. Next you probably want to recreate that runner to get a new token. Refer to :ref:`get_a_runner_token-label` for how to do that.

@@ -44,7 +44,6 @@ OpenAPI docs
 Quick overview
 --------------
 
-   .. openapi:: ./openapi.json
+   .. openapi:: ./.sphinx-openapi.json
       :examples:
       :group:
-      :format: markdown

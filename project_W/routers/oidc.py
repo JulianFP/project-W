@@ -15,6 +15,9 @@ router = APIRouter(
 
 @router.get("/login/{idp_name}", name="oidc-redirect")
 async def login(idp_name: str, request: Request) -> RedirectResponse:
+    """
+    Start an OIDC login flow. This route will redirect you to the login page of the identity provider 'idp_name'. This name was specified by the admin in the config of this instance. Use the /api/auth_settings route to get the authentication-related configuration of this instance.
+    """
     redirect_uri = request.url_for("oidc-auth", idp_name=idp_name)
     idp_name = idp_name.lower()
     return await getattr(oidc.oauth, idp_name).authorize_redirect(request, redirect_uri)
@@ -44,6 +47,9 @@ async def login(idp_name: str, request: Request) -> RedirectResponse:
     },
 )
 async def auth(idp_name: str, request: Request) -> RedirectResponse:
+    """
+    Landing route: After authenticating on the login page of the identity provider the provider will redirect you to this route so that the backend can process the IdP's response. This route will then redirect you to the official client's page (as set by the instance's admin) so that the client can get and store the OIDC id_token.
+    """
     idp_name = idp_name.lower()
     try:
         oidc_response = await getattr(oidc.oauth, idp_name).authorize_access_token(request)

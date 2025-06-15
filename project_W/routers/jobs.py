@@ -53,6 +53,9 @@ async def submit_settings(
     job_settings: JobSettings,
     is_new_default: bool = False,
 ) -> int:
+    """
+    Submit a new job settings object to the backend. If is_new_default is set to True this set of job settings will become the new default for this account and if no job settings object is specified during job submission this set of settings will be used. If it is set to False then this set of settings will only be used if specified explicitly during job submission. Returns the id of the newly created job settings object which can then be used to reference these job settings during job submission.
+    """
     return await dp.db.add_new_job_settings(current_user.id, job_settings, is_new_default)
 
 
@@ -62,6 +65,9 @@ async def get_default_settings(
         User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
     ],
 ) -> JobSettings:
+    """
+    Returns the default job settings of the current account. If no job settings id is explicitly specified during job submission then these job settings will be used for the job. These job settings where either set previously using the submit_settings route or are the application defaults.
+    """
     if (job_settings := await dp.db.get_default_job_settings_of_user(current_user.id)) is not None:
         return job_settings
     else:
@@ -84,6 +90,11 @@ async def submit_job(
     audio_file: UploadFile,
     job_settings_id: int | None = None,
 ) -> int:
+    """
+    Submit a new transcription job. If the job_settings_id is omitted the account defaults will be used.
+    If you want to define the job settings then create a job settings object using the submit_settings route and then set job_settings_id here to the returned integer.
+    Returns the id of the newly created job.
+    """
     if not audio_file.content_type or audio_file.content_type.split("/")[0].strip() not in [
         "audio",
         "video",
@@ -111,6 +122,10 @@ async def job_count(
     exclude_finished: bool,
     exclude_downloaded: bool,
 ) -> int:
+    """
+    Returns the total amount of jobs this user has after applying the provided filter options.
+    exclude_finished excludes finished jobs (both successful and aborted) while exclude_downloaded excludes finished jobs where the transcript was already downloaded at least ones.
+    """
     return await dp.db.get_total_number_of_jobs_of_user(
         current_user.id, exclude_finished, exclude_downloaded
     )
@@ -128,6 +143,10 @@ async def get(
     exclude_finished: bool,
     exclude_downloaded: bool,
 ) -> list[int]:
+    """
+    Returns a list of job ids sorted and filtered by the specified criteria.
+    start_index and end_index specify which jobs to return from the sorted list, e.g. a start_index of 0 and end_index of 9 will return the first 10 jobs, while a start_index of 10 and and end_index of 19 will return the next 10 and so on.
+    """
     return await dp.db.get_job_ids_of_user(
         current_user.id,
         start_index,
@@ -146,6 +165,10 @@ async def job_info(
     ],
     job_ids: Annotated[list[int], Query()],
 ) -> list[JobInfo]:
+    """
+    Returns a list of job objects containing all information related to each of the specified jobs.
+    Note that job infos will be returned in no specific order, please use the get route to get an ordering of jobs by id and only use this route to get additional information about these jobs.
+    """
     job_and_setting_infos: list[JobAndSettings] = await dp.db.get_job_infos_with_settings_of_user(
         current_user.id, job_ids
     )
@@ -163,7 +186,7 @@ async def job_info(
                 runner_dict = runner.model_dump()
                 for key, val in runner_dict.items():
                     data[f"runner_{key}"] = val  # JobBase optional data
-        elif data["step"] == JobStatus.SUCCESS:
+        elif data["step"] == JobStatus.SUCCESS or data["step"] == JobStatus.DOWNLOADED:
             data["progress"] = 100
         job_infos.append(JobInfo.model_validate(data))
     return job_infos
@@ -184,6 +207,9 @@ async def abort_jobs(
     ],
     job_ids: list[int],
 ) -> str:
+    """
+    Aborts a currently running job. This will put the job into a failed state with an error message saying that the job was aborted. Any processing of this job will be canceled.
+    """
     jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
@@ -221,6 +247,9 @@ async def delete_jobs(
     ],
     job_ids: list[int],
 ) -> str:
+    """
+    Deletes a completed (aborted/successfully finished) job. To delete a currently running job please use the abort route first and then delete it using this route.
+    """
     jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
@@ -251,8 +280,12 @@ async def download_transcript(
     job_id: int,
     transcript_type: TranscriptTypeEnum,
 ) -> str | dict:
+    """
+    Downloads the transcript of a successfully finished job. The transcript can be downloaded in multiple formats.
+    Returns the transcript as a string.
+    """
     if (
-        transcript := await dp.db.get_job_transcript_of_user(
+        transcript := await dp.db.get_job_transcript_of_user_set_downloaded(
             current_user.id, job_id, transcript_type
         )
     ) is None:
@@ -270,4 +303,8 @@ async def events(
         User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
     ],
 ) -> StreamingResponse:
+    """
+    This is a special route for subscribing to server-sent events (SSE).
+    Currently there is only one type of event called 'job_updated'. It returns the job id of a currently running job which attributes (e.g. processing step, progress, assigned runner, ...) have changed. This event can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs.
+    """
     return StreamingResponse(dp.ch.event_generator(current_user.id), media_type="text/event-stream")

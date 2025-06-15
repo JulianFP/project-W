@@ -43,9 +43,10 @@ async def register(
     runner_data: RunnerRegisterRequest,
 ) -> int:
     """
-    Registers the given runner as online.
+    Registers the runner with the given runner_id as online.
     Starting from the registration, the runner must periodically send
     heartbeat requests to the manager, or it may be unregistered.
+    Returns the runner id on success.
     """
     if (await dp.ch.get_online_runner_by_id(runner_id)) is not None:
         raise HTTPException(
@@ -76,7 +77,7 @@ async def unregister_runner(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
 ) -> str:
     """
-    Unregisters an online runner.
+    Unregisters an online runner. This will mark the runner as offline and no heartbeat or similar request will be possible anymore until another register request was performed.
     """
     await dp.ch.unregister_online_runner(online_runner.id)
 
@@ -103,6 +104,9 @@ async def unregister_runner(
 async def retrieve_job_info(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
 ) -> RunnerJobInfoResponse:
+    """
+    The runner can retrieve metadata about the job that was assigned to it. This includes e.g. the job settings. The runner should call this route BEFORE it calls retrieve_job_audio to first make sure it can process the job. retrieve_job_info doesn't mark the job as running yet, only retrieve_job_audio will do that.
+    """
     if online_runner.assigned_job_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -131,10 +135,9 @@ async def retrieve_job_audio(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
 ) -> StreamingResponse:
     """
-    For a given online runner, retrieves the job that it has been assigned.
-    Additionally, if the runner wasn't marked as processing the job yet, it
-    marks it as such. If the runner has not been assigned a job, it returns
-    None and does nothing.
+    The runner streams the audio binary data of the job it got assigned over this route.
+    Additionally this route will mark the job a currently being processed by this runner.
+    Before callling this route the runner should have called retrieve_job_info first.
     """
     if online_runner.assigned_job_id is None:
         raise HTTPException(
@@ -167,10 +170,7 @@ async def submit_job_result(
     background_tasks: BackgroundTasks,
 ) -> str:
     """
-    Handles the submission of a job result by a runner. If the runner is not currently
-    processing a job, returns an error message. Otherwise, marks the job as completed/failed
-    by setting either the transcript or the error_msg field of the job, marks the runner as
-    available and returns None.
+    The runner submits the result of processing the job it got assigned over this route. The result can either be that the job failed (in which case the runner submits an error message) or that the job was successful (in which case the runner submits the transcript in all possible formats). This route will mark the job as failed or successful and notify the user over email if they activated email notifications for this job.
     """
     if online_runner.in_process_job_id is None:
         raise HTTPException(
@@ -230,6 +230,9 @@ async def submit_job_result(
 async def heartbeat(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)], req: HeartbeatRequest
 ) -> HeartbeatResponse:
+    """
+    The heartbeat route that the runner has to periodically call to not be unregistered automatically by the backend. Over the response of this route the runner will also be notified about a new job that it got assigned or an abort request for a job the runner is currently processing.
+    """
     await dp.ch.reset_runner_expiration(online_runner.id)
 
     if online_runner.in_process_job_id is not None:

@@ -22,13 +22,7 @@ async def create_runner(
         DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
     ],
 ) -> RunnerCreatedInfo:
+    """
+    Create a new global runner that can be used by all users of this instance. Returns the id and the runner token of the newly created runner. Put this token into the config file of the runner that you are trying to host. Create a new runner token for each new runner that you want to host using this route!
+    """
     return await dp.db.create_runner()
-
-
-@router.get("/test")
-async def admin_test(
-    _: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=False, require_admin=True))
-    ],
-) -> str:
-    return "Only an admin is allowed to see this"

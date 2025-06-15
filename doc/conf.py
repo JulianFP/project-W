@@ -63,7 +63,7 @@ app.include_router(oidc.router, prefix="/api")
 app.include_router(ldap.router, prefix="/api")
 app.include_router(local_account.router, prefix="/api")
 
-openapi_file = Path(__file__).parent / "openapi.json"
+openapi_file = Path(__file__).parent / ".sphinx-openapi.json"
 openapi_file.write_text(json.dumps(app.openapi()))
 
 # -- Config file autodoc setup -----------------------------------------------

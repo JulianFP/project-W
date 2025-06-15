@@ -42,11 +42,11 @@ async def lifespan(app: FastAPI):
 
     # include security routers depending on which authentication backends are configured in config file
     login_method_exists = False
-    if dp.config.security.oidc_providers is not {}:
+    if dp.config.security.oidc_providers:
         login_method_exists = True
         app.include_router(oidc.router, prefix="/api")
         await oidc_deps.register_with_oidc_providers(dp.config)
-    if dp.config.security.ldap_providers is not {}:
+    if dp.config.security.ldap_providers:
         login_method_exists = True
         app.include_router(ldap.router, prefix="/api")
         ldap_deps.ldap_adapter = ldap_deps.LdapAdapter()
@@ -94,21 +94,37 @@ Refer to the [full documentation](https://project-w.readthedocs.io) for more inf
 - [Backend](https://github.com/julianFP/project-w)
 - [Frontend](https://github.com/julianFP/project-w-frontend)
 - [Runner](https://github.com/julianFP/project-w-runner)
-
-The API is split into the following sections:
-
-### users
-For regular users to manage their accounts
-
-### admins
-For admin users to manage the server and all users on it
-
-### oidc, ldap and local_account
-Different authentication (login, signup, etc.) routes for different authentication backends
-
-### jobs
-Submit new transcription jobs, manage existing ones
 """
+app_tags_metadata = [
+    {
+        "name": "users",
+        "description": "For regular users to manage their accounts",
+    },
+    {
+        "name": "local-account",
+        "description": "Login, Signup and account management routes for local Project-W accounts",
+    },
+    {
+        "name": "oidc",
+        "description": "Login/Signup routes for OIDC authentication providers. If no routes are shown here then this instance has no OIDC provider configured.",
+    },
+    {
+        "name": "ldap",
+        "description": "Login/Signup routes for LDAP authentication providers. If no routes are shown here then this instance has no LDAP provider configured.",
+    },
+    {
+        "name": "jobs",
+        "description": "Job submission and management routes",
+    },
+    {
+        "name": "admins",
+        "description": "For admin users to manage the server and all users on it",
+    },
+    {
+        "name": "runners",
+        "description": "Routes used by Project-W runners to communicate with the backend, retrieve jobs and submit transcripts",
+    },
+]
 
 app = FastAPI(
     title="Project-W",
@@ -120,6 +136,7 @@ app = FastAPI(
         "identifier": "AGPL-3.0-only",
         "url": "https://www.gnu.org/licenses/agpl-3.0.txt",
     },
+    openapi_tags=app_tags_metadata,
     lifespan=lifespan,
 )
 app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))  # for oidc
@@ -132,6 +149,9 @@ app.include_router(runners.router, prefix="/api")
 
 @app.get("/api/about")
 async def about() -> AboutResponse:
+    """
+    Returns a brief description of Project-W, a link to the backend's GitHub repository, the backend's version currently running on the system as well as the imprint of this instance (if it was configured by the instance's admin).
+    """
     return AboutResponse(
         description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
         source_code="https://github.com/JulianFP/project-W",
@@ -142,6 +162,9 @@ async def about() -> AboutResponse:
 
 @app.get("/api/auth_settings")
 async def auth_settings() -> AuthSettings:
+    """
+    Returns all information required by the client regarding which account types and identity providers this instance supports, whether account signup of local accounts is allowed, whether the creation of API tokens is allowed for each account type and so on.
+    """
     return AuthSettings(
         local_account=dp.config.security.local_account,
         oidc_providers=dp.config.security.oidc_providers,
