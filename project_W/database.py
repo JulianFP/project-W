@@ -694,7 +694,7 @@ class PostgresAdapter(DatabaseAdapter):
                     id int GENERATED ALWAYS AS IDENTITY,
                     name varchar(64) NOT NULL,
                     user_id int NOT NULL,
-                    secret char(32) NOT NULL DEFAULT MD5(random()::text),
+                    secret text NOT NULL DEFAULT MD5(random()::text) CHECK (length(secret)=32),
                     temp_token_secret boolean NOT NULL DEFAULT false,
                     PRIMARY KEY (id),
                     FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
@@ -738,7 +738,7 @@ class PostgresAdapter(DatabaseAdapter):
                 CREATE TABLE {self.schema}.local_accounts (
                     email varchar(254) NOT NULL,
                     id int NOT NULL UNIQUE,
-                    password_hash char(97) NOT NULL,
+                    password_hash text NOT NULL CHECK(length(password_hash) = 97),
                     is_admin boolean NOT NULL DEFAULT false,
                     is_verified boolean NOT NULL DEFAULT false,
                     provision_number int UNIQUE DEFAULT null,
@@ -781,7 +781,7 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.runners (
                     id int GENERATED ALWAYS AS IDENTITY,
-                    token_hash char(43) UNIQUE,
+                    token_hash text UNIQUE CHECK(length(token_hash) = 43),
                     PRIMARY KEY (id)
                 )
             """
@@ -824,7 +824,7 @@ class PostgresAdapter(DatabaseAdapter):
                     runner_name varchar(40),
                     runner_id int,
                     runner_version text,
-                    runner_git_hash char(40),
+                    runner_git_hash text CHECK(length(runner_git_hash)=40),
                     runner_source_code_url text,
                     downloaded boolean,
                     error_msg text,

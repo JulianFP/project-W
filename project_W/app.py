@@ -90,10 +90,14 @@ app_description = """
 
 Project-W is a platform for creating transcripts of audio files (speech-to-text). It leverages OpenAIs Whisper models for the transcription while providing an API and easy-to-use interface for users to create and manage transcription jobs.
 
-Refer to the [full documentation](https://project-w.readthedocs.io) for more information. You can also find the source code all of it's components on GitHub:
-- [Backend](https://github.com/julianFP/project-w)
-- [Frontend](https://github.com/julianFP/project-w-frontend)
-- [Runner](https://github.com/julianFP/project-w-runner)
+## More documentation
+
+In addition to [the OpenAPI doc](/docs) there is also [a Redoc doc](/redoc) available if you prefer.
+
+If you are looking for documentation about something else than the API then refer to the [full Project-W documentation](https://project-w.readthedocs.io). You can also find the source code of all Project-W components on GitHub:
+- [Backend](https://github.com/julianfp/project-w)
+- [Frontend](https://github.com/julianfp/project-w-frontend)
+- [Runner](https://github.com/julianfp/project-w-runner)
 """
 app_tags_metadata = [
     {

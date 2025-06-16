@@ -1,9 +1,7 @@
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, status
 from pydantic import ValidationError
 
 import project_W.dependencies as dp
@@ -18,12 +16,6 @@ from ..models.internal import (
 )
 
 admin_user_scope = "admin"
-oauth2_scheme: OAuth2PasswordBearer = OAuth2PasswordBearer(
-    tokenUrl="/auth",
-    scopes={
-        admin_user_scope: "Admin user, has full administrative privileges, can read data of every user and more!"
-    },
-)
 jwt_issuer = "project-W"
 jwt_algorithm = "HS256"
 
@@ -123,7 +115,7 @@ def create_password_reset_token(config: Settings, data: PasswordResetTokenData):
 
 # this function validates jwt tokens (for both local and LDAP accounts) and returns the associated users
 async def validate_local_auth_token(
-    config: Settings, token: Annotated[str, Depends(oauth2_scheme)], token_payload: dict
+    config: Settings, token: str, token_payload: dict
 ) -> DecodedAuthTokenData:
     # prepare http exceptions
     credentials_exception = HTTPException(
