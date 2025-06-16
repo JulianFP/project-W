@@ -824,7 +824,7 @@ class PostgresAdapter(DatabaseAdapter):
                     runner_name varchar(40),
                     runner_id int,
                     runner_version text,
-                    runner_git_hash text CHECK(length(runner_git_hash)=40),
+                    runner_git_hash varchar(40),
                     runner_source_code_url text,
                     downloaded boolean,
                     error_msg text,
