@@ -64,8 +64,20 @@ jobs:
           fi
           echo "RUNNER_BRANCH_NAME=${RUNNER_BRANCH_NAME}" >> "$GITHUB_ENV"
           echo "runner-branch-name=${RUNNER_BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-      - name: Checkout repository
+
+      - name: Checkout backend repository
         uses: actions/checkout@v4
+        with:
+          path: backend
+          fetch-depth: 0
+
+      - name: Checkout runner repository
+        uses: actions/checkout@v4
+        with:
+          repository: julianfp/project-w-runner
+          ref: ${{ env.RUNNER_BRANCH_NAME }}
+          path: runner
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python_version }}
         uses: actions/setup-python@v5
@@ -74,7 +86,7 @@ jobs:
 
       - name: Install test requirements
         run: |
-          python -m pip install -r tests/requirements.txt
+          python -m pip install -r backend/tests/requirements.txt
 
       - name: Setup SSL certificates
         run: |
@@ -94,7 +106,7 @@ jobs:
       - name: Build Project-W docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./backend
           tags: project-w:latest
 
           #pull frontend from branch with the same name as backend is currently on:
@@ -109,11 +121,9 @@ jobs:
       - name: Build Project-W Runner docker image
         uses: docker/build-push-action@v6
         with:
-          context: https://github.com/julianfp/project-w-runner.git#${{ env.RUNNER_BRANCH_NAME }}
-          file: ./Dockerfile.dummy
+          context: ./runner
+          file: ./runner/Dockerfile.dummy
           tags: project-w_runner_dummy:latest
-          build-args: |
-            BUILDKIT_CONTEXT_KEEP_GIT_DIR=1
           push: false
           load: true
           cache-from: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache
@@ -121,7 +131,7 @@ jobs:
 
       - name: Run test suite
         run: |
-          python -m pytest --timeout=45 tests/
+          python -m pytest --timeout=45 backend/tests/
 
   docker-build-push:
     #don't push docker image on a PR
@@ -132,6 +142,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - id: meta
         uses: docker/metadata-action@v5
         with:
