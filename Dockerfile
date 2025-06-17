@@ -11,6 +11,6 @@ COPY . .
 RUN --mount=source=.git,target=.git,type=bind \
     pip install --no-cache-dir -e .
 
-CMD ["gunicorn", "--bind", "backend:8080", "project_W:create_app()"]
+CMD ["gunicorn", "--bind", "backend:8080", "--limit-request-line", "8190", "project_W:create_app()"]
 
 HEALTHCHECK CMD curl -f http://backend:8080/api/about || exit 1
