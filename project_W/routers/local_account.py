@@ -142,7 +142,10 @@ async def signup(data: SignupData, background_tasks: BackgroundTasks) -> str:
             detail="Signup of new local accounts is disabled on this server",
         )
 
-    if data.email.get_domain() not in dp.config.security.local_account.allowed_email_domains:
+    if (
+        dp.config.security.local_account.allowed_email_domains
+        and data.email.get_domain() not in dp.config.security.local_account.allowed_email_domains
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"'{data.email.get_domain()}' is not an allowed email domain on this server",

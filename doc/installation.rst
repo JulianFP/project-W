@@ -3,19 +3,22 @@ Installation
 
 The following installation guides are for Linux only. Theoretically all the components of this software should be possible to deploy onto other operating systems as well however this is not tested and not supported. You will have to be on your own for that.
 
+.. note::
+   The config files shown here are for a setup with local Project-W accounts only. If you want to setup LDAP and/or OIDC, please refer to TODO for more advanced example configs.
+
 .. important::
    If you plan to host the backend public to the internet: Make sure to only serve the backend over https regardless of your installation method! Without ssl encryption sensitive information like passwords, JWT Tokens for the clients and runners or user data will be transmitted in clear text!
 
 .. note::
-   Prerequisites: Make sure that your DNS and Firewall settings are correct. In particular, the domain that you want to use has to point to the ip address of your server, and your servers firewall needs to allow incoming tcp traffic on ports 80 and 443 (only on port 80 if you go with the reverse proxy setup)
+   Prerequisites: Make sure that your DNS and Firewall settings are correct. In particular, the domain that you want to use has to point to the ip address of your server, and your servers firewall needs to allow incoming tcp traffic on your http port
 
 Docker
 ------
 
-We provide a docker image for each of the components of this software (client, backend, runner). The best way to use them is with Docker Compose. In the following we assume that you want to host our backend and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
+We provide two docker images, one for the backend that also serves the frontend at the same time, and one for the runner. The best way to use the backend's  In the following we assume that you want to host our backend and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
 
 .. note::
-   For each of the three components there are multiple docker image tags. The examples below will use the 'latest' tag which will pull the latest stable release (recommended). If you want to pull the development version (latest git commit on main branch), then choose the 'main' tag instead. Alternatively you can also pinpoint the docker image to a specific versions. Go to the Packages section of each GitHub repository to find out which tags are available. To use a tag other than 'latest' add it to the end of the 'image:' lines in the docker-compose.yml files below like this: image: <source>/<name>:<tag>
+   For both docker images there are multiple docker image tags. The examples below will use the 'latest' tag which will pull the latest stable release (recommended). If you want to pull the development version (latest git commit on main branch), then choose the 'main' tag instead. Alternatively you can also pinpoint the docker image to a specific versions. Go to the Packages section of each GitHub repository to find out which tags are available. To use a tag other than 'latest' add it to the end of the 'image:' lines in the docker-compose.yml files below like this: image: <source>/<name>:<tag>
 
 .. _docker_backend_frontend-label:
 
@@ -25,191 +28,112 @@ Backend & Frontend
 To run the backend you need a config.yml file that configures it. Prepare this file before running the installation steps below. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
 
 .. warning::
-   Please make sure to save 'sessionSecretKey' and 'smtpServer.password' in a secret way on your server! With the 'sessionSecretKey' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtpServer.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
+   Please make sure to save 'security.local_token.session_secret_key' and 'smtp_server.password' in a secret way on your server! With the 'security.local_token.session_secret_key' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtp_server.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
 
-In this setup, sessionSecretKey and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
 .. code-block:: yaml
 
-   clientURL: https://<DOMAIN>/#
-   databasePath: /database
-   loginSecurity:
-     sessionSecretKey: !ENV ${JWT_SECRET_KEY}
-   smtpServer:
-     domain: <YOUR SMTP SERVERS DOMAIN>
-     port: <SMTP PORT OF SMTP SERVER>
+   client_url: https://<your domain>/#
+   web_server:
+     ssl:
+       cert_file: '/etc/xdg/project-W/certs/cert.pem'
+       key_file: '/etc/xdg/project-W/certs/key.pem'
+   postgres_connection_string: !ENV 'postgresql://project_w:${POSTGRES_PASSWORD}@postgres:5432/project_w'
+   redis_connection:
+     connection_string: 'redis://redis:6379/project-W'
+   security:
+     local_token:
+       session_secret_key: !ENV ${JWT_SECRET_KEY}
+     local_account:
+       user_provisioning:
+         0:
+           email: <email of your admin user>
+           password: !ENV ${ADMIN_PASSWORD}
+           is_admin: true
+   smtp_server:
+     hostname: <your smtp servers domain>
+     port: <smtp port of smtp server>
      secure: <starttls or ssl>
-     senderEmail: <EMAIL ADDRESS>
-     username: <probably same of above>
+     sender_email: <email address that should send emails to your users>
+     username: <probably same as above>
      password: !ENV ${SMTP_PASSWORD}
 
-Choose between the following instructions depending on your setup. If you are unsure which setup to choose then :ref:`standalone_all-label` is probably for you.
+Choose between the following instructions depending on your setup. If you are unsure which setup to choose then :ref:`standalone-label` is probably for you.
 
-.. _standalone_all-label:
+.. _standalone-label:
 
-Standalone, All-in-One
-''''''''''''''''''''''
+Standalone
+''''''''''
 
-Additionally to the backend and frontend, the following instructions will also set up certbot to request let's encrypt ssl certificates. If you want to use your own certificates instead, please jump ahead to :ref:`standalone_byo-label`.
-
-1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
-2. Create initial directory structure and enter project-w directory:
-
-   .. code-block:: console
-
-      mkdir -p project-W/project-W-data/sslCert && mkdir project-W/project-W-data/config && cd project-W
-
-3. Put your config.yml into ./project-W-data/config
-4. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
-
-   .. code-block:: yaml
-
-      services:
-        backend:
-          image: ghcr.io/julianfp/project-w_backend
-          restart: unless-stopped
-          volumes:
-            - ./project-W-data/config:/etc/xdg/project-W/
-            - ./project-W-data/database:/database
-          environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
-            - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
-        frontend:
-          image: ghcr.io/julianfp/project-w_frontend
-          restart: unless-stopped
-          ports:
-            - 80:80
-            - 443:443
-          volumes:
-            - ./project-W-data/sslCert:/ssl:ro
-            - ./acme:/acme
-          environment:
-            - NGINX_CONFIG=initial
-            - SERVER_NAME=<DOMAIN>
-        certbot:
-          image: certbot/certbot:latest
-          depends_on:
-            - frontend
-          command: >-
-                   certonly --reinstall --webroot --webroot-path=/var/www/certbot
-                   --email <YOUR EMAIL ADDRESS> --agree-tos --no-eff-email
-                   -d <DOMAIN>
-          volumes:
-            - ./project-W-data/sslCert:/etc/letsencrypt/live/<DOMAIN>
-            - ./acme:/var/www/certbot
-
-5. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
-
-   .. code-block:: console
-
-      python -c 'import secrets; print(secrets.token_hex())'
-
-6. Run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
-
-   .. code-block:: console
-
-      PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" docker compose up -d
-
-7. Check the logs of the certbot container and wait for 'Successfully received certificate.'. Use the following command for this:
-
-   .. code-block:: console
-
-      docker logs project-w-certbot-1
-
-   If that line appears, then please replace 'initial' in your docker-compose.yml with 'ssl'. After that rerun the command in step 6. If an error is shown instead, then please verify your DNS and Firewall configuration and try again beginning from step 6. In the end, your containers should be up and running and your docker-compose.yml should look like this:
-
-   .. code-block:: yaml
-
-      services:
-        backend:
-          image: ghcr.io/julianfp/project-w_backend
-          restart: unless-stopped
-          volumes:
-            - ./project-W-data/config:/etc/xdg/project-W/
-            - ./project-W-data/database:/database
-          environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
-            - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
-        frontend:
-          image: ghcr.io/julianfp/project-w_frontend
-          restart: unless-stopped
-          ports:
-            - 80:80
-            - 443:443
-          volumes:
-            - ./project-W-data/sslCert:/ssl:ro
-            - ./acme:/acme
-          environment:
-            - NGINX_CONFIG=ssl
-            - SERVER_NAME=<DOMAIN>
-        certbot:
-          image: certbot/certbot:latest
-          depends_on:
-            - frontend
-          command: >-
-                   certonly --reinstall --webroot --webroot-path=/var/www/certbot
-                   --email <YOUR EMAIL ADDRESS> --agree-tos --no-eff-email
-                   -d <DOMAIN>
-          volumes:
-            - ./project-W-data/sslCert:/etc/letsencrypt/live/<DOMAIN>
-            - ./acme:/var/www/certbot
-
-8. You may want to setup a cronjob or a systemd service with systemd timers to periodically restart the certbot container. Let's encrypt certificates are only valid for 90 days, so if you don't your certificate will expire!
-9. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
-
-.. _standalone_byo-label:
-
-Standalone, BYO
-'''''''''''''''
-
-If you want to bring your own ssl certificate (e.g. self-signed or using some other acme setup), then this is the right setup for you.
+This will setup the backend/frontend without a reverse proxy or any additional components. This guide assumes that you know how to obtain SSL certificates. The recommended way to obtain an SSL certificate is by setting up an ACME client that automatically requests and renews Let's encrypt certificates. Alternatively if that is not possible (e.g. if the instance shouldn't be accessible over the public internet) then you can also generate your own self-signed certificates using openssl.
 
 1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
-2. Create initial directory structure and enter project-w directory:
+2. Create initial directory structure and enter project-W directory:
 
    .. code-block:: console
 
-      mkdir -p project-W/project-W-data/sslCert/ && mkdir project-W/project-W-data/config && cd project-W
+      mkdir -p project-W/project-W-data/certs && mkdir project-W/project-W-data/postgres && cd project-W
 
-3. Put your config.yml into ./project-W-data/config
-4. Put your ssl certificate files into ./project-W-data/sslCert. The following files should be in that directory: fullchain.pem (ssl certificate), privkey.pem (ssl certificate private key) and chain.pem (ssl trusted certificate for OCSP stapling). If you use self-signed certificates then chain.pem and fullchain.pem will be the same.
+3. Put your config.yml into ./project-W-data/
+4. Put your ssl certs into ./project-W-data/certs. Name the cert and key files as specified in the config above (cert.pem and key.pem respectively)
 5. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
 
    .. code-block:: yaml
 
       services:
-        backend:
-          image: ghcr.io/julianfp/project-w_backend
+        postgres:
+          image: postgres:17
           restart: unless-stopped
-          volumes:
-            - ./project-W-data/config:/etc/xdg/project-W/
-            - ./project-W-data/database:/database
           environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
-            - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
-        frontend:
-          image: ghcr.io/julianfp/project-w_frontend
+            - POSTGRES_USER=project_w
+            - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
+          healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U project_w -d project_w"]
+            interval: 10s
+            retries: 3
+            start_period: 30s
+            timeout: 10s
+          volumes:
+            - ./project-W-data/postgres/:/var/lib/postgresql
+        redis:
+          image: redis:8
           restart: unless-stopped
+          healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            retries: 3
+            start_period: 30s
+            timeout: 10s
+        project-w:
+          image: ghcr.io/julianfp/project-w
+          restart: unless-stopped
+          depends_on:
+            postgres:
+              condition: service_healthy
+            redis:
+              condition: service_healthy
+          volumes:
+            - ./project-W-data/:/etc/xdg/project-W/
+          environment:
+            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
+            - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD}
+            - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
+            - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
           ports:
-            - 80:80
-            - 443:443
-          volumes:
-            - ./project-W-data/sslCert:/ssl:ro
-          environment:
-            - NGINX_CONFIG=ssl
-            - SERVER_NAME=<DOMAIN>
+            - 443:8443
 
 6. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
 
    .. code-block:: console
 
-      python -c 'import secrets; print(secrets.token_hex())'
+      python -c 'import secrets; print(secrets.token_hex(32))'
 
-7. Run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
+7. Run the containers. Replace <JWT Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the JWT_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
 
    .. code-block:: console
 
-      PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" docker compose up -d
+      PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" PROJECT_W_POSTGRES_PASSWORD="<Postgres password>" PROJECT_W_ADMIN_PASSWORD="<project-w admin user password>" docker compose up -d
 
 8. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
 
@@ -219,7 +143,7 @@ With Reverse Proxy
 Follow this guide if you want to run this behind a Reverse Proxy which takes care of SSL. Please really only use this if this is the case since with this setup the webserver of the container will be set up with HTTP only. With a proper Reverse Proxy setup this means that the traffic would stay unencrypted between Project-W backend/frontend server and Reverse Proxy, but then would be encrypted before sending it to the internet. If you were to run the following setup without a Reverse Proxy then all the communication between client and backend as well as possibly backend and runners would be send unencrypted through the internet including passwords, session tokens and user data!
 
 .. attention::
-   Make sure that your reverse proxy is properly configured to handle the upload of large files. The backend can handle files up to a size of 1GB, setting this to anything less in your reverse proxy will hinder the submission of jobs and present the user with possibly confusing error messages! We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 1g;`` in your config.
+   Make sure that your reverse proxy is properly configured to handle the upload of large files. The backend can handle files of many GiB or even larger, limiting this in your reverse proxy will hinder the submission of jobs and present the user with possibly confusing error messages! We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 0;`` in your config.
 
 1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
 2. Create initial directory structure and enter project-w directory:
