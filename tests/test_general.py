@@ -30,7 +30,10 @@ def test_about(get_client):
         == "A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI"
     )
     assert content.get("source_code") == "https://github.com/JulianFP/project-W"
-    assert type(content.get("version")) == str
+    version_splitted = content.get("version").split(".")
+    assert (
+        version_splitted[0] != "0" or version_splitted[1] != "0"
+    )  # make sure that version is larger than 0.0.x
 
 
 @pytest.mark.parametrize(
@@ -119,7 +122,10 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
             job_info[0].get("runner_source_code_url")
             == "https://github.com/JulianFP/project-W-runner"
         )
-        assert type(job_info[0].get("runner_version")) == str
+        runner_version_splitted = job_info[0].get("runner_version").split(".")
+        assert (
+            runner_version_splitted[0] != "0" or runner_version_splitted[1] != "0"
+        )  # make sure that version is larger than 0.0.x
         assert type(job_info[0].get("runner_git_hash")) == str
 
         helper_functions.wait_for_job_completion(job_id, client)
@@ -134,7 +140,10 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
             job_info[0].get("runner_source_code_url")
             == "https://github.com/JulianFP/project-W-runner"
         )
-        assert type(job_info[0].get("runner_version")) == str
+        runner_version_splitted = job_info[0].get("runner_version").split(".")
+        assert (
+            runner_version_splitted[0] != "0" or runner_version_splitted[1] != "0"
+        )  # make sure that version is larger than 0.0.x
         assert type(job_info[0].get("runner_git_hash")) == str
 
         response = client.get(
