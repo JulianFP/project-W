@@ -332,11 +332,11 @@ class WebServerSettings(BaseModel):
     )
     worker_count: int = Field(
         description="Amount of workers that should serve the web server simultaneously. Increasing this will allow for more concurrent users as long as it is lower or equal than the amount of CPU cores on your system.",
-        default=4,
+        default=1,
     )
     address: IPvAnyInterface = Field(
         description="The address of the interface under which the web server should be served.",
-        default=IPv4Interface("127.0.0.1"),
+        default=IPv4Interface("0.0.0.0"),
     )
     port: int | None = Field(
         ge=0,

@@ -1,8 +1,8 @@
 # This is a dummy config intended for development purposes only!
 client_url: http://localhost:5173/#
 web_server:
+  address: "127.0.0.1"
   no_https: true
-  worker_count: 1
 postgres_connection_string: "postgresql://postgres@%2Fvar%2Frun%2Fpostgresql/postgres"
 redis_connection:
   unix_socket_path: "/var/run/redis-project-W/redis.sock"
