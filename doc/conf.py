@@ -66,7 +66,14 @@ app.include_router(local_account.router, prefix="/api")
 openapi_file = Path(__file__).parent / ".sphinx-openapi.json"
 openapi_file.write_text(json.dumps(app.openapi()))
 
+import os
+
 # -- Config file autodoc setup -----------------------------------------------
+import sys
+
+sys.path.append(os.path.abspath("."))
+import runner_settings
+
 autodoc_pydantic_model_show_field_summary = False
 autodoc_pydantic_model_show_config_summary = False
 autodoc_pydantic_model_show_validator_members = False

@@ -119,7 +119,7 @@ The easiest way to start a development instance of the backend is to use the pro
 
 If you didn't set up a `config.yml` file before then it will use the provided dummy file that came with the git repository. This file is for development purposes only and should not be used in production! If you need to develop stuff that involves sending emails then you might want to adjust the file to incorporate a smtp configuration. Refer to :ref:`description_backend_config-label` for how to do that.
 
-The backend will now run under the url `http://localhost:8000`, with the API docs available under `http://localhost:8000/docs`. The development webserver will also restart automatically when making changes to any code.
+The backend will now run under the url `http://localhost:5000`, with the API docs available under `http://localhost:5000/docs`. The development webserver will also restart automatically when making changes to any code.
 
 Frontend
 ````````

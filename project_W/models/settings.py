@@ -338,22 +338,12 @@ class WebServerSettings(BaseModel):
         description="The address of the interface under which the web server should be served.",
         default=IPv4Interface("0.0.0.0"),
     )
-    port: int | None = Field(
+    port: int = Field(
         ge=0,
         le=65535,
-        default=None,
-        description="The port under which the web server should be served. The default is 8000 if http is used and 8443 if https is used. Shouldn't be changed inside the docker container because that will break the health check. Use dockers port mapping feature instead.",
+        default=5000,
+        description="The port under which the web server should be served. The default port is 5000 regardless of whether https is enabled or not. This shouldn't be changed in a docker deployment because that would break the docker container's health check. Use docker's port mapping feature instead.",
     )
-
-    @model_validator(mode="after")
-    def set_default_port(self) -> Self:
-        # set the default port dependent on whether https is enabled or not
-        if self.port is None:
-            if self.no_https:
-                self.port = 8000
-            else:
-                self.port = 8443
-        return self
 
 
 class Settings(BaseModel):

@@ -25,48 +25,12 @@ We provide two docker images, one for the backend that also serves the frontend 
 Backend & Frontend
 ``````````````````
 
-To run the backend you need a config.yml file that configures it. Prepare this file before running the installation steps below. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
-
-.. warning::
-   Please make sure to save 'security.local_token.session_secret_key' and 'smtp_server.password' in a secret way on your server! With the 'security.local_token.session_secret_key' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtp_server.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
-
-In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
-
-.. code-block:: yaml
-
-   client_url: https://<your domain>/#
-   web_server:
-     ssl:
-       cert_file: '/etc/xdg/project-W/certs/cert.pem'
-       key_file: '/etc/xdg/project-W/certs/key.pem'
-   postgres_connection_string: !ENV 'postgresql://project_w:${POSTGRES_PASSWORD}@postgres:5432/project_w'
-   redis_connection:
-     connection_string: 'redis://redis:6379/project-W'
-   security:
-     local_token:
-       session_secret_key: !ENV ${JWT_SECRET_KEY}
-     local_account:
-       user_provisioning:
-         0:
-           email: <email of your admin user>
-           password: !ENV ${ADMIN_PASSWORD}
-           is_admin: true
-   smtp_server:
-     hostname: <your smtp servers domain>
-     port: <smtp port of smtp server>
-     secure: <starttls or ssl>
-     sender_email: <email address that should send emails to your users>
-     username: <probably same as above>
-     password: !ENV ${SMTP_PASSWORD}
-
-Choose between the following instructions depending on your setup. If you are unsure which setup to choose then :ref:`standalone-label` is probably for you.
-
-.. _standalone-label:
+Choose between the following instructions depending on your setup. If you are unsure which setup to choose and you want the SSL certificate generation to be as easy as possible then :ref:`reverse_proxy-label` is probably for you.
 
 Standalone
 ''''''''''
 
-This will setup the backend/frontend without a reverse proxy or any additional components. This guide assumes that you know how to obtain SSL certificates. The recommended way to obtain an SSL certificate is by setting up an ACME client that automatically requests and renews Let's encrypt certificates. Alternatively if that is not possible (e.g. if the instance shouldn't be accessible over the public internet) then you can also generate your own self-signed certificates using openssl.
+This will setup the backend/frontend without a reverse proxy or any additional components. This guide assumes that you know how to get an SSL certificate for the backend yourself (e.g. by using a self-signed certificate).
 
 1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
 2. Create initial directory structure and enter project-W directory:
@@ -75,7 +39,40 @@ This will setup the backend/frontend without a reverse proxy or any additional c
 
       mkdir -p project-W/project-W-data/certs && mkdir project-W/project-W-data/postgres && cd project-W
 
-3. Put your config.yml into ./project-W-data/
+3. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
+
+   .. warning::
+      Please make sure to save 'security.local_token.session_secret_key' and 'smtp_server.password' in a secret way on your server! With the 'security.local_token.session_secret_key' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtp_server.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
+
+   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+
+   .. code-block:: yaml
+
+      client_url: https://<your domain>/#
+      web_server:
+      ssl:
+        cert_file: '/etc/xdg/project-W/certs/cert.pem'
+        key_file: '/etc/xdg/project-W/certs/key.pem'
+      postgres_connection_string: !ENV 'postgresql://project_w:${POSTGRES_PASSWORD}@postgres:5432/project_w'
+      redis_connection:
+        connection_string: 'redis://redis:6379/project-W'
+      security:
+      local_token:
+        session_secret_key: !ENV ${JWT_SECRET_KEY}
+      local_account:
+        user_provisioning:
+          0:
+            email: <email of your admin user>
+            password: !ENV ${ADMIN_PASSWORD}
+            is_admin: true
+      smtp_server:
+        hostname: <your smtp servers domain>
+        port: <smtp port of smtp server>
+        secure: <starttls or ssl>
+        sender_email: <email address that should send emails to your users>
+        username: <probably same as above>
+        password: !ENV ${SMTP_PASSWORD}
+
 4. Put your ssl certs into ./project-W-data/certs. Name the cert and key files as specified in the config above (cert.pem and key.pem respectively)
 5. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
 
@@ -113,6 +110,8 @@ This will setup the backend/frontend without a reverse proxy or any additional c
               condition: service_healthy
             redis:
               condition: service_healthy
+          healthcheck:
+            test: ["CMD", "curl", "-fk", "https://localhost:5000/api/about"]
           volumes:
             - ./project-W-data/:/etc/xdg/project-W/
           environment:
@@ -121,7 +120,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
             - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
             - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
           ports:
-            - 443:8443
+            - 443:5000
 
 6. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
 
@@ -137,83 +136,212 @@ This will setup the backend/frontend without a reverse proxy or any additional c
 
 8. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
 
+
+.. _reverse_proxy-label:
+
 With Reverse Proxy
 ''''''''''''''''''
 
-Follow this guide if you want to run this behind a Reverse Proxy which takes care of SSL. Please really only use this if this is the case since with this setup the webserver of the container will be set up with HTTP only. With a proper Reverse Proxy setup this means that the traffic would stay unencrypted between Project-W backend/frontend server and Reverse Proxy, but then would be encrypted before sending it to the internet. If you were to run the following setup without a Reverse Proxy then all the communication between client and backend as well as possibly backend and runners would be send unencrypted through the internet including passwords, session tokens and user data!
+Follow this guide if you want to run this behind a Reverse Proxy which automatically takes care of SSL. This setup will disable https on the backend itself but enable it on the reverse proxy. Please make sure that your users only access the Project-W backend through the reverse proxy in this setup, otherwise their traffic will be unencrypted leaving sensitive data, passwords and token open to attackers!
 
 .. attention::
-   Make sure that your reverse proxy is properly configured to handle the upload of large files. The backend can handle files of many GiB or even larger, limiting this in your reverse proxy will hinder the submission of jobs and present the user with possibly confusing error messages! We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 0;`` in your config.
+   This guide will make use of the caddy webserver because of it's automatic handling of https. If you choose to not use caddy as your reverse proxy though then please make sure that your reverse proxy is properly configured to handle the upload of large files. The backend can handle files of many GiB or even larger, limiting this in your reverse proxy will hinder the submission of jobs and present the user with possibly confusing error messages! We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 0;`` in your config.
 
 1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
-2. Create initial directory structure and enter project-w directory:
+2. Create initial directory structure and enter project-W directory:
 
    .. code-block:: console
 
-      mkdir -p project-W/project-W-data/config && cd project-W
+      mkdir -p project-W/project-W-data && mkdir -p project-W/caddy-data/data && mkdir project-W/caddy-data/config && mkdir project-W/caddy-data/conf && cd project-W
 
-3. Put your config.yml into ./project-W-data/config
+3. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
+
+   .. warning::
+      Please make sure to save 'security.local_token.session_secret_key' and 'smtp_server.password' in a secret way on your server! With the 'security.local_token.session_secret_key' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtp_server.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
+
+   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+
+   .. code-block:: yaml
+
+      client_url: https://<your domain>/#
+      web_server:
+        no_https: true
+      postgres_connection_string: !ENV 'postgresql://project_w:${POSTGRES_PASSWORD}@postgres:5432/project_w'
+      redis_connection:
+        connection_string: 'redis://redis:6379/project-W'
+      security:
+      local_token:
+        session_secret_key: !ENV ${JWT_SECRET_KEY}
+      local_account:
+        user_provisioning:
+          0:
+            email: <email of your admin user>
+            password: !ENV ${ADMIN_PASSWORD}
+            is_admin: true
+      smtp_server:
+        hostname: <your smtp servers domain>
+        port: <smtp port of smtp server>
+        secure: <starttls or ssl>
+        sender_email: <email address that should send emails to your users>
+        username: <probably same as above>
+        password: !ENV ${SMTP_PASSWORD}
+
 4. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
 
    .. code-block:: yaml
 
       services:
-        backend:
-          image: ghcr.io/julianfp/project-w_backend
+        postgres:
+          image: postgres:17
           restart: unless-stopped
-          volumes:
-            - ./project-W-data/config:/etc/xdg/project-W/
-            - ./project-W-data/database:/database
           environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY:-}
-            - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD:-}
-        frontend:
-          image: ghcr.io/julianfp/project-w_frontend
+            - POSTGRES_USER=project_w
+            - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
+          healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U project_w -d project_w"]
+            interval: 10s
+            retries: 3
+            start_period: 30s
+            timeout: 10s
+          volumes:
+            - ./project-W-data/postgres/:/var/lib/postgresql
+        redis:
+          image: redis:8
           restart: unless-stopped
+          healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            retries: 3
+            start_period: 30s
+            timeout: 10s
+        project-w:
+          image: ghcr.io/julianfp/project-w
+          restart: unless-stopped
+          depends_on:
+            postgres:
+              condition: service_healthy
+            redis:
+              condition: service_healthy
+          healthcheck:
+            test: ["CMD", "curl", "-fk", "http://localhost:5000/api/about"]
+          volumes:
+            - ./project-W-data/:/etc/xdg/project-W/
+          environment:
+            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
+            - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD}
+            - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
+            - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
+        caddy:
+          image: caddy:2
+          restart: unless-stopped
+          cap_add:
+            - NET_ADMIN
+          depends_on:
+            project-w:
+              condition: service_healthy
+          volumes:
+            - ./caddy-data/data:/data
+            - ./caddy-data/config:/config
+            - ./caddy-data/conf:/etc/caddy
           ports:
             - 80:80
-          environment:
-            - NGINX_CONFIG=reverseProxy
-            - SERVER_NAME=<DOMAIN>
+            - 443:443
+            - 443:443/udp
 
 5. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
 
    .. code-block:: console
 
-      python -c 'import secrets; print(secrets.token_hex())'
+      python -c 'import secrets; print(secrets.token_hex(32))'
 
-6. Run the containers. Replace <JWT Secret Key> and <Your SMTP Password> with the JWT_SECRET_KEY we generated before and the password of the SMTP Server you want to use respectively:
+6. Run the containers. Replace <JWT Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the JWT_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
 
    .. code-block:: console
 
-      PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" docker compose up -d
+      PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" PROJECT_W_POSTGRES_PASSWORD="<Postgres password>" PROJECT_W_ADMIN_PASSWORD="<project-w admin user password>" docker compose up -d
 
 7. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
 
 Runner
 ``````
 
-Like for the backend you also need a config.yml file for the runner. Prepare this file before following the installation steps below. You can use the following example as a base (don't forget to replace the <placeholder>!) and modify it to your needs if necessary. Refer to :ref:`description_runner_config-label` for more information about all the configuration options of the runner.
-
-.. warning::
-   Please make sure to save 'runnerToken' in a secret way on your machine! Runner tokens are unique to each runner! With it a bad actor could log in to the backend as this runner and accept jobs of possibly any user including their audio files. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
-
-In this setup, runnerToken is being read from the environment variable 'PROJECT_W_RUNNER_TOKEN'. If you want you can also choose to set it directly in the config, but if you do so please take appropriate measures to keep this config file secret!
-
-.. code-block:: yaml
-
-   backendURL: https://<DOMAIN>
-   modelCacheDir: /models
-   runnerToken: !ENV ${RUNNER_TOKEN}
-
 The runner runs the whisper model and thus benefits greatly from running on a GPU, which we heavily recommend. This GPU should have at least 10GB of VRAM available, ideally a bit more. If you don't have a powerful enough GPU available though you can choose to also run it on CPU. Choose between the following instructions depending on your choice. Currently we have only instructions for NVIDIA GPUs using CUDA but it should also be possible to run this on an AMD GPU using ROCM (for this you are on your own though).
 
 NVIDIA GPU
 ''''''''''
 
-1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
+1. If you don't already have one then create an hugging face account, then using that account accept the conditions for the `pyannote/segmentation-3.0 <https://huggingface.co/pyannote/segmentation-3.0>`_ and `pyannote/speaker-diarization-3.1 <https://huggingface.co/pyannote/speaker-diarization-3.1>`_ models and create a token with access permissions to these repositories.
 
-2. Install the NVIDIA container toolkit. Refer to the `NVIDIA toolkit documentation <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>`_ for this. Don't forget to restart your docker daemon afterwards.
+2. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
+
+3. Install the NVIDIA container toolkit. Refer to the `NVIDIA toolkit documentation <https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>`_ for this. Don't forget to restart your docker daemon afterwards.
+
+4. Create initial directory structure and enter project-w directory:
+
+   .. code-block:: console
+
+      mkdir -p project-W/runner-config && mkdir project-W/runner-models && cd project-W
+
+5. Like for the backend you also need a config.yml file for the runner. Prepare this file before following the installation steps below. You can use the following example as a base (don't forget to replace the <placeholder>!) and modify it to your needs if necessary. Put this file into ./runner-config. Refer to :ref:`description_runner_config-label` for more information about all the configuration options of the runner.
+
+   .. warning::
+      Please make sure to save 'backend_settings.auth_token' in a secret way on your machine! Runner tokens are unique to each runner! With it a bad actor could log in to the backend as this runner and accept jobs of possibly any user including their audio files. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
+
+   In this setup, the auth token and the hugging face token are read from the environment variable 'PROJECT_W_AUTH_TOKEN' and 'PROJECT_W_HF_TOKEN' respectively. If you want you can also choose to set it directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+
+   .. code-block:: yaml
+
+      runner_attributes:
+        name: "<name of your runner how it should be shown to your users>"
+      backend_settings:
+        url: https://<domain of your Project-W backend>
+        auth_token: !ENV ${AUTH_TOKEN}
+      whisper_settings:
+        hf_token: !ENV ${HF_TOKEN}
+        model_cache_dir: /models
+
+
+6. Put docker-compose.yml in the current directory. Use the following config and make adjustments if needed
+
+   .. code-block:: yaml
+
+      services:
+        runner:
+          image: ghcr.io/julianfp/project-w_runner
+          restart: unless-stopped
+          volumes:
+            - ./runner-config:/etc/xdg/project-W-runner/
+            - ./runner-models:/models
+          environment:
+            - AUTH_TOKEN=${PROJECT_W_AUTH_TOKEN}
+            - HF_TOKEN=${PROJECT_W_HF_TOKEN}
+          deploy:
+            resources:
+              reservations:
+                devices:
+                  - driver: nvidia
+                    count: 1
+                    capabilities: [gpu]
+
+   .. note::
+      Alternatively if you have a system with multiple GPUs and you want to have more control over which GPU gets allocated to the Runner, you can replace 'count: 1' above with 'count: all' and then select the GPU in the config.yml using the 'whisper_settings.torch_device' option. See :ref:`description_runner_config-label`.
+
+7. Create a new Runner and obtain its runner token. Refer to :doc:`connect_runner_backend` for how to do that.
+
+8. Run the container. Replace <Runner Token> with the runner token you obtained from the backend in the previous step:
+
+   .. code-block:: console
+
+      PROJECT_W_AUTH_TOKEN="<obtained runner token>" PROJECT_W_HF_TOKEN="<your huggingface token>" docker compose up -d
+
+9. You may want to back up the runners config file (in ./runner-config) and the docker-compose.yml file if you made any changes to them. The ./runner-models directory contains all the whisper models that the runner will fetch automatically. You don't need to backup this directory but you can keep this directory around, copy it to other machines and share it between runners so that the runner doesn't need to spend time fetching these models anymore and so that if you have multiple runners on the same machine the models don't take up storage space multiple times!
+
+CPU
+'''
+
+1. If you don't already have one then create an hugging face account, then using that account accept the conditions for the `pyannote/segmentation-3.0 <https://huggingface.co/pyannote/segmentation-3.0>`_ and `pyannote/speaker-diarization-3.1 <https://huggingface.co/pyannote/speaker-diarization-3.1>`_ models and create a token with access permissions to these repositories.
+
+2. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
 
 3. Create initial directory structure and enter project-w directory:
 
@@ -221,7 +349,27 @@ NVIDIA GPU
 
       mkdir -p project-W/runner-config && mkdir project-W/runner-models && cd project-W
 
-4. Put your config.yml into ./runner-config
+4. Like for the backend you also need a config.yml file for the runner. Prepare this file before following the installation steps below. You can use the following example as a base (don't forget to replace the <placeholder>!) and modify it to your needs if necessary. Put this file into ./runner-config. Refer to :ref:`description_runner_config-label` for more information about all the configuration options of the runner.
+
+   .. warning::
+      Please make sure to save 'backend_settings.auth_token' in a secret way on your machine! Runner tokens are unique to each runner! With it a bad actor could log in to the backend as this runner and accept jobs of possibly any user including their audio files. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
+
+   In this setup, the auth token and the hugging face token are read from the environment variable 'PROJECT_W_AUTH_TOKEN' and 'PROJECT_W_HF_TOKEN' respectively. If you want you can also choose to set it directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+
+   .. code-block:: yaml
+
+      runner_attributes:
+        name: "<name of your runner how it should be shown to your users>"
+      backend_settings:
+        url: https://<domain of your Project-W backend>
+        auth_token: !ENV ${AUTH_TOKEN}
+      whisper_settings:
+        hf_token: !ENV ${HF_TOKEN}
+        model_cache_dir: /models
+        torch_device: cpu
+        compute_type: int8
+        batch_size: 4
+
 
 5. Put docker-compose.yml in the current directory. Use the following config and make adjustments if needed
 
@@ -235,17 +383,8 @@ NVIDIA GPU
             - ./runner-config:/etc/xdg/project-W-runner/
             - ./runner-models:/models
           environment:
-            - RUNNER_TOKEN=${PROJECT_W_RUNNER_TOKEN:-}
-          deploy:
-            resources:
-              reservations:
-                devices:
-                  - driver: nvidia
-                    count: 1
-                    capabilities: [gpu]
-
-   .. note::
-      Alternatively if you have a system with multiple GPUs and you want to have more control over which GPU gets allocated to the Runner, you can replace 'count: 1' above with 'count: all' and then select the GPU in the config.yml using the 'torchDevice' option. See :ref:`description_runner_config-label`.
+            - AUTH_TOKEN=${PROJECT_W_AUTH_TOKEN}
+            - HF_TOKEN=${PROJECT_W_HF_TOKEN}
 
 6. Create a new Runner and obtain its runner token. Refer to :doc:`connect_runner_backend` for how to do that.
 
@@ -253,47 +392,9 @@ NVIDIA GPU
 
    .. code-block:: console
 
-      PROJECT_W_RUNNER_TOKEN="<Runner Token>" docker compose up -d
+      PROJECT_W_AUTH_TOKEN="<obtained runner token>" PROJECT_W_HF_TOKEN="<your huggingface token>" docker compose up -d
 
 8. You may want to back up the runners config file (in ./runner-config) and the docker-compose.yml file if you made any changes to them. The ./runner-models directory contains all the whisper models that the runner will fetch automatically. You don't need to backup this directory but you can keep this directory around, copy it to other machines and share it between runners so that the runner doesn't need to spend time fetching these models anymore and so that if you have multiple runners on the same machine the models don't take up storage space multiple times!
-
-CPU
-'''
-
-1. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
-
-
-2. Create initial directory structure and enter project-w directory:
-
-   .. code-block:: console
-
-      mkdir -p project-W/runner-config && mkdir project-W/runner-models && cd project-W
-
-3. Put your config.yml into ./runner-config
-
-4. Put docker-compose.yml in the current directory. Use the following config and make adjustments if needed
-
-   .. code-block:: yaml
-
-      services:
-        runner:
-          image: ghcr.io/julianfp/project-w_runner
-          restart: unless-stopped
-          volumes:
-            - ./runner-config:/etc/xdg/project-W-runner/
-            - ./runner-models:/models
-          environment:
-            - RUNNER_TOKEN=${PROJECT_W_RUNNER_TOKEN:-}
-
-5. Create a new Runner and obtain its runner token. Refer to :doc:`connect_runner_backend` for how to do that.
-
-6. Run the container. Replace <Runner Token> with the runner token you obtained from the backend in the previous step:
-
-   .. code-block:: console
-
-      PROJECT_W_RUNNER_TOKEN="<Runner Token>" docker compose up -d
-
-7. You may want to back up the runners config file (in ./runner-config) and the docker-compose.yml file if you made any changes to them. The ./runner-models directory contains all the whisper models that the runner will fetch automatically. You don't need to backup this directory but you can keep this directory around, copy it to other machines and share it between runners so that the runner doesn't need to spend time fetching these models anymore and so that if you have multiple runners on the same machine the models don't take up storage space multiple times!
 
 NixOS
 -----
@@ -506,40 +607,13 @@ Manual installation
 
 You can also run Project-W barebones. This can be a bit more difficult and the following steps will not be as detailed as the ones with Docker or NixOS. You will have to do stuff like configuring python virtual environments, setting up webservers or compiling the frontend yourself.
 
-Backend
-```````
+Backend & Frontend
+``````````````````
 
-1. Install Python (3.8 or newer, we have tested 3.8 to 3.12) and pip
-2. Clone this repository and enter it:
-
-   .. code-block:: console
-
-      git clone https://github.com/JulianFP/project-W.git & cd project-W
-
-3. Install the package with pip:
-
-   .. code-block:: console
-
-      python -m pip install .
-
-4. To run the backend server in production you need a webserver with WSGI support, for example gunicorn. Install gunicorn with pip:
-
-   .. code-block:: console
-
-      python -m pip install gunicorn
-
-5. Run the backend server with gunicorn:
-
-   .. code-block:: console
-
-      gunicorn --bind <DOMAIN>:443 --certfile=<Path to ssl cert> --keyfile=<path to ssl key> project_W:create_app()
-
-Frontend
-````````
-
-The frontend is written in Svelte and needs to be compiled into native Javascript. To do this you will need some build dependencies, however you can remove them after step 4. If you want you can even build it on a different machine and then just move the dist directory to the server between step 4 and 5.
+The frontend is written in Svelte and needs to be compiled into native Javascript. To do this you will need some build dependencies, however you can remove them after step 4. If you want you can even build it on a different machine and then just move the build directory to the server between step 4 and 5.
 
 1. Install nodejs
+
 2. Clone the frontend repository and enter it:
 
    .. code-block:: console
@@ -558,41 +632,60 @@ The frontend is written in Svelte and needs to be compiled into native Javascrip
 
       pnpm install
 
-4. Build the frontend (replace <BACKEND URL> with the url to the backend api. Leave empty if the frontend and backend are hosted on the same origin):
+4. Build the frontend:
 
    .. code-block:: console
 
-      VITE_BACKEND_BASE_URL="<BACKEND URL>" pnpm build
+      pnpm build
 
-5. You can find the result in the ./dist directory. Setup a webserver (like nginx) to serve all contents of this directory. Optionally you can also setup nginx in a way such that it forwards requests to /api/* routes to the gunicorn webserver (which then should run on a different port without ssl). This way both backend and frontend would run on the same server and origin. Make sure to enable https!
+You can find the result in the ./build directory. Now we will now setup the backend which will serve the static files inside this build directory together with the API. This way the frontend and the API are served from the same origin.
+
+5. Install Python (3.11 or newer, I have tested 3.11 to 3.13) and pip
+
+6. Clone this repository and enter it:
+
+   .. code-block:: console
+
+      git clone https://github.com/JulianFP/project-W.git & cd project-W
+
+7. Install the package with pip:
+
+   .. code-block:: console
+
+      python -m pip install .
+
+8. Spin up a Postgresql and Redis server (outside of the scope of this tutorial) and put the config.yml file of the backend either into /etc/xdg/project-W/ or ~/.config/project-W/. Alternatively you can also set a custom path to the config file using the `--custom_config_path` CLI option in the command below.
+
+9. Run the backend server:
+
+   .. code-block:: console
+
+      project_W --root_static_files <path to the build directory of the frontend>
+
 
 Runner
 ``````
 
-1. Install Python (3.11 or newer, we have tested 3.11 to 3.12), pip, and ffmpeg.
+1. Install Python (3.11 or 3.12, I have mostly tested 3.12), pip, and ffmpeg.
+
 2. Clone this repository and enter it:
 
    .. code-block:: bash
 
       git clone https://github.com/JulianFP/project-W-runner.git & cd project-W-runner
 
-3. Install the package with pip:
+3. Install the package including the whisperx dependencies with pip:
 
    .. code-block:: bash
 
-      python -m pip install .
+      python -m pip install .[not_dummy]
 
-4. Set the relevant config values:
-
-  For the runner to work, it needs a config as described in :ref:`description_runner_config-label`. You always need to set the ``backendURL`` and ``runnerToken`` values, otherwise the runner will abort on startup. Please refer to :doc:`connect_runner_backend` for how to do that.
-
-.. warning::
-   The tokens must be unique per runner and must be kept secret. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
+4. Put the config.yml file of the runner either into /etc/xdg/project-W-runner/ or ~/.config/project-W-runner/. Alternatively you can also set a custom path to the config file using the `--custom_config_path` CLI option in the command below.
 
 5. Start up the runner:
 
    .. code-block:: bash
 
-      python -m project_W_runner
+      project_W_runner
 
 6. You may want to make sure that the runner will always restart itself even if it crashes. Currently this might happen in rare cases, so maybe write a script or a systemd service that will always automatically restart the runner in case of a crash.

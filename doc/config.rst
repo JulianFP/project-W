@@ -49,7 +49,7 @@ For a full reference of the syntax and usage of this feature please refer to `th
 Description of backend config options
 -------------------------------------
 
-The following table gives an overview over all options available to you. All options printed in bolt letters must be set since they do not have any default value, however you probably also want to set 'security.local_token.session_secret_key'. For an example config, please refer to :ref:`docker_backend_frontend-label`
+The following gives an overview over all config options available to you on the backend. For an example config, please refer to :ref:`docker_backend_frontend-label`
 
 .. autopydantic_model:: project_W.models.settings.Settings
 
@@ -65,13 +65,13 @@ Refer below to each of the fields and their subfields and subsubfields and so on
 Description of runner config options
 -------------------------------------
 
-The following table describes all config options for the runner config.
+The following gives an overview over all config options available to you on the runner:
 
-=================    =========      ==========================================================================================================
-Name                 Optional?      Description
------------------    ---------      ----------------------------------------------------------------------------------------------------------
-``runnerToken``      No             The token that's used to authenticate the runner to the backend.
-``backendURL``       No             The URL where the backend is hosted.
-``modelCacheDir``    Yes            Path to directory used to cache the Whisper models. If this is not set, ``$HOME/.cache/whisper/`` is used.
-``torchDevice``      Yes            The PyTorch device used by Whisper. If this is not set, the default device is used.
-=================    =========      ==========================================================================================================
+.. autopydantic_model:: runner_settings.Settings
+
+Refer below to each of the fields and their subfields and subsubfields and so on:
+
+.. automodule:: runner_settings
+   :members:
+   :inherited-members: BaseModel, str
+   :exclude-members: Settings

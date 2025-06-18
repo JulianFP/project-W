@@ -31,5 +31,3 @@ RUN --mount=source=.git,target=.git,type=bind \
     pip install --no-cache-dir --upgrade -e .
 
 CMD ["python", "-m", "project_W", "--root_static_files", "/frontend"]
-
-HEALTHCHECK CMD curl -fk https://localhost:8443/api/about || exit 1

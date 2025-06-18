@@ -59,7 +59,7 @@ def secret_key():
 
 @pytest.fixture(scope="function")
 def backend(request, smtpd, secret_key, helper_functions):
-    BACKEND_BASE_URL = "https://localhost:8443"
+    BACKEND_BASE_URL = "https://localhost:5000"
 
     postgres_conn = "postgresql://test:test@localhost:5432/test_db"
     redis_conn = "redis://localhost:6379/project-W"
@@ -67,7 +67,6 @@ def backend(request, smtpd, secret_key, helper_functions):
     settings = {
         "client_url": f"{BACKEND_BASE_URL}/#",
         "web_server": {
-            "port": 8443,
             "ssl": {
                 "cert_file": "/etc/xdg/project-W/certs/cert.pem",
                 "key_file": "/etc/xdg/project-W/certs/key.pem",
