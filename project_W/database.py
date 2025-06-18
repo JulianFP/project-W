@@ -178,6 +178,13 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    async def delete_runner(self, runner_id: int):
+        """
+        Deletes the runner with id runner_id thus invalidating it's access token
+        """
+        pass
+
+    @abstractmethod
     async def get_user_by_id(self, user_id: int) -> UserInDb | None:
         """
         Return the user with the specified id, regardless of whether this user is a local, oidc or ldap user.
@@ -836,9 +843,9 @@ class PostgresAdapter(DatabaseAdapter):
                         (finish_timestamp IS NULL AND runner_id IS NULL AND runner_name IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
                         OR finish_timestamp IS NOT NULL
                     ),
-                    CONSTRAINT either_no_or_all_runner_info CHECK (
+                    CONSTRAINT either_no_or_all_runner_info_except_runner_id CHECK (
                         (runner_id IS NULL AND runner_name IS NULL AND runner_version IS NULL AND runner_git_hash IS NULL AND runner_source_code_url IS NULL)
-                        OR (runner_id IS NOT NULL AND runner_name IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
+                        OR (runner_name IS NOT NULL AND runner_version IS NOT NULL AND runner_git_hash IS NOT NULL AND runner_source_code_url IS NOT NULL)
                     ),
                     CONSTRAINT only_finished_job_is_succeeded_or_failed CHECK (
                         (finish_timestamp IS NOT NULL AND downloaded IS NOT NULL AND error_msg IS NULL)
@@ -1245,6 +1252,17 @@ class PostgresAdapter(DatabaseAdapter):
                         )
                     """,
                     (job_setting_ids,),
+                )
+
+    async def delete_runner(self, runner_id: int):
+        async with self.apool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                        DELETE FROM {self.schema}.runners
+                        WHERE id = %s
+                    """,
+                    (runner_id,),
                 )
 
     async def get_user_by_id(self, user_id: int) -> UserInDb | None:

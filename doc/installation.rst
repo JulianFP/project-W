@@ -52,6 +52,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
       web_server:
       ssl:
         allowed_hosts:
+          - localhost
           - <your domain>
         cert_file: '/etc/xdg/project-W/certs/cert.pem'
         key_file: '/etc/xdg/project-W/certs/key.pem'
@@ -183,10 +184,11 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
       client_url: https://<your domain>/#
       web_server:
         allowed_hosts:
+          - localhost
           - <your domain>
         reverse_proxy:
           trusted_proxies:
-            - "<IP address of your proxy as the backend sees it>"
+            - "172.16.0.0/12" #private ip range used by docker by default
         no_https: true
       postgres_connection_string: !ENV 'postgresql://project_w:${POSTGRES_PASSWORD}@postgres:5432/project_w'
       redis_connection:

@@ -243,7 +243,10 @@ async def heartbeat(
             )
         if in_process_job.abort:
             return HeartbeatResponse(abort=True)
-        await dp.ch.set_in_process_job(online_runner.in_process_job_id, {"progress": req.progress})
+        if in_process_job.progress != req.progress:
+            await dp.ch.set_in_process_job(
+                online_runner.in_process_job_id, {"progress": req.progress}
+            )
     if online_runner.assigned_job_id:
         return HeartbeatResponse(job_assigned=True)
     return HeartbeatResponse()
