@@ -95,7 +95,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
             start_period: 30s
             timeout: 10s
           volumes:
-            - ./project-W-data/postgres/:/var/lib/postgresql
+            - ./project-W-data/postgres/:/var/lib/postgresql/data
         redis:
           image: redis:8
           restart: unless-stopped
@@ -228,7 +228,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
             start_period: 30s
             timeout: 10s
           volumes:
-            - ./project-W-data/postgres/:/var/lib/postgresql
+            - ./project-W-data/postgres/:/var/lib/postgresql/data
         redis:
           image: redis:8
           restart: unless-stopped

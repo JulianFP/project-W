@@ -8,9 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 
 RUN npm install -g pnpm
 
-ARG FRONTEND_BRANCH_NAME=main
-
-RUN git clone -b ${FRONTEND_BRANCH_NAME} https://github.com/JulianFP/project-W-frontend.git .
+COPY ./frontend .
 
 RUN pnpm install
 
@@ -25,9 +23,9 @@ COPY --from=builder /frontend-code/build /frontend
 
 WORKDIR /backend
 
-COPY . .
+COPY ./backend .
 
-RUN --mount=source=.git,target=.git,type=bind \
+RUN --mount=source=./backend/.git,target=.git,type=bind \
     pip install --no-cache-dir --upgrade -e .
 
 CMD ["python", "-m", "project_W", "--root_static_files", "/frontend"]
