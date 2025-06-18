@@ -49,6 +49,7 @@ dependencies = [
     "aiosmtplib",
     # for deployment
     "granian[pname]",
+    "uvicorn", # we still need this for its ProxyHeadersMiddleware
     # for multipart streaming
     "python-multipart",
     # for making http requests to OIDC provider

@@ -1,9 +1,10 @@
-import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import project_W.dependencies as dp
 
@@ -20,6 +21,7 @@ from .smtp import SmtpClient
 # startup database connections before spinning up application
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
     # add imprint info to app attributes (so that it is displayed in OpenAPI docs as well)
     if dp.config.imprint:
         app.contact = {
@@ -142,8 +144,25 @@ app = FastAPI(
     },
     openapi_tags=app_tags_metadata,
     lifespan=lifespan,
+    root_path=(
+        dp.config.web_server.reverse_proxy.root_path
+        if dp.config.web_server.reverse_proxy and dp.config.web_server.reverse_proxy.root_path
+        else ""
+    ),
+    root_path_in_servers=False,
 )
-app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))  # for oidc
+# middleware required by authlib for oidc
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=dp.config.security.local_token.session_secret_key.root.get_secret_value(),
+)
+# middleware to guard against HTTP Host header attacks
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=dp.config.web_server.allowed_hosts)
+# middleware to handle proxy headers and rewrite Host header accordingly
+if dp.config.web_server.reverse_proxy is not None:
+    app.add_middleware(
+        ProxyHeadersMiddleware, trusted_hosts=dp.config.web_server.reverse_proxy.trusted_proxies
+    )
 
 app.include_router(users.router, prefix="/api")
 app.include_router(admins.router, prefix="/api")

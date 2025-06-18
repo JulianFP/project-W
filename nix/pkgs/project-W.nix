@@ -26,6 +26,7 @@ python3Packages.buildPythonPackage rec {
     bonsai
     aiosmtplib
     granian
+    uvicorn
     setproctitle
     python-multipart
     httpx

@@ -42,7 +42,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
 3. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
 
    .. warning::
-      Please make sure to save 'security.local_token.session_secret_key' and 'smtp_server.password' in a secret way on your server! With the 'security.local_token.session_secret_key' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtp_server.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
+      Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
    In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
@@ -51,6 +51,8 @@ This will setup the backend/frontend without a reverse proxy or any additional c
       client_url: https://<your domain>/#
       web_server:
       ssl:
+        allowed_hosts:
+          - <your domain>
         cert_file: '/etc/xdg/project-W/certs/cert.pem'
         key_file: '/etc/xdg/project-W/certs/key.pem'
       postgres_connection_string: !ENV 'postgresql://project_w:${POSTGRES_PASSWORD}@postgres:5432/project_w'
@@ -112,6 +114,10 @@ This will setup the backend/frontend without a reverse proxy or any additional c
               condition: service_healthy
           healthcheck:
             test: ["CMD", "curl", "-fk", "https://localhost:5000/api/about"]
+            interval: 10s
+            retries: 3
+            start_period: 30s
+            timeout: 10s
           volumes:
             - ./project-W-data/:/etc/xdg/project-W/
           environment:
@@ -154,10 +160,21 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
 
       mkdir -p project-W/project-W-data && mkdir -p project-W/caddy-data/data && mkdir project-W/caddy-data/config && mkdir project-W/caddy-data/conf && cd project-W
 
-3. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
+3. Configure Caddy by creating the file called Caddyfile under caddy-data/conf/ with the following content. Please make sure that the DNS record of this domain points to the docker host and that all firewalls and NATs you may have in place are configured to allow traffic on ports 80 AND 443 to the docker host from the internet.
+
+   .. code-block:: Caddyfile
+      <the domain under which the backend should be served>
+
+      #configure hsts
+      header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload"
+      #compression
+      encode zstd gzip
+      reverse_proxy project-w:5000
+
+4. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
 
    .. warning::
-      Please make sure to save 'security.local_token.session_secret_key' and 'smtp_server.password' in a secret way on your server! With the 'security.local_token.session_secret_key' a bad actor could log in as any user, even as an admin user, and read any current and future user data. With the 'smtp_server.password' a bad actor could authenticate with your mail server and send malicious phishing emails to you users while masquerading as the server admin.
+      Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
    In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
@@ -165,6 +182,11 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
 
       client_url: https://<your domain>/#
       web_server:
+        allowed_hosts:
+          - <your domain>
+        reverse_proxy:
+          trusted_proxies:
+            - "<IP address of your proxy as the backend sees it>"
         no_https: true
       postgres_connection_string: !ENV 'postgresql://project_w:${POSTGRES_PASSWORD}@postgres:5432/project_w'
       redis_connection:
@@ -186,7 +208,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
         username: <probably same as above>
         password: !ENV ${SMTP_PASSWORD}
 
-4. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
+5. Put docker-compose.yml in the current directory. Use the following config and make same adjustments if needed (make sure to replace the <placeholders>!):
 
    .. code-block:: yaml
 
@@ -224,6 +246,10 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
               condition: service_healthy
           healthcheck:
             test: ["CMD", "curl", "-fk", "http://localhost:5000/api/about"]
+            interval: 10s
+            retries: 3
+            start_period: 30s
+            timeout: 10s
           volumes:
             - ./project-W-data/:/etc/xdg/project-W/
           environment:
@@ -248,19 +274,19 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
             - 443:443
             - 443:443/udp
 
-5. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
+6. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
 
    .. code-block:: console
 
       python -c 'import secrets; print(secrets.token_hex(32))'
 
-6. Run the containers. Replace <JWT Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the JWT_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
+7. Run the containers. Replace <JWT Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the JWT_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
 
    .. code-block:: console
 
       PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" PROJECT_W_POSTGRES_PASSWORD="<Postgres password>" PROJECT_W_ADMIN_PASSWORD="<project-w admin user password>" docker compose up -d
 
-7. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
+8. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database and your config.yml), the caddy-data directory (which will include your ssl certs, ocsp staples and so on) and maybe your docker-compose.yml if you made changes to it.
 
 Runner
 ``````
@@ -270,7 +296,7 @@ The runner runs the whisper model and thus benefits greatly from running on a GP
 NVIDIA GPU
 ''''''''''
 
-1. If you don't already have one then create an hugging face account, then using that account accept the conditions for the `pyannote/segmentation-3.0 <https://huggingface.co/pyannote/segmentation-3.0>`_ and `pyannote/speaker-diarization-3.1 <https://huggingface.co/pyannote/speaker-diarization-3.1>`_ models and create a token with access permissions to these repositories.
+1. If you don't already have one then create an hugging face account, then using that account accept the conditions for the `pyannote/segmentation-3.0 <https://huggingface.co/pyannote/segmentation-3.0>`_ and `pyannote/speaker-diarization-3.1 <https://huggingface.co/pyannote/speaker-diarization-3.1>`_ models. Create a token with access permissions to these repositories (e.g. by just granting the 'Read access to contents of all public gated repos you can access' permission).
 
 2. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
 
@@ -285,7 +311,7 @@ NVIDIA GPU
 5. Like for the backend you also need a config.yml file for the runner. Prepare this file before following the installation steps below. You can use the following example as a base (don't forget to replace the <placeholder>!) and modify it to your needs if necessary. Put this file into ./runner-config. Refer to :ref:`description_runner_config-label` for more information about all the configuration options of the runner.
 
    .. warning::
-      Please make sure to save 'backend_settings.auth_token' in a secret way on your machine! Runner tokens are unique to each runner! With it a bad actor could log in to the backend as this runner and accept jobs of possibly any user including their audio files. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
+      Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
    In this setup, the auth token and the hugging face token are read from the environment variable 'PROJECT_W_AUTH_TOKEN' and 'PROJECT_W_HF_TOKEN' respectively. If you want you can also choose to set it directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
@@ -339,7 +365,7 @@ NVIDIA GPU
 CPU
 '''
 
-1. If you don't already have one then create an hugging face account, then using that account accept the conditions for the `pyannote/segmentation-3.0 <https://huggingface.co/pyannote/segmentation-3.0>`_ and `pyannote/speaker-diarization-3.1 <https://huggingface.co/pyannote/speaker-diarization-3.1>`_ models and create a token with access permissions to these repositories.
+1. If you don't already have one then create an hugging face account, then using that account accept the conditions for the `pyannote/segmentation-3.0 <https://huggingface.co/pyannote/segmentation-3.0>`_ and `pyannote/speaker-diarization-3.1 <https://huggingface.co/pyannote/speaker-diarization-3.1>`_ models. Create a token with access permissions to these repositories (e.g. by just granting the 'Read access to contents of all public gated repos you can access' permission).
 
 2. Install Docker: Refer to your distros package manager / the `Docker documentation <https://docs.docker.com/engine/install/>`_ for this
 
@@ -352,7 +378,7 @@ CPU
 4. Like for the backend you also need a config.yml file for the runner. Prepare this file before following the installation steps below. You can use the following example as a base (don't forget to replace the <placeholder>!) and modify it to your needs if necessary. Put this file into ./runner-config. Refer to :ref:`description_runner_config-label` for more information about all the configuration options of the runner.
 
    .. warning::
-      Please make sure to save 'backend_settings.auth_token' in a secret way on your machine! Runner tokens are unique to each runner! With it a bad actor could log in to the backend as this runner and accept jobs of possibly any user including their audio files. If you accidentally leaked a token, immediately contact an administrator to have the token revoked. If you are the administrator, please refer to :ref:`revoke_a_runner-label` for how to do that.
+      Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
    In this setup, the auth token and the hugging face token are read from the environment variable 'PROJECT_W_AUTH_TOKEN' and 'PROJECT_W_HF_TOKEN' respectively. If you want you can also choose to set it directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 

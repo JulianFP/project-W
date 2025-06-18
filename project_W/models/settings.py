@@ -318,8 +318,28 @@ class SslSettings(BaseModel):
     )
 
 
+class ReverseProxySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    trusted_proxies: list[str] = Field(
+        description="List of IP addresses to trust as the proxy from which traffic originates",
+    )
+    root_path: str | None = Field(
+        description="Set this option to your path prefix if you want to serve Project-W from a root path prefix at your proxy",
+        default=None,
+    )
+
+
 class WebServerSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    allowed_hosts: list[str] = Field(
+        description="List of domains that are allowed as hostnames. Wildcard domains supported",
+        default=["*"],
+        validate_default=True,
+    )
+    reverse_proxy: ReverseProxySettings | None = Field(
+        description="Settings for when running Project-W behind a Reverse Proxy",
+        default=None,
+    )
     ssl: SslSettings | None = Field(
         description="SSL settings to enable https encrypted traffic",
         default=None,
