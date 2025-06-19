@@ -24,7 +24,7 @@ let { data }: Props = $props();
   {#if data.about.imprint}
     <Hr class="bg-gray-400 w-96 h-1 mx-auto my-0 rounded"/>
 
-    <div>
+    <div class="flowbite-anchors">
       <Heading tag="h4" class="mb-2">Imprint of this instance</Heading>
       <dl class="text-gray-900 dark:text-white flex flex-col gap-2">
         <div>

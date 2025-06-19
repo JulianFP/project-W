@@ -38,3 +38,10 @@
     display: none;
   }
 }
+
+/* utility to change default styling of anchor mainly used in the imprint which is set from the config file in plain html instead of using flowbite components */
+@utility flowbite-anchors {
+    a {
+    @apply inline-flex items-center hover:underline text-primary-600 dark:text-primary-500
+    }
+}
