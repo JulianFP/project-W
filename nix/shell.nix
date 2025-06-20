@@ -32,8 +32,8 @@ pkgs.mkShell {
   buildInputs =
     with pkgs;
     [
-      nodejs_20
-      corepack_20
+      nodejs_24
+      corepack_24
     ]
     ++ pre-commit-check.enabledPackages;
 

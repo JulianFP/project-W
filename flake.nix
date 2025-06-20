@@ -40,6 +40,5 @@
           pkgs = pkgsFor.${system};
         };
       });
-      nixosModules.default = import ./nix/module.nix inputs;
     };
 }
