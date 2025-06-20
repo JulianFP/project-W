@@ -67,7 +67,7 @@ config_dict = {
     },
     "postgres_connection_string": "postgresql://postgres@%2Fvar%2Frun%2Fpostgresql/postgres",
     "redis_connection": {
-        "unix_socket_path": "/var/run/redis-project-W/redis.sock",
+        "connection_string": "redis://localhost:6379/project-W",
     },
     "security": {
         "local_token": {

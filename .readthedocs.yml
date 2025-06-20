@@ -4,6 +4,11 @@ build:
   os: ubuntu-24.04
   tools:
     python: "3.13"
+  apt_packages:
+    - git
+    - gcc
+    - libldap2-dev
+    - libsasl2-dev
 
 sphinx:
   configuration: doc/conf.py
