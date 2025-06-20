@@ -20,7 +20,7 @@ maintainers = [
     { name = "Markus Everling", email = "your@email.com"}
 ]
 dynamic = ["version"]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = { text = "AGPLv3" }
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -28,39 +28,52 @@ classifiers = [
     "License :: OSI Approved :: GNU Affero General Public License v3",
 ]
 dependencies = [
+    # click cli to pass some hosting options to application which shouldn't be part of config file,
+    "click",
     # Argon2 for password hashing
     "argon2-cffi",
-    # Click for the CLI
-    "click",
-    # Flask for the WSGI server
-    "flask",
-    # JWT Flask plugin for session tokens
-    "flask-jwt-extended",
-    # SQL Flask plugin for database management
-    "flask-sqlalchemy",
-    # for setting header for cors support globally
-    "flask-cors",
+    # Fastapi and validation libraries
+    "fastapi",
+    "pydantic",
+    "email-validator",
+    # Postgres client library
+    "psycopg[binary,pool]",
+    # Redis client library
+    "redis[hiredis]",
+    # auth & security stuff
+    "authlib",
+    "pyjwt",
+    "itsdangerous", #required by starlette's SessionMiddleware
+    "bonsai",
+    # async smtp library
+    "aiosmtplib",
+    # for deployment
+    "granian[pname]",
+    "uvicorn", # we still need this for its ProxyHeadersMiddleware
+    # for multipart streaming
+    "python-multipart",
+    # for making http requests to OIDC provider
+    "httpx",
     # getting platform-independent directories for config and data (follows xdg standard on Linux)
     "platformdirs",
     # parsing config from yaml file and env vars
     "pyaml_env",
-    #validating config files and filling out defaults
-    "jsonschema"
 ]
 
 [project.optional-dependencies]
-tests = [
-    "pytest",
-    "pytest-mock",
-    "pytest-cov"
+development_mode = [
+    # granian extra packages
+    "granian[pname,reload]",
 ]
 docs = [
     #sphinx documentation engine
     "sphinx",
-    #for automatically documenting http apis
-    "sphinxcontrib-httpdomain",
-    #for automatically documenting jsonschemas (like the one for our config)
-    "sphinx-jsonschema",
+    #for including FastAPI's OpenAPI docs
+    "sphinxcontrib-openapi",
+    # for settings documentation (which are pydantic models)
+    "autodoc_pydantic",
+    # for cloning the runner repo to generate docs for its code as well
+    "GitPython",
     #for including markdown files in sphinx documentation (like the README)
     "sphinx_mdinclude",
     #read the docs theme for sphinx
@@ -83,12 +96,6 @@ packages = [
 # the version control system. For more information see its documentation:
 # https://github.com/pypa/setuptools_scm
 [tool.setuptools_scm]
-version_scheme = "no-guess-dev"
+version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
-write_to = "project_W/_version.py"
-
-# The following is the configuration for the pytest test suite
-[tool.pytest.ini_options]
-testpaths = [
-    "tests"
-]
+version_file = "project_W/_version.py"

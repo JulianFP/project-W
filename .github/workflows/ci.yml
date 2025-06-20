@@ -1,74 +1,199 @@
-name: CI
+name: "CI: system & integration tests, docker build"
 
 on:
   # We run CI on pushes to the main branch
   push:
     branches:
       - main
+      - dev
+    tags:
+      - "v*"
   # and on all pull requests to the main branch
   pull_request:
     branches:
       - main
+      - dev
   # as well as upon manual triggers through the 'Actions' tab of the Github UI
   workflow_dispatch:
 
 jobs:
   build-and-test:
-    name: Testing on ${{matrix.os}}
-    runs-on: ${{matrix.os}}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        # Here, we are testing the oldest and the newest supported Python version.
-        # If this is insufficient for your package, consider adding more versions.
-        python-version: ["3.8", "3.12"]
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        # setuptools_scm requires a non-shallow clone of the repository
-        fetch-depth: 0
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install Python package
-      run: |
-        python -m pip install .[tests]
-
-    - name: Run Python tests
-      run: |
-        python -m pytest
-
-  coverage:
-    name: Coverage Testing
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        #test all components with the oldest and newest supported version
+        postgres_version: [ "14", "17" ] #14 is minimal required version
+        redis_version: [ "7.2", "8" ] #7.2 is minimal required version
+        python_version: ["3.11", "3.13"] #3.11 is minimal required version
+
+    outputs:
+      frontend-branch-name: ${{ steps.branch-names.outputs.frontend-branch-name }}
+      runner-branch-name: ${{ steps.branch-names.outputs.runner-branch-name }}
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres_version }}
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:${{ matrix.redis_version }}
+        ports:
+          - 6379:6379
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Check which frontend & runner branches to use
+        id: branch-names
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/julianfp/project-w-frontend ${{ github.ref_name }}; then
+            FRONTEND_BRANCH_NAME="${{ github.ref_name }}"
+          else
+            FRONTEND_BRANCH_NAME="dev"
+          fi
+          echo "FRONTEND_BRANCH_NAME=${FRONTEND_BRANCH_NAME}" >> "$GITHUB_ENV"
+          echo "frontend-branch-name=${FRONTEND_BRANCH_NAME}" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --heads https://github.com/julianfp/project-w-runner ${{ github.ref_name }}; then
+            RUNNER_BRANCH_NAME="${{ github.ref_name }}"
+          else
+            RUNNER_BRANCH_NAME="dev"
+          fi
+          echo "RUNNER_BRANCH_NAME=${RUNNER_BRANCH_NAME}" >> "$GITHUB_ENV"
+          echo "runner-branch-name=${RUNNER_BRANCH_NAME}" >> "$GITHUB_OUTPUT"
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
+      - name: Checkout backend repository
+        uses: actions/checkout@v4
+        with:
+          path: backend
+          fetch-depth: 0
 
-    - name: Install Python package
-      run: |
-        python -m pip install .[tests]
+      - name: Checkout frontend repository
+        uses: actions/checkout@v4
+        with:
+          repository: julianfp/project-w-frontend
+          ref: ${{ env.FRONTEND_BRANCH_NAME }}
+          path: frontend
+          fetch-depth: 0
 
-    - name: Run Python tests
-      working-directory: ./tests
-      run: |
-        python -m pytest --cov --cov-report=xml
+      - name: Checkout runner repository
+        uses: actions/checkout@v4
+        with:
+          repository: julianfp/project-w-runner
+          ref: ${{ env.RUNNER_BRANCH_NAME }}
+          path: runner
+          fetch-depth: 0
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        fail_ci_if_error: true
-        files: ./tests/coverage.xml
-        token: ${{ secrets.CODECOV_TOKEN }}
-        slug: JulianFP/project-W
+      - name: Set up Python ${{ matrix.python_version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Install test requirements
+        run: |
+          python -m pip install -r backend/tests/requirements.txt
+
+      - name: Setup SSL certificates
+        run: |
+          mkdir -p ./backend-config/certs
+          openssl req -x509 -newkey rsa:4096 -sha256 -nodes -keyout ./backend-config/certs/key.pem -out ./backend-config/certs/cert.pem -subj '/CN=localhost'
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login with ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Project-W docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          tags: project-w:latest
+
+          #pull frontend from branch with the same name as backend is currently on:
+          build-args: |
+            PYTHON_VERSION: ${{ matrix.python_version }}
+          push: false
+          load: true
+          cache-from: type=registry,ref=ghcr.io/julianfp/project-w:buildcache
+          cache-to: type=registry,ref=ghcr.io/julianfp/project-w:buildcache,mode=max
+
+      - name: Build Project-W Runner docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./runner
+          file: ./runner/Dockerfile.dummy
+          tags: project-w_runner_dummy:latest
+          push: false
+          load: true
+          cache-from: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache
+          cache-to: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache,mode=max
+
+      - name: Run test suite
+        run: |
+          python -m pytest --timeout=45 backend/tests/
+
+  docker-build-push:
+    #don't push docker image on a PR
+    if: ${{ github.event_name != 'pull_request' }}
+    #wait until testing has finished first so that we don't push a broken build
+    #also then we can take advantage of the already cached build and don't need to build the image twice
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout backend repository
+        uses: actions/checkout@v4
+        with:
+          path: backend
+          fetch-depth: 0
+
+      - name: Checkout frontend repository
+        uses: actions/checkout@v4
+        with:
+          repository: julianfp/project-w-frontend
+          ref: ${{needs.build-and-test.outputs.frontend-branch-name}}
+          path: frontend
+          fetch-depth: 0
+
+      - name: Metadata for docker container
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/julianfp/project-w
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Setup qemu
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login with ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Project-W docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/julianfp/project-w:buildcache
+          cache-to: type=registry,ref=ghcr.io/julianfp/project-w:buildcache,mode=max

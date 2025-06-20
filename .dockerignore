@@ -1,0 +1,11 @@
+tests/
+doc/
+nix/
+.github/
+.gitignore
+README.md
+flake.*
+**.yml
+**.yaml
+**.sh
+**/__pycache__/

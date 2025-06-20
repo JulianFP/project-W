@@ -1,6 +1,24 @@
 # This is a dummy config intended for development purposes only!
-disableOptionValidation: true
-clientURL: http://localhost:5173/#
-databasePath: .
-loginSecurity:
-  sessionSecretKey: abcdefghijklmnopqrstuvwxyz0123456789
+client_url: http://localhost:5173/#
+web_server:
+  address: "127.0.0.1"
+  no_https: true
+postgres_connection_string: "postgresql://postgres@%2Fvar%2Frun%2Fpostgresql/postgres"
+redis_connection:
+  unix_socket_path: "/var/run/redis-project-W/redis.sock"
+security:
+  local_token:
+    session_secret_key: f26a5feb0eb502fb2b4f872026ce7b5d3986dbfef77d72d3f29050df2f8b3bdb
+  local_account:
+    user_provisioning:
+      0:
+        email: <your email>
+        password: verysecurepassword
+        is_admin: true
+smtp_server:
+  hostname: <your hostname>
+  port: 587
+  secure: starttls
+  sender_email: <your email>
+  username: <your username>
+  password: <your password>

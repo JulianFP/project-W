@@ -1,0 +1,6 @@
+pytest
+pytest-timeout
+httpx
+smtpdfix
+psycopg[binary,pool]
+redis[hiredis]

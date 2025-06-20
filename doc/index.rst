@@ -12,6 +12,7 @@ project W
    :caption: For Administrators:
 
    installation
+   example_configs
    config
    connect_runner_backend
 
@@ -21,6 +22,7 @@ project W
 
    dev_getting_started
    tech-stack
+   database_design
    testing_and_code-quality
    api
 

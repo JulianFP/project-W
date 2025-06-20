@@ -1,16 +1,31 @@
-FROM python:3.12-slim
+ARG PYTHON_VERSION=3.13
 
-WORKDIR /app
+FROM node:24-slim AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends git curl
+WORKDIR /frontend-code
 
-RUN pip install gunicorn
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates
 
-COPY . .
+RUN npm install -g pnpm
 
-RUN --mount=source=.git,target=.git,type=bind \
-    pip install --no-cache-dir -e .
+COPY ./frontend .
 
-CMD ["gunicorn", "--bind", "backend:8080", "--limit-request-line", "8190", "project_W:create_app()"]
+RUN pnpm install
 
-HEALTHCHECK CMD curl -f http://backend:8080/api/about || exit 1
+RUN pnpm build
+
+FROM python:${PYTHON_VERSION}-slim
+
+# gcc, libldap and libsas are required to compile bonsai (the ldap library we use) since it doesn't have any wheels on pypi
+RUN apt-get update && apt-get install -y --no-install-recommends git curl gcc libldap2-dev libsasl2-dev
+
+COPY --from=builder /frontend-code/build /frontend
+
+WORKDIR /backend
+
+COPY ./backend .
+
+RUN --mount=source=./backend/.git,target=.git,type=bind \
+    pip install --no-cache-dir --upgrade -e .
+
+CMD ["python", "-m", "project_W", "--root_static_files", "/frontend"]

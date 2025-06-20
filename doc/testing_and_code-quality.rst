@@ -8,56 +8,39 @@ This document describes the current testing strategies and general measures to k
 Test setup
 ----------
 
-Currently the backend has rigorous component tests for all client-facing api routes (meaning all ``/api/jobs`` and ``/api/users`` routes, refer to :ref:`general-label` for more info about them). These tests can be found in the ``/tests`` directory.
+Problems with standard component testing
+````````````````````````````````````````
 
-The test framework in use is ``pytest`` and we have multiple custom fixtures around it. Most notably there is a ``client`` fixture that uses flasks ``app.test_client()`` to mock an http client that then calls the api routes in the test cases and also creates the config file which is required to run most of the backends code. There is also a ``mockedSMTP`` fixture that mocks pythons smtp library and is required for testing routes that would otherwise send emails to the user. These fixtures are defined in ``/tests/conftest.py``
+FastAPI does provide good tooling for testing the API in a more classical component test setup with pytest. For this application a setup like that would come with a significant amount of work and some serious shortcomings: The backend relies on many external services for its operations: A PostgreSQL database, a Redis database, a SMTP server, one or more runners and optionally LDAP and OIDC providers. These services wouldn't be available in a component test setup. The solution would be to replace all code that communicates with such services with dummy code during testing time. This could be done either by supplying a different class for database/caching operations that implements the same abstract parent class during testing time (both the PostgreSQL and Redis adapters inherit from an abstract parent class, it would 'just' require a dummy implementation of these classes) or my monkey patching. This has two major disadvantages:
 
-Backend fixtures
-````````````````
+- for so many services it would be a lot of work
 
-The ``client`` fixture accepts multiple non-optional parameters which are meant to define config options that affect the behavior of certain api-routes. Think of them as parameters of a function that you write a test for: We want to write one test case for every possible parameter value or maybe even for every possible combination of parameter values. Luckily, pytest does that for us: We can write a test case ones and define multiple tuples of parameters that the config should have in the ``@pytest.mark.parametrize``. Pytest will then run that test case multiple times, ones for each tuple of config parameters.
+- most of the backend's behavior and logic is actually implemented in these services. If all these services would be replaced by dummy implementations, there wouldn't remain much else to test for the component tests.
 
-The ``@pytest.mark.parametrize`` should look like this when using the ``client`` fixture: As the first parameter, pass the name of the fixture as a string (`"client"`). As the second parameter, pass an array of tuples of config file parameters. Each tuple in the array is one combination of config file parameters (pytest will run the test case for each of these tupels ones). Both values of the tupel are strings and should contain valid json for the config options ``allowedEmailDomains`` and ``disableSignup`` (refer to :ref:`description_backend_config-label` for more info about them). All other config values are also being set by the fixture but currently not customizable on a per test case basis. Go to ``/tests/conftest.py`` to find out their values. Also don't forget to set ``indirect=True`` to activate this feature. After that you can define the test case in usual pytest notation. Don't forget to include the ``client`` fixture as well as other fixtures you want to use (e.g. ``mockedSMTP``) as function parameters.
+- these services, their behavior and correct interfacing by the backend is very crucial and should also be tested
 
-Take the following test case definition as an example:
+Because of these considerations I chose to prioritize the system and Integration tests. For the time being there are no component tests of Project-W code.
 
-   .. code-block:: python
+System and Integration testing
+``````````````````````````````
 
-      @pytest.mark.parametrize(
-         "client",
-         [("[]", "false"), ("[ 'test.com' ]", "false"), ("[ 'test.com', 'sub.test.com' ]", "false")],
-         indirect=True,
-      )
-      def test_signup_valid(client: Client, mockedSMTP):
+The goal of this test setup is to deploy a fully working version of Project-W including PostgreSQL, Redis, runners and more in a way that simulates a real world deployment as much as possible, and then use `pytest <https://docs.pytest.org>`_ and httpx to make http requests to the backend, effectively simulating a client. This test setup required the following to work:
 
-This tests a valid call of the signup route. It instructs pytest to run the test case three times: The first time all mail domains are allowed, the second time only test.com is allowed, and the third time both test.com and sub.test.com are allowed. In all three instances, signup stays enabled. In addition to the client fixture this test case also requests the mockedSMTP fixture because the signup route sends an activation email to the user.
+GitHub actions as our CI system
+```````````````````````````````
 
-For more examples of how to use these fixtures, look at existing test cases in ``/tests``.
+Github actions and Github runners are powerful enough to setup multiple docker containers, to build the Project-W container and the Project-W-runner container in it's dummy version (because the runner doesn't have enough storage for the full WhisperX version) and then run the pytest test suite.
 
-CI setup
-````````
+This test is implemented as matrix test, meaning the same thing is done for each combination of Python version, PostgreSQL version and Redis version that I defined in the action (currently for each the oldest and newest supported by the backend).
 
-We use Github actions and `pre-commit.ci <https://pre-commit.ci>`_ as our CI tools. When triggered it will validate that the following runs successfully:
+In addition to that our CI system also runs `pre-commit.ci <https://pre-commit.ci>`_ for code formatting.
 
-- checkout the repository, install the package (with optional tests dependencies) using pip and run all pytest test cases (backend)
+pytest fixtures
+```````````````
 
-   - For each of the following systems: ubuntu-latest, macos-latest, windows-latest
-   - For Python version 3.8 and version 3.12
+The docker containers of the backend and runners are started and stopped using pytest fixtures. They also create their config files and flush the PostgreSQL and Redis databases afterwards. This ensures that each test case starts of with a freshly started backend and runner, and clean databases.
 
-- Measure the codecov test coverage for regressions (backend)
-
-- run the pre-commit checks and apply changes (if any) in an automated commit (all repositories)
-
-The CI will run for each newly pushed commit to the main branch as well as on open pull requests into the main branch. Issues discovered by the CI should be fixed before merging into main!
-
-Shortcomings and planned improvements
-`````````````````````````````````````
-
-On the backend, the ``/api/runners`` routes currently don't have any test cases. The blocker for this is the requirement for a new fixture that mocks the runner somehow. It would also be nice to have dedicated test cases for some of the functions in utils.py, model.py and runner_manager.py independently from the api interface to get the coverage even higher. This would require additional fixtures as well (e.g. for checking database writes).
-
-On the frontend and runner side we currently don't have any automated tests. The runner has a working pytest and Github CI setup similar to the one of the backend, however it would also require additional fixtures (e.g. for mocking the backend) to be able to actually define test cases.
-
-It is planned to remedy these shortcomings. There are open Github issues for them, check them for progress on this.
+Test cases have some control over these fixtures over pytest's indirect parametrization feature (e.g. some of the contents of config files are handled this way).
 
 .. _code_style-label:
 

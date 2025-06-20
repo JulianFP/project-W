@@ -2,29 +2,38 @@
 
 python3Packages.buildPythonPackage rec {
   pname = "project_W";
-  version = "0.0.1";
-  format = "setuptools";
+  version = "0.3.0";
+  pyproject = true;
 
   src = ../../.;
 
+  build-system = [ python3Packages.setuptools ];
+
   nativeBuildInputs = with python3Packages; [ setuptools-scm ];
+
   propagatedBuildInputs = with python3Packages; [
-    argon2-cffi
     click
-    flask
-    flask-jwt-extended
-    flask-sqlalchemy
-    flask-cors
+    argon2-cffi
+    fastapi
+    pydantic
+    email-validator
+    psycopg
+    psycopg-pool
+    redis
+    authlib
+    pyjwt
+    itsdangerous
+    bonsai
+    aiosmtplib
+    granian
+    uvicorn
+    setproctitle
+    python-multipart
+    httpx
     platformdirs
     pyaml-env
-    jsonschema
   ];
 
-  nativeCheckInputs = with python3Packages; [
-    pytestCheckHook
-    pytest-mock
-    pytest-cov
-  ];
   pythonImportsCheck = [ pname ];
 
   #hardcode version so that setuptools-scm works without .git folder:
