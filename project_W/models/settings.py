@@ -61,7 +61,7 @@ class SessionTokenValidated(RootModel):
     root: SecretStr
 
     @model_validator(mode="after")
-    def password_validation(self) -> Self:
+    def session_token_validation(self) -> Self:
         # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, if second half is supplied by database then only first half of that is used)
         if len(self.root.get_secret_value()) != 64:
             raise ValueError(

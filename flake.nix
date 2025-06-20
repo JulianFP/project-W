@@ -8,10 +8,19 @@
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    project-W-frontend = {
+      url = "github:julianfp/project-W-frontend";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    inputs@{ nixpkgs, systems, ... }:
+    inputs@{
+      nixpkgs,
+      systems,
+      project-W-frontend,
+      ...
+    }:
     let
       pythonOverlay = import ./nix/overlay.nix;
       eachSystem = nixpkgs.lib.genAttrs (import systems);
@@ -35,7 +44,19 @@
           pkgs = pkgsFor.${system};
         };
       });
-      nixosModules.default = import ./nix/module.nix inputs;
+      nixosModules.default =
+        { pkgs, ... }:
+        {
+          #apply overlay
+          nixpkgs.overlays = [
+            pythonOverlay
+            (final: prev: {
+              project-W-frontend = project-W-frontend.packages."${pkgs.system}".project-W_frontend;
+            })
+          ];
+
+          imports = [ ./nix/module.nix ];
+        };
       overlays.default = pythonOverlay;
     };
 }

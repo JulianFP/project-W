@@ -12,6 +12,7 @@ project W
    :caption: For Administrators:
 
    installation
+   example_configs
    config
    connect_runner_backend
 

@@ -48,4 +48,4 @@ async def invalidate_runner(
 
     await dp.db.delete_runner(runner_id)
 
-    return f"Successfully invalidated and deleted runner with id {runner_id}"
+    return f"If a runner with id {runner_id} existed it was successfully invalidated and deleted"

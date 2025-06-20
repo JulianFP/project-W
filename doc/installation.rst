@@ -39,7 +39,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
 
       mkdir -p project-W/project-W-data/certs && mkdir project-W/project-W-data/postgres && cd project-W
 
-3. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
+3. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :doc:`example_configs` for more advanced example configs and to :ref:`description_backend_config-label` for more information about all the configuration options.
 
    .. warning::
       Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
@@ -163,7 +163,8 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
 
 3. Configure Caddy by creating the file called Caddyfile under caddy-data/conf/ with the following content. Please make sure that the DNS record of this domain points to the docker host and that all firewalls and NATs you may have in place are configured to allow traffic on ports 80 AND 443 to the docker host from the internet.
 
-   .. code-block:: Caddyfile
+   .. code-block::
+
       <the domain under which the backend should be served>
 
       #configure hsts
@@ -172,7 +173,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
       encode zstd gzip
       reverse_proxy project-w:5000
 
-4. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :ref:`description_backend_config-label` for more information about all the configuration options.
+4. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :doc:`example_configs` for more advanced example configs and to :ref:`description_backend_config-label` for more information about all the configuration options.
 
    .. warning::
       Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
@@ -427,10 +428,10 @@ CPU
 NixOS
 -----
 
-We provide NixOS flakes for the backend, frontend and runner. Each of them include a NixOS module to setup the service, a nix-shell for development purposes as well as a package and overlay for running the service manually if desired. We will focus on the NixOS module here.
+We provide NixOS flakes for the backend & frontend combination. Each of the flakes provide a development shell and a package, and the Project-W flake also provides a NixOS module that we will be using now. The runner package, dev shell and NixOS module are currently not functional because nixpkgs hasn't the required version of whisperx right now and updating it is not trivial.
 
-Backend
-```````
+Backend & Frontend
+``````````````````
 
 First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
 
@@ -444,189 +445,26 @@ First you need to import our flake into your flake containing the NixOS config o
           };
         };
 
-Next you need to pass your inputs as an argument to your outputs, where you then can import the module and apply the overlay:
+Next you need to pass your inputs as an argument to your outputs, where you then can import the module:
 
     .. code-block:: Nix
 
         nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
           ...
-          pkgs = import nixpkgs {
-            ...
-            overlays = [
-               inputs.project-W.overlays.default
-            ];
-          };
           modules = [
             inputs.project-W.nixosModules.default
             ...
           ];
         };
 
-Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W repository. Also the `settings` attribute set is basically just a copy of the options of the config file (however with different default values), so you can also refer to :ref:`description_backend_config-label` for this part. However the following config should get you started as well:
+Now you can start using the module. It's options are available under ``services.project-W``. For a full list and description of options go to nix/module.nix in the project-W repository. Also the ``services.project-W.settings`` attribute set is just a copy of the options of the config file, so you can also refer to :ref:`description_backend_config-label` for this part. You can just use ``!ENV`` at the beginning of Nix strings as well, the module will take care that these are correctly translated into appropriate YAML. Use the ``services.project-W.envFile`` option to pass a path to a file that sets the required environment variables. You can use secret management systems like sops-nix for this to securely manage these secrets. Don't write sensitive information into the ``services.project-W.settings`` because then they would be world-readable in the nix store!
 
-.. warning::
-    The options 'settings.loginSecurity.sessionSecretKey' and 'settings.smtpServer.password' are available, but they are not very secure since it's contents will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that.
-
-.. code-block:: Nix
-
-   services.project-W-backend = {
-     enable = true;
-     hostName = "<DOMAIN>";
-     settings = {
-       clientURL = "https://<DOMAIN where frontend is hosted>/#";
-       smtpServer = {
-         domain = "<smtp servers domain>";
-         port = <port of smtp server>;
-         secure = "<ssl or starttls>";
-         senderEmail = "<email registered at smtp server>";
-         username = config.services.project-W-backend.senderEmail; #probably, if not the same then set something different here
-       };
-     };
-     envFile = "<path to env file>";
-   };
-   services.nginx.virtualHosts.${config.services.project-W-backend.hostName} = {
-     forceSSL = true;
-     http2 = true;
-     enableACME= true;
-   };
-   security.acme = {
-     acceptTerms = true;
-     certs = {
-       ${config.services.project-W-backend.hostName}.email = "<your email address for let's encrypt>";
-     };
-   };
-
-This setup already enables https and automatic ssl certificate renewal over let's encrypt for you. If you want to run this behind a reverse proxy, then just leave the nginx and acme part away.
-
-.. attention::
-   If you use a Reverse Proxy: Make sure that your reverse proxy is properly configured to handle the upload of large files. The backend can handle files up to a size of 1GB, setting this to anything less in your reverse proxy will hinder the submission of jobs and present the user with possibly confusing error messages! We will not cover the configuration of the reverse proxy here, but for example if you use nginx you will want to set ``client_max_body_size 1g;`` in your config.
-
-The envFile should contain the following. Please make sure to keep this secret!!!:
-
-.. code-block:: console
-
-   JWT_SECRET_KEY="<your jwt secret key>"
-   SMTP_PASSWORD="<password of user at your smtp server>"
-
-The JWT_SECRET_KEY can be generated with the following command:
-
-.. code-block:: console
-
-   nix run nixpkgs#python3 -- -c 'import secrets; print(secrets.token_hex())'
-
-Rebuild your NixOS config and you are done! The backend now running under the systemd service 'project-W-backend.service' and is being served by nginx (in case you need to check the logs).
-
-If you want to do backups, you just need to backup the directory that is set with 'settings.databasePath' (per default: /var/lib/project-W-backend/database) as well as the directory where acme stores the ssl certificates (per default: /var/lib/acme/<DOMAIN>). Of course you also need to backup your NixOS config, but you probably have that in a git repo anyway ;)
-
-Frontend
-````````
-
-First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
-
-.. code-block:: Nix
-
-   inputs = {
-     ...
-     project-W-frontend = {
-       url = "github:JulianFP/project-W-frontend";
-       inputs.nixpkgs.follows = "nixpkgs";
-     };
-   };
-
-Next you need to pass your inputs as an argument to your outputs, where you then can import the module (for the frontend no overlay is required):
-
-.. code-block:: Nix
-
-   nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
-     ...
-     modules = [
-       inputs.project-W-frontend.nixosModules.default
-       ...
-     ];
-   };
-
-Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W-frontend repository. However the following config should get you started as well:
-
-.. code-block:: Nix
-
-   services.project-W-frontend = {
-     enable = true;
-     hostName = "<DOMAIN>";
-     backendBaseURL = "https://<Backends DOMAIN>"; #leave to default if both domains are the same
-   };
-   services.nginx.virtualHosts.${config.services.project-W-frontend.hostName} = {
-     forceSSL = true;
-     http2 = true;
-     enableACME= true;
-   };
-   security.acme = {
-     acceptTerms = true;
-     certs = {
-       ${config.services.project-W-frontend.hostName}.email = "<your email address for let's encrypt>";
-     };
-   };
-
-This setup already enables https and automatic ssl certificate renewal over let's encrypt for you. If you want to run this behind a reverse proxy, then just leave the nginx and acme part away.
-
-Rebuild your NixOS config and you are done! The frontend is now being served by nginx (in case you need to check the logs).
+Please also make sure to setup a Postgresql and Redis server since that is out of scope of this NixOS module. Refer to the NixOS wiki for how to do that.
 
 Runner
 ``````
 
-First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
-
-.. code-block:: Nix
-
-   inputs = {
-     ...
-     project-W-runner = {
-       url = "github:JulianFP/project-W-runner";
-       inputs.nixpkgs.follows = "nixpkgs";
-     };
-   };
-
-Next you need to pass your inputs as an argument to your outputs, where you then can import the module (for the runner no overlay is required either):
-
-.. code-block:: Nix
-
-   nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
-     ...
-     modules = [
-       inputs.project-W-runner.nixosModules.default
-       ...
-     ];
-   };
-
-Now you can start using the module. For a full list and description of options go to nix/module.nix in the project-W-runner repository. Also the `settings` attribute set is basically just a copy of the options of the runner config file (however with different default values), so you can also refer to :ref:`description_runner_config-label` for this part. However the following config should get you started as well:
-
-.. warning::
-    The option 'settings.runnerToken' is available, but it is not very secure since it's content will be public in the nix store! We strongly recommend to use the envFile option to add the secrets to your config. If you want your secrets to be part of your NixOS config, then please use sops-nix or agenix for that.
-
-.. code-block:: Nix
-
-   services.project-W-runner = {
-     enable = true;
-     settings = {
-       backendURL = "<URL of your backend>";
-       #torchDevice = "cuda:0"; #only enable this if you want to tell pytorch explicitly to use the first cuda device of the system
-     };
-     envFile = "<path to env file>";
-   };
-
-The envFile should contain the following. Please make sure to keep this secret!!!:
-
-.. code-block:: console
-
-   RUNNER_TOKEN="<your runners token>"
-
-Rebuild your NixOS config and you are done! The runner is running under the systemd service 'project-W-runner.service'.
-
-By default, whisper models will be cached in the `/var/cache/project-W-runner_whisperCache` directory. Go there if you want to replace them.
-
-.. note::
-   We didn't test if the NixOS module would work with CUDA since we didn't have access to a NixOS machine with NVIDIA GPUs. If additional configuration in the module should be necessary: Contributions welcome!
-
-For CUDA support please add the cuda toolkit you want to use to `environment.systemPackages` in your NixOS config.
+As already mentioned the runner package and module are currently not working. Use the docker or manual installation method for the runner or make a PR to fix it.
 
 .. _manual_installation-label:
 

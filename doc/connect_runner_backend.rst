@@ -1,7 +1,9 @@
 Connect a runner with the backend
 =================================
 
-This page contains a manual for how to connect a runner with its backend, or in other words: How to get a token for a runner.
+This page contains guides about how to login as an admin user with admin privileges and how to use these privileges to create a new runner or to invalidate an existing runner.
+
+.. _login_with_admin_privileges:
 
 Create an admin account and login with admin privileges
 -------------------------------------------------------
@@ -44,7 +46,7 @@ The default login through the frontend as well as API tokens don't have admin pr
 
 .. code-block:: console
 
-   curl -X "POST" "http://<backend url>/api/local-account/login" -d "grant_type=password&scope=admin&username=<user's email>&password=<user's password>"
+   curl -X "POST" "https://<backend url>/api/local-account/login" -d "grant_type=password&scope=admin&username=<user's email>&password=<user's password>"
 
 The important part for requesting admin privileges is the `scope=admin` parameter. This request will of course only be granted if the user is an admin user. Please also remember to URL-escape any special characters in your email and password (e.g. the escape code for '@' is '%40'). We will use the resulting token in the next step.
 
@@ -153,7 +155,7 @@ The default login through the frontend as well as API tokens don't have admin pr
 
 .. code-block:: console
 
-   curl -X "POST" "http://<backend url>/api/ldap/login/<ldap provider name from config file>" -d "grant_type=password&scope=admin&username=<ldap username>&password=<ldap password>"
+   curl -X "POST" "https://<backend url>/api/ldap/login/<ldap provider name from config file>" -d "grant_type=password&scope=admin&username=<ldap username>&password=<ldap password>"
 
 The important part for requesting admin privileges is the `scope=admin` parameter. This request will of course only be granted if the user is an admin user. Please also remember to URL-escape any special characters in your email and password (e.g. the escape code for '@' is '%40', a space must be substituted with '%20'). We will use the resulting token in the next step.
 
@@ -162,14 +164,16 @@ The important part for requesting admin privileges is the `scope=admin` paramete
 Get a new runner token
 ----------------------
 
-To operate a runner you need a token for it. The runner uses it to authenticate with the backend. Without one, the runner won't even start. To get one, you need to call the /api/admins/create_runner route, which will create a new runner in the backend and return its token. For more details about that, please refer to :doc:`api`. After that, you will need to save that token for yourself. If you loose it, then you will have to create a new runner again!
+To operate a runner you need a token for it. The runner uses it to authenticate with the backend. Without one, the runner won't even start. Please note that the runner token is different from the user access tokens (sometimes we also call them JWT tokens) that are being used to authenticate as a user after logging in. For the /api/runners/* routes you need a runner token, for all other authenticated routes you need a user token.
 
 .. warning::
    Please make sure to save the runner token in a secret way! If it gets leaked, anyone could authenticate as that runner and accept and read users jobs in behalf of your runner! If you accidentally leaked a token, immediately revoke that token. Refer to :ref:`revoke_a_runner-label` for that.
 
-Follow the following step-by-step guide to register a new runner after you obtained an admin users's token in the last chapter. We assume that you are in a Bash Terminal with curl installed:
+Follow the following step-by-step guide to register a new runner. We assume that you are in a Bash Terminal with curl installed:
 
-1. Store the obtained token in an environment variable for easy access in subsequent commands:
+1. Please login as an admin user with admin privileges. Follow the steps described in :ref:`login_with_admin_privileges` for how to do that.
+
+2. Store the obtained admin user token in an environment variable for easy access in subsequent commands:
 
    .. code-block:: console
 
@@ -192,31 +196,20 @@ Revoke a runner token
 
 If a runner token got leaked or if you just don't use this runner anymore and want to clean up, then follow this step-by-step guide:
 
-1. Make sure that you are in the same directory as the ``database.db`` file of the Backend. If you are not sure where it is then refer to the `databasePath` value in the :ref:`description_backend_config-label`.
-2. Enter the sql shell of the sqlite database:
+1. Please login as an admin user with admin privileges. Follow the steps described in :ref:`login_with_admin_privileges` for how to do that.
+
+2. Store the obtained admin user token in an environment variable for easy access in subsequent commands:
 
    .. code-block:: console
 
-      sqlite3 database.db
+      JWT="<value of the obtained access token>"
 
-3. Delete the runner from the table. Make sure to replace <runners id> by the id of the runner from which you want to revoke the token. Runner IDs are created sequentially, so the first runner you created will have ID 1, the second ID 2 and so on:
+3. Find out the ID of the runner you want to invalidate. You can find it in the logs of the runner or as a property of any job this runner has completed.
 
-   .. code-block:: sql
+4. Invalidate the runner:
 
-      DELETE FROM runners WHERE id=<runners id>;
+   .. code-block:: console
 
-4. Print whole table and check if change was successful:
+      curl -X DELETE -H "Authorization: Bearer $JWT" "https://<backend url>/api/admins/invalidate_runner?runner_id=<id of the runner>"
 
-   .. code-block:: sql
-
-      SELECT * FROM runners;
-
-   The runner with the id you used above should be gone (and only that runner!).
-
-5. Exit the sqlite shell:
-
-   .. code-block:: sql
-
-      .quit
-
-The runner is now removed and the token is therefore now revoked. Next you probably want to recreate that runner to get a new token. Refer to :ref:`get_a_runner_token-label` for how to do that.
+   The runner should now have been deleted from the database, any existing jobs that may have been assigned to that runner will have been re-assigned to a different runner and the token of that runner shouldn't work anymore.

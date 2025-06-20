@@ -56,6 +56,30 @@ html_css_files = [
 import json
 from pathlib import Path
 
+import project_W.dependencies as dp
+from project_W.models.settings import Settings
+
+config_dict = {
+    "client_url": "http://localhost:5173/#",
+    "web_server": {
+        "address": "127.0.0.1",
+        "no_https": True,
+    },
+    "postgres_connection_string": "postgresql://postgres@%2Fvar%2Frun%2Fpostgresql/postgres",
+    "redis_connection": {
+        "unix_socket_path": "/var/run/redis-project-W/redis.sock",
+    },
+    "security": {
+        "local_token": {
+            "session_secret_key": "f26a5feb0eb502fb2b4f872026ce7b5d3986dbfef77d72d3f29050df2f8b3bdb",
+        },
+    },
+    "smtp_server": {
+        "hostname": "example.org",
+        "sender_email": "test@example.org",
+    },
+}
+dp.config = Settings.model_validate(config_dict)
 from project_W.app import app
 from project_W.routers import ldap, local_account, oidc
 
