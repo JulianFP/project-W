@@ -13,6 +13,8 @@ interface Props {
 	data: Data;
 }
 let { data }: Props = $props();
+
+let [frontend_version, frontend_git_hash] = version.split("|");
 </script>
 
 <CenterPage title="About">
@@ -47,8 +49,8 @@ let { data }: Props = $props();
 
   <div>
     <Heading tag="h4" class="mb-2">Version and source code information</Heading>
-    <P>The backend is running on version {data.about.version}. <A href={data.about.source_code} target="_blank" rel="noopener noreferrer">Click here to access it's source code</A>.</P>
-    <P>The frontend is running on version {version}. <A href="https://github.com/JulianFP/project-W-frontend" target="_blank" rel="noopener noreferrer">Click here to access it's source code</A>.</P>
+    <P>The backend is running on version {data.about.version}. <A href={data.about.source_code} target="_blank" rel="noopener noreferrer">It's source code</A> is checked out at git hash {data.about.git_hash}.</P>
+    <P>The frontend is running on version {frontend_version}. <A href="https://github.com/JulianFP/project-W-frontend" target="_blank" rel="noopener noreferrer">It's source code</A> is checked out at git hash {frontend_git_hash}.</P>
     <P>The version and source code information for each runner can be viewed under the job details after a submitted job was assigned to the runner.</P>
   </div>
 

@@ -18,6 +18,7 @@
 
   outputs =
     inputs@{
+      self,
       nixpkgs,
       systems,
       pnpm2nix-nzbr,
@@ -31,6 +32,7 @@
       packages = eachSystem (system: rec {
         default = project-W_frontend;
         project-W_frontend = pkgsFor.${system}.callPackage ./nix/derivation-frontendFiles.nix {
+          inherit self;
           mkPnpmPackage = pnpm2nix-nzbr.packages.${system}.mkPnpmPackage;
         };
       });

@@ -144,6 +144,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	"/api/admins/invalidate_runner": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/**
+		 * Invalidate Runner
+		 * @description Invalidate the token of a runner and delete it from the database and redis. If it has any jobs assigned at the time of invalidation these jobs will be reassigned to a different runner. Call this route immediately ones you find out that a runner token was compromised!
+		 */
+		delete: operations["invalidate_runner_api_admins_invalidate_runner_delete"];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	"/api/jobs/submit_settings": {
 		parameters: {
 			query?: never;
@@ -750,6 +770,8 @@ export interface components {
 			source_code: string;
 			/** Version */
 			version: string;
+			/** Git Hash */
+			git_hash: string;
 			imprint: components["schemas"]["ImprintSettings"] | null;
 		};
 		/** AlignmentProcessingSettings */
@@ -1808,6 +1830,57 @@ export interface operations {
 				};
 				content: {
 					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+		};
+	};
+	invalidate_runner_api_admins_invalidate_runner_delete: {
+		parameters: {
+			query: {
+				runner_id: number;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": string;
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
 				};
 			};
 		};

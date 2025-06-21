@@ -2,6 +2,7 @@
   lib,
   mkPnpmPackage,
   writeShellScriptBin,
+  self,
 
   #needs to be supplied explicitly
   backend_base_url ? "",
@@ -16,7 +17,11 @@ mkPnpmPackage rec {
 
   buildInputs = [
     (writeShellScriptBin "git" ''
-      echo "v${version}"
+      if [ "$1" == "rev-parse" ]; then
+        echo "${self.shortRev or self.dirtyShortRev}"
+      else
+        echo "v${version}"
+      fi
     '')
   ];
 

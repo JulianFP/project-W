@@ -8,7 +8,7 @@ const config = {
 		adapter: adapter(),
 		router: { type: "hash" },
 		version: {
-			name: child_process.execSync("git describe --tags").toString().trim(),
+			name: `${child_process.execSync("git describe --tags").toString().trim()}|${child_process.execSync("git rev-parse --short HEAD").toString().trim()}`,
 		},
 	},
 };
