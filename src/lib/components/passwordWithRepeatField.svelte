@@ -6,7 +6,7 @@ interface Props {
 	error?: boolean;
 	errorMsg: string;
 	tabindex?: number;
-	password_change: boolean;
+	password_change?: boolean;
 }
 
 let {

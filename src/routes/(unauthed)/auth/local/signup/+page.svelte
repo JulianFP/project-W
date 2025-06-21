@@ -1,6 +1,7 @@
 <script lang="ts">
-import { Button, Helper } from "flowbite-svelte";
+import { Helper } from "flowbite-svelte";
 
+import Button from "$lib/components/button.svelte";
 import EmailField from "$lib/components/emailField.svelte";
 import FormPage from "$lib/components/formPage.svelte";
 import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
@@ -70,7 +71,7 @@ interface Props {
 let { data }: Props = $props();
 
 let helper_text = $derived(
-	data.auth_settings.local_account.allowed_email_domains
+	data.auth_settings.local_account.allowed_email_domains.length > 0
 		? `Account creation is only permitted with email addresses that use one of the following domains: ${data.auth_settings.local_account.allowed_email_domains.join(", ")}`
 		: "",
 );
