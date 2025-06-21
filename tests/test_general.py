@@ -34,6 +34,7 @@ def test_about(get_client):
     assert (
         version_splitted[0] != "0" or version_splitted[1] != "0"
     )  # make sure that version is larger than 0.0.x
+    assert type(content.get("git_hash")) == str
 
 
 @pytest.mark.parametrize(

@@ -43,6 +43,7 @@ class AboutResponse(BaseModel):
     description: str
     source_code: str
     version: str
+    git_hash: str
     imprint: ImprintSettings | None
 
 
