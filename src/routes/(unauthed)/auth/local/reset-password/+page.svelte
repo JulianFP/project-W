@@ -27,7 +27,7 @@ async function resetPassword(event: Event): Promise<void> {
 			),
 		);
 		alerts.push({ msg: "Password reset successful", color: "green" });
-		routing.set({
+		await routing.set({
 			destination: "#/",
 			params: {},
 			overwriteParams: true,

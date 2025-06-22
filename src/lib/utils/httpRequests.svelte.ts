@@ -73,7 +73,7 @@ async function loggedInWrapper<ResponseType>(
 					msg: `You have been logged out: ${error.message}`,
 					color: "red",
 				});
-				routing.dest_forward();
+				await routing.dest_forward();
 			}
 			throw error;
 		}
@@ -86,7 +86,7 @@ async function loggedInWrapper<ResponseType>(
 			msg: "You are not logged in anymore",
 			color: "red",
 		});
-		routing.dest_forward();
+		await routing.dest_forward();
 		throw new BackendCommError(401, "Not logged in");
 	}
 }

@@ -18,7 +18,7 @@ async function activate(): Promise<void> {
 			color: "green",
 		});
 		auth.forgetToken();
-		routing.set({
+		await routing.set({
 			destination: "#/auth/local/login",
 			params: {},
 			overwriteParams: true,
@@ -32,7 +32,7 @@ async function activate(): Promise<void> {
 			msg: `Error occured during account activation: ${errorMsg}`,
 			color: "red",
 		});
-		routing.set({ destination: "#/", params: {}, overwriteParams: true });
+		await routing.set({ destination: "#/", params: {}, overwriteParams: true });
 	}
 }
 </script>
