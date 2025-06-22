@@ -49,13 +49,13 @@ class RoutingManager {
 		new URLSearchParams(page.url.hash.split("?")[1]),
 	);
 
-	set({
+	async set({
 		destination = this.location,
 		params = null,
 		overwriteParams = false,
 		removeParams = [],
 		history = false,
-	}: RoutingObjectType): void {
+	}: RoutingObjectType): Promise<void> {
 		let newParams: URLSearchParams;
 
 		if (params == null)
@@ -79,20 +79,20 @@ class RoutingManager {
 
 		const paramString = newParams.toString();
 		if (paramString) {
-			goto(`${destination}?${paramString}`, { replaceState: !history });
+			await goto(`${destination}?${paramString}`, { replaceState: !history });
 		} else {
-			goto(`${destination}`, { replaceState: !history });
+			await goto(`${destination}`, { replaceState: !history });
 		}
 	}
 
-	dest_forward() {
+	async dest_forward() {
 		const locationVal: string = this.location;
 		if (locationVal && locationVal !== "#/")
 			localStorage.setItem("dest", locationVal);
-		this.set({ destination: "#/auth" });
+		await this.set({ destination: "#/auth" });
 	}
 
-	login_forward() {
+	async login_forward() {
 		let destination: string | null = localStorage.getItem("dest");
 		localStorage.removeItem("dest");
 
@@ -100,7 +100,7 @@ class RoutingManager {
 			destination = "#/";
 		}
 
-		this.set({ destination: destination, removeParams: ["token"] });
+		await this.set({ destination: destination, removeParams: ["token"] });
 	}
 }
 

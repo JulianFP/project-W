@@ -1,6 +1,8 @@
 <script lang="ts">
 import { auth, routing } from "$lib/utils/global_state.svelte";
 
+import WaitingForGoto from "$lib/components/waitingForGoto.svelte";
+
 $effect(() => {
 	if (!auth.loggedIn) {
 		routing.dest_forward();
@@ -9,4 +11,10 @@ $effect(() => {
 
 let { children } = $props();
 </script>
-{@render children()}
+{#if auth.loggedIn}
+  {@render children()}
+{:else}
+  {#await routing.dest_forward()}
+    <WaitingForGoto/>
+  {/await}
+{/if}

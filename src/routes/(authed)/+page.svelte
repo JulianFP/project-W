@@ -153,11 +153,7 @@ async function fetch_jobs() {
 	}
 	fetchingJobs = false;
 }
-
-//this if-condition is required because the test in ./+layout.svelte might be to slow
-if (auth.loggedIn) {
-	fetch_jobs();
-}
+fetch_jobs();
 
 async function update_jobs(job_ids: number[]) {
 	let args_formatted: string[][] = [];
