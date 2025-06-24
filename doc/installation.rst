@@ -327,7 +327,6 @@ NVIDIA GPU
         auth_token: !ENV ${AUTH_TOKEN}
       whisper_settings:
         hf_token: !ENV ${HF_TOKEN}
-        model_cache_dir: /models
 
 
 6. Put docker-compose.yml in the current directory. Use the following config and make adjustments if needed
@@ -340,7 +339,7 @@ NVIDIA GPU
           restart: unless-stopped
           volumes:
             - ./runner-config:/etc/xdg/project-W-runner/
-            - ./runner-models:/models
+            - ./runner-models:/root/.cache/project-W-runner/
           environment:
             - AUTH_TOKEN=${PROJECT_W_AUTH_TOKEN}
             - HF_TOKEN=${PROJECT_W_HF_TOKEN}
@@ -394,7 +393,6 @@ CPU
         auth_token: !ENV ${AUTH_TOKEN}
       whisper_settings:
         hf_token: !ENV ${HF_TOKEN}
-        model_cache_dir: /models
         torch_device: cpu
         compute_type: int8
         batch_size: 4
@@ -410,7 +408,7 @@ CPU
           restart: unless-stopped
           volumes:
             - ./runner-config:/etc/xdg/project-W-runner/
-            - ./runner-models:/models
+            - ./runner-models:/root/.cache/project-W-runner/
           environment:
             - AUTH_TOKEN=${PROJECT_W_AUTH_TOKEN}
             - HF_TOKEN=${PROJECT_W_HF_TOKEN}

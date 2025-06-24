@@ -17,7 +17,7 @@ from ..models.response_data import (
     RunnerJobInfoResponse,
 )
 from ..security.auth import (
-    auth_dependency_responses,
+    runner_token_dependency_responses,
     validate_online_runner,
     validate_runner,
 )
@@ -25,19 +25,11 @@ from ..security.auth import (
 router = APIRouter(
     prefix="/runners",
     tags=["runners"],
-    responses=auth_dependency_responses,
+    responses=runner_token_dependency_responses,
 )
 
 
-@router.post(
-    "/register",
-    responses={
-        400: {
-            "model": ErrorResponse,
-            "description": "Runner already registered",
-        }
-    },
-)
+@router.post("/register")
 async def register(
     runner_id: Annotated[int, Depends(validate_runner)],
     runner_data: RunnerRegisterRequest,

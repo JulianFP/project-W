@@ -43,6 +43,26 @@ auth_dependency_responses: dict[int | str, dict[str, Any]] = {
         "description": "Token doesn't grand enough permissions",
     },
 }
+runner_token_dependency_responses: dict[int | str, dict[str, Any]] = {
+    401: {
+        "model": ErrorResponse,
+        "headers": {
+            "WWW-Authenticate": {
+                "type": "string",
+            }
+        },
+        "description": "No runner with that token exists",
+    },
+    403: {
+        "model": ErrorResponse,
+        "headers": {
+            "WWW-Authenticate": {
+                "type": "string",
+            }
+        },
+        "description": "This runner is currently already registered/not registered as online",
+    },
+}
 
 get_token = HTTPBearer(
     bearerFormat="Bearer",

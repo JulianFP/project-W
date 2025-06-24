@@ -81,11 +81,11 @@ Runner
 
       source venv/bin/activate
 
-5. Install project dependencies including optional dependencies for testing and building the documentation:
+5. Install project dependencies including optional dependencies for testing. If you want to not only run the dummy runner but also the whisperx code then you also need to install the ``not_dummy`` optional dependencies:
 
    .. code-block:: bash
 
-      python -m pip install .[not_dummy,tests]
+      python -m pip install .[tests]
 
 You are now ready to go! Note that by default, Whisper caches downloaded models in ``$HOME/.cache/whisper/``. If you would like
 the runner to download the models into a different directory, set ``whisper_settings.model_cache_dir`` in your ``config.yml`` to the desired directory.

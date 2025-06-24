@@ -1,4 +1,4 @@
-# This is a dummy config intended for development purposes only!
+# ATTENTION: This config file is for a development setup of the project-W backend. Refer to https://project-w.readthedocs.io/en/stable/installation.html for example config files for production deployments!
 client_url: http://localhost:5173/#
 web_server:
   address: "127.0.0.1"
