@@ -49,17 +49,7 @@ async def register(
     online_runner = OnlineRunner.model_validate(runner_data.model_dump() | {"id": runner_id})
     await dp.ch.register_new_online_runner(online_runner)
 
-    # TODO: If we have runner tags, only assign job if it has the right tag.
-    if (await dp.ch.number_of_enqueued_jobs()) > 0:
-        job_id = await dp.ch.pop_job_with_highest_priority()
-        if job_id is None:
-            raise Exception("Redis data error: job queue is not empty but popmax returns None")
-        user_id = await dp.db.get_user_id_of_job(job_id)
-        if user_id is None:
-            raise Exception(
-                f"Redis/Postgresql data mismatch: Popped job with id {job_id} from redis that doesn't exist in Postgresql!"
-            )
-        await dp.ch.assign_job_to_online_runner(job_id, user_id)
+    await dp.ch.assign_job_to_runner_if_possible()
 
     return runner_id
 
@@ -73,13 +63,7 @@ async def unregister_runner(
     """
     await dp.ch.unregister_online_runner(online_runner.id)
 
-    if online_runner.assigned_job_id is not None:
-        user_id = await dp.db.get_user_id_of_job(online_runner.assigned_job_id)
-        if user_id is None:
-            raise Exception(
-                f"Redis/Postgresql data mismatch: Runner had job {online_runner.assigned_job_id} assigned that doesn't exist in Postgresql!"
-            )
-        await dp.ch.enqueue_new_job(online_runner.assigned_job_id, 0, user_id)
+    await dp.ch.unregister_online_runner(online_runner.id)
 
     return "Success"
 
@@ -137,10 +121,8 @@ async def retrieve_job_audio(
             detail="This runner has currently no job assigned",
         )
 
-    if online_runner.in_process_job_id is None:
-        await dp.ch.set_online_runner(
-            online_runner.id, {"in_process_job_id": online_runner.assigned_job_id}
-        )
+    if not online_runner.in_process:
+        await dp.ch.mark_job_of_runner_in_progress(online_runner.id)
 
     return StreamingResponse(
         dp.db.get_job_audio(online_runner.assigned_job_id), media_type="audio/"
@@ -164,22 +146,22 @@ async def submit_job_result(
     """
     The runner submits the result of processing the job it got assigned over this route. The result can either be that the job failed (in which case the runner submits an error message) or that the job was successful (in which case the runner submits the transcript in all possible formats). This route will mark the job as failed or successful and notify the user over email if they activated email notifications for this job.
     """
-    if online_runner.in_process_job_id is None:
+    if not online_runner.in_process or online_runner.assigned_job_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This runner is currently not processing a job!",
         )
 
-    if not (settings := await dp.db.get_job_settings_by_job_id(online_runner.in_process_job_id)):
+    if not (settings := await dp.db.get_job_settings_by_job_id(online_runner.assigned_job_id)):
         raise Exception("Trying to submit job with an non-existing id!")
-    if not (in_process_job := await dp.ch.get_in_process_job(online_runner.in_process_job_id)):
+    if not (in_process_job := await dp.ch.get_in_process_job(online_runner.assigned_job_id)):
         raise Exception("Trying to submit job that doesn't exist in Redis!")
     if not (user := await dp.db.get_user_by_id(in_process_job.user_id)):
         raise Exception("Trying to submit a job that belongs to a non-existing user!")
 
     if submitted_data.error_msg is not None:
         await dp.db.finish_failed_job(
-            online_runner.in_process_job_id, submitted_data.error_msg, online_runner
+            online_runner.assigned_job_id, submitted_data.error_msg, online_runner
         )
         if settings.email_notification:
             background_tasks.add_task(
@@ -202,18 +184,7 @@ async def submit_job_result(
 
     await dp.ch.finish_job_of_online_runner(online_runner)
 
-    # If there are any jobs in the queue, assign one to this runner.
-    # TODO: Maybe encapsulate this in a method?
-    if (await dp.ch.number_of_enqueued_jobs()) > 0:
-        job_id = await dp.ch.pop_job_with_highest_priority()
-        if job_id is None:
-            raise Exception("Redis data error: job queue is not empty but popmax returns None")
-        user_id = await dp.db.get_user_id_of_job(job_id)
-        if user_id is None:
-            raise Exception(
-                f"Redis/Postgresql data mismatch: Popped job with id {job_id} from redis that doesn't exist in Postgresql!"
-            )
-        await dp.ch.assign_job_to_online_runner(job_id, user_id)
+    await dp.ch.assign_job_to_runner_if_possible()
 
     return "Success"
 
@@ -227,8 +198,8 @@ async def heartbeat(
     """
     await dp.ch.reset_runner_expiration(online_runner.id)
 
-    if online_runner.in_process_job_id is not None:
-        in_process_job = await dp.ch.get_in_process_job(online_runner.in_process_job_id)
+    if online_runner.in_process and online_runner.assigned_job_id is not None:
+        in_process_job = await dp.ch.get_in_process_job(online_runner.assigned_job_id)
         if in_process_job is None:
             raise Exception(
                 "Redis data invalid: OnlineRunner has in_process_job set but the jobs key doesn't exist"
@@ -236,8 +207,8 @@ async def heartbeat(
         if in_process_job.abort:
             return HeartbeatResponse(abort=True)
         if in_process_job.progress != req.progress:
-            await dp.ch.set_in_process_job(
-                online_runner.in_process_job_id, {"progress": req.progress}
+            await dp.ch.report_progress_of_in_process_job(
+                online_runner.assigned_job_id, req.progress
             )
     if online_runner.assigned_job_id:
         return HeartbeatResponse(job_assigned=True)

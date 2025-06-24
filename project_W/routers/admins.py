@@ -41,11 +41,6 @@ async def invalidate_runner(
     if online_runner := await dp.ch.get_online_runner_by_id(runner_id):
         await dp.ch.unregister_online_runner(online_runner.id)
 
-        if online_runner.assigned_job_id is not None:
-            user_id = await dp.db.get_user_id_of_job(online_runner.assigned_job_id)
-            if user_id is not None:
-                await dp.ch.enqueue_new_job(online_runner.assigned_job_id, 0, user_id)
-
     await dp.db.delete_runner(runner_id)
 
     return f"If a runner with id {runner_id} existed it was successfully invalidated and deleted"

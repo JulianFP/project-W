@@ -423,9 +423,9 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
+    async def get_all_unfinished_jobs(self) -> list[int]:
         """
-        Returns the job id and user id all jobs in the database that haven't finished yet (not downloaded, finished, failed).
+        Returns the job id of all jobs in the database that haven't finished yet (not downloaded, finished, failed).
         Will be called at startup to enqueue existing jobs
         """
         pass
@@ -1783,12 +1783,12 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     return None
 
-    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
+    async def get_all_unfinished_jobs(self) -> list[int]:
         async with self.apool.connection() as conn:
-            async with conn.cursor() as cur:
+            async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
                     f"""
-                        SELECT id, user_id
+                        SELECT id
                         FROM {self.schema}.jobs
                         WHERE finish_timestamp IS NULL
                     """
@@ -1817,11 +1817,11 @@ class PostgresAdapter(DatabaseAdapter):
                         FROM {self.schema}.jobs
                         WHERE id = %s
                     """,
-                    (runner.in_process_job_id,),
+                    (runner.assigned_job_id,),
                 )
                 if (audio_oid := await cur.fetchone()) is None:
                     raise Exception(
-                        f"Couldn't get audio_oid for the unfinished job with id {runner.in_process_job_id}"
+                        f"Couldn't get audio_oid for the unfinished job with id {runner.assigned_job_id}"
                     )
                 await cur.execute(
                     f"""
@@ -1835,7 +1835,7 @@ class PostgresAdapter(DatabaseAdapter):
                         runner.version,
                         runner.git_hash,
                         runner.source_code_url,
-                        runner.in_process_job_id,
+                        runner.assigned_job_id,
                     ),
                 )
                 await cur.execute(
@@ -1844,7 +1844,7 @@ class PostgresAdapter(DatabaseAdapter):
                         VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        runner.in_process_job_id,
+                        runner.assigned_job_id,
                         transcript.as_txt,
                         transcript.as_srt,
                         transcript.as_tsv,

@@ -26,14 +26,14 @@ async def job_status(job: JobBase) -> JobStatus:
         return JobStatus.SUCCESS
     if job.error_msg is not None:
         return JobStatus.FAILED
-    if (await dp.ch.get_job_pos_in_queue(job.id)) is not None:
-        return JobStatus.PENDING_RUNNER
     if (runner_id := (await dp.ch.get_online_runner_id_by_assigned_job(job.id))) is not None and (
         runner := await dp.ch.get_online_runner_by_id(runner_id)
     ) is not None:
-        if runner.in_process_job_id is not None:
+        if runner.in_process:
             return JobStatus.RUNNER_IN_PROGRESS
         return JobStatus.RUNNER_ASSIGNED
+    if await dp.ch.queue_contains_job(job.id):
+        return JobStatus.PENDING_RUNNER
     # TODO: Do we need additional logic here?
     return JobStatus.NOT_QUEUED
 
@@ -110,7 +110,8 @@ async def submit_job(
             detail=f"The provided job_settings_id of '{job_settings_id}' is invalid",
         )
 
-    await dp.ch.enqueue_new_job(job_id, 0, current_user.id)
+    await dp.ch.enqueue_new_job(job_id, job_id * -1)
+    await dp.ch.assign_job_to_runner_if_possible()
     return job_id
 
 
@@ -223,7 +224,7 @@ async def abort_jobs(
     for job in jobs:
         jobStatus = await job_status(job)
         if jobStatus in [JobStatus.RUNNER_ASSIGNED, JobStatus.RUNNER_IN_PROGRESS]:
-            await dp.ch.set_in_process_job(job.id, {"abort": 1})
+            await dp.ch.abort_in_process_job(job.id)
         else:
             if jobStatus is JobStatus.PENDING_RUNNER:
                 await dp.ch.remove_job_from_queue(job.id)
