@@ -14,10 +14,12 @@ from ..models.request_data import (
 from ..models.response_data import (
     ErrorResponse,
     HeartbeatResponse,
+    RegisteredResponse,
     RunnerJobInfoResponse,
 )
 from ..security.auth import (
-    runner_token_dependency_responses,
+    online_runner_dependency_responses,
+    runner_dependency_responses,
     validate_online_runner,
     validate_runner,
 )
@@ -25,15 +27,23 @@ from ..security.auth import (
 router = APIRouter(
     prefix="/runners",
     tags=["runners"],
-    responses=runner_token_dependency_responses,
+    responses=runner_dependency_responses,
 )
 
 
-@router.post("/register")
+@router.post(
+    "/register",
+    responses={
+        403: {
+            "model": ErrorResponse,
+            "description": "This runner is currently already registered as online",
+        },
+    },
+)
 async def register(
     runner_id: Annotated[int, Depends(validate_runner)],
     runner_data: RunnerRegisterRequest,
-) -> int:
+) -> RegisteredResponse:
     """
     Registers the runner with the given runner_id as online.
     Starting from the registration, the runner must periodically send
@@ -46,24 +56,23 @@ async def register(
             detail="This runner is already registered as online!",
         )
 
-    online_runner = OnlineRunner.model_validate(runner_data.model_dump() | {"id": runner_id})
-    await dp.ch.register_new_online_runner(online_runner)
+    token = await dp.ch.register_new_online_runner(runner_id, runner_data)
 
     await dp.ch.assign_queue_job_to_runner_if_possible()
 
-    return runner_id
+    return RegisteredResponse(id=runner_id, session_token=token)
 
 
 @router.post("/unregister")
 async def unregister_runner(
-    online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)],
+    runner_id: Annotated[int, Depends(validate_runner)],
 ) -> str:
     """
     Unregisters an online runner. This will mark the runner as offline and no heartbeat or similar request will be possible anymore until another register request was performed.
     """
-    await dp.ch.unregister_online_runner(online_runner.id)
+    await dp.ch.unregister_online_runner(runner_id)
 
-    await dp.ch.unregister_online_runner(online_runner.id)
+    await dp.ch.unregister_online_runner(runner_id)
 
     return "Success"
 
@@ -75,6 +84,7 @@ async def unregister_runner(
             "model": ErrorResponse,
             "description": "No job assigned or job not in database",
         },
+        **online_runner_dependency_responses,
     },
 )
 async def retrieve_job_info(
@@ -105,6 +115,7 @@ async def retrieve_job_info(
             "model": ErrorResponse,
             "description": "No job assigned",
         },
+        **online_runner_dependency_responses,
     },
 )
 async def retrieve_job_audio(
@@ -136,6 +147,7 @@ async def retrieve_job_audio(
             "model": ErrorResponse,
             "description": "Runner not processing a job",
         },
+        **online_runner_dependency_responses,
     },
 )
 async def submit_job_result(
@@ -189,7 +201,10 @@ async def submit_job_result(
     return "Success"
 
 
-@router.post("/heartbeat")
+@router.post(
+    "/heartbeat",
+    responses=online_runner_dependency_responses,
+)
 async def heartbeat(
     online_runner: Annotated[OnlineRunner, Depends(validate_online_runner)], req: HeartbeatRequest
 ) -> HeartbeatResponse:

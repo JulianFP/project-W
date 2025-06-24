@@ -1,3 +1,4 @@
+import secrets
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 
@@ -7,10 +8,12 @@ from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 
 import project_W.dependencies as dp
+from project_W.models.request_data import RunnerRegisterRequest
 
 from .logger import get_logger
 from .models.internal import InProcessJob, OnlineRunner
 from .models.settings import RedisConnection
+from .utils import hash_runner_token
 
 
 class CachingAdapter(ABC):
@@ -31,9 +34,12 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def register_new_online_runner(self, new_online_runner: OnlineRunner):
+    async def register_new_online_runner(
+        self, runner_id: int, runner_data: RunnerRegisterRequest
+    ) -> str:
         """
         This method registers a runner as online
+        Returns the new runner session token
         """
         pass
 
@@ -212,18 +218,24 @@ class RedisAdapter(CachingAdapter):
         self.logger.info("Closing Redis connections...")
         await self.client.close()
 
-    async def register_new_online_runner(self, new_online_runner: OnlineRunner):
+    async def register_new_online_runner(
+        self, runner_id: int, runner_data: RunnerRegisterRequest
+    ) -> str:
+        token = secrets.token_urlsafe()
+        token_hash = hash_runner_token(token)
         async with self.client.pipeline(transaction=True) as pipe:
-            key_name = self.__get_runner_key(new_online_runner.id)
-            runner_dump = new_online_runner.model_dump(exclude_none=True, exclude={"id"})
-            runner_dump["in_process"] = int(runner_dump["in_process"])
+            key_name = self.__get_runner_key(runner_id)
+            runner_dump = runner_data.model_dump(exclude_none=True)
+            runner_dump["in_process"] = 0
+            runner_dump["session_token_hash"] = token_hash
             pipe.hset(key_name, mapping=runner_dump)
             pipe.expire(key_name, self.__heartbeat_timeout)
             pipe.zadd(
                 self.__runner_sorted_set_name,
-                {str(new_online_runner.id): new_online_runner.priority},
+                {str(runner_id): runner_data.priority},
             )
             await pipe.execute()
+        return token
 
     async def reset_runner_expiration(self, runner_id: int):
         async with self.client.pipeline(transaction=True) as pipe:

@@ -1,5 +1,3 @@
-import base64
-import hashlib
 import secrets
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -30,7 +28,7 @@ from .models.internal import (
 )
 from .models.request_data import JobSettings, Transcript, TranscriptTypeEnum
 from .models.response_data import JobAndSettings, RunnerCreatedInfo, TokenSecretInfo
-from .utils import parse_version_tuple
+from .utils import hash_runner_token, parse_version_tuple
 
 
 class DatabaseAdapter(ABC):
@@ -312,19 +310,6 @@ class DatabaseAdapter(ABC):
         """
         pass
 
-    def __runner_token_hash(self, token: str):
-        """
-        We only store the hash of the token, otherwise a db leak would make
-        it possible to impersonate any runner. We don't need to use a salted hash
-        because the token is created by the server and already has sufficient entropy.
-        The hash itself is stored using base64.
-        """
-        return (
-            base64.urlsafe_b64encode(hashlib.sha256(token.encode("ascii")).digest())
-            .rstrip(b"=")
-            .decode("ascii")
-        )
-
     @abstractmethod
     async def add_new_job_settings(
         self, user_id: int, job_settings: JobSettings, is_new_default: bool = False
@@ -469,18 +454,18 @@ class DatabaseAdapter(ABC):
         token generation is done here because it is important that the token is sever generated (because of how it is hashed)
         """
         token = secrets.token_urlsafe()
-        token_hash = self.__runner_token_hash(token)
+        token_hash = hash_runner_token(token)
 
         # Sanity check to ensure that the token and its hash are unique.
         while (await self._get_runner_by_token_hashed(token_hash)) is not None:
             token = secrets.token_urlsafe()
-            token_hash = self.__runner_token_hash(token)
+            token_hash = hash_runner_token(token)
 
         runner_id = await self._create_runner_hashed(token_hash)
         return RunnerCreatedInfo(id=runner_id, token=token)
 
     async def get_runner_by_token(self, token: str) -> int | None:
-        token_hash = self.__runner_token_hash(token)
+        token_hash = hash_runner_token(token)
         return await self._get_runner_by_token_hashed(token_hash)
 
 
