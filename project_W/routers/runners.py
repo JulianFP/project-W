@@ -49,7 +49,7 @@ async def register(
     online_runner = OnlineRunner.model_validate(runner_data.model_dump() | {"id": runner_id})
     await dp.ch.register_new_online_runner(online_runner)
 
-    await dp.ch.assign_job_to_runner_if_possible()
+    await dp.ch.assign_queue_job_to_runner_if_possible()
 
     return runner_id
 
@@ -184,7 +184,7 @@ async def submit_job_result(
 
     await dp.ch.finish_job_of_online_runner(online_runner)
 
-    await dp.ch.assign_job_to_runner_if_possible()
+    await dp.ch.assign_queue_job_to_runner_if_possible()
 
     return "Success"
 

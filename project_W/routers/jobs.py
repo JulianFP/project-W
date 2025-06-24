@@ -111,7 +111,7 @@ async def submit_job(
         )
 
     await dp.ch.enqueue_new_job(job_id, job_id * -1)
-    await dp.ch.assign_job_to_runner_if_possible()
+    await dp.ch.assign_queue_job_to_runner_if_possible()
     return job_id
 
 

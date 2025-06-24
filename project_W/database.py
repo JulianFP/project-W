@@ -423,9 +423,9 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_all_unfinished_jobs(self) -> list[int]:
+    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
         """
-        Returns the job id of all jobs in the database that haven't finished yet (not downloaded, finished, failed).
+        Returns the job id and user id of all jobs in the database that haven't finished yet (not downloaded, finished, failed).
         Will be called at startup to enqueue existing jobs
         """
         pass
@@ -1783,12 +1783,12 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     return None
 
-    async def get_all_unfinished_jobs(self) -> list[int]:
+    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                        SELECT id
+                        SELECT id, user_id
                         FROM {self.schema}.jobs
                         WHERE finish_timestamp IS NULL
                     """

@@ -96,7 +96,15 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def assign_job_to_runner_if_possible(self):
+    async def assign_job_to_runner_if_possible(self, job_id: int, user_id: int):
+        """
+        Assigns the provided job to a free runner (if there is one)
+        Does nothing if not
+        """
+        pass
+
+    @abstractmethod
+    async def assign_queue_job_to_runner_if_possible(self):
         """
         Assigns an unassigned job from the queue to a free runner (if both exist)
         Does nothing if not
@@ -274,6 +282,7 @@ class RedisAdapter(CachingAdapter):
                 pipe.delete(self.__get_job_key(job_id))
                 pipe.publish(self.__get_pubsub_channel(user_id), job_id)
                 await pipe.execute()
+                await self.assign_job_to_runner_if_possible(job_id, user_id)
 
     async def get_online_runner_id_by_assigned_job(self, job_id: int) -> int | None:
         async with self.client.pipeline(transaction=True) as pipe:
@@ -293,37 +302,8 @@ class RedisAdapter(CachingAdapter):
             pipe.zrem(self.__job_queue_sorted_set_name, job_id)
             await pipe.execute()
 
-    async def assign_job_to_runner_if_possible(self):
-        # TODO: If we have runner tags, only assign job if it has the right tag.
+    async def assign_job_to_runner_if_possible(self, job_id: int, user_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
-            i = 0
-            pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
-            (ids_returned,) = await pipe.execute()
-            if len(ids_returned) == 0:
-                return
-            else:
-                job_id = ids_returned[0]
-            pipe.exists(self.__get_job_key(job_id))
-            (job_in_progress,) = await pipe.execute()
-            while job_in_progress:
-                i += 1
-                pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
-                values = await pipe.execute()
-                print(values)
-                (ids_returned,) = values
-                if len(ids_returned) == 0:
-                    return
-                else:
-                    job_id = ids_returned[0]
-                pipe.exists(self.__get_job_key(job_id))
-                (job_in_progress,) = await pipe.execute()
-
-            # query user id from database for event publish
-            user_id = await dp.db.get_user_id_of_job(job_id)
-            if user_id is None:
-                raise Exception(
-                    f"Redis/Postgresql data mismatch: Read a job with id {job_id} from redis that doesn't exist in Postgresql!"
-                )
             # get runner to assign this to
             pipe.zpopmax(self.__runner_sorted_set_name)
             (ids_returned,) = await pipe.execute()
@@ -365,6 +345,40 @@ class RedisAdapter(CachingAdapter):
                 await self.reset_runner_expiration(
                     runner_id
                 )  # to sync expiration between runner and job hash
+
+    async def assign_queue_job_to_runner_if_possible(self):
+        # TODO: If we have runner tags, only assign job if it has the right tag.
+        async with self.client.pipeline(transaction=True) as pipe:
+            i = 0
+            pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
+            (ids_returned,) = await pipe.execute()
+            if len(ids_returned) == 0:
+                return
+            else:
+                job_id = int(ids_returned[0])
+            pipe.exists(self.__get_job_key(job_id))
+            (job_in_progress,) = await pipe.execute()
+            while job_in_progress:
+                i += 1
+                pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
+                values = await pipe.execute()
+                print(values)
+                (ids_returned,) = values
+                if len(ids_returned) == 0:
+                    return
+                else:
+                    job_id = int(ids_returned[0])
+                pipe.exists(self.__get_job_key(job_id))
+                (job_in_progress,) = await pipe.execute()
+
+            # query user id from database for event publish
+            user_id = await dp.db.get_user_id_of_job(job_id)
+            if user_id is None:
+                raise Exception(
+                    f"Redis/Postgresql data mismatch: Read a job with id {job_id} from redis that doesn't exist in Postgresql!"
+                )
+
+            await self.assign_job_to_runner_if_possible(job_id, user_id)
 
     async def get_in_process_job(self, job_id: int) -> InProcessJob | None:
         async with self.client.pipeline(transaction=True) as pipe:
