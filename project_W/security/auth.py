@@ -11,6 +11,7 @@ from project_W.models.response_data import User
 from ..logger import get_logger
 from ..models.internal import DecodedAuthTokenData, OnlineRunner
 from ..models.response_data import ErrorResponse, User, UserTypeEnum
+from ..utils import hash_runner_token
 from .ldap_deps import lookup_ldap_user_in_db_from_token
 from .local_account_deps import lookup_local_user_in_db_from_token
 from .local_token import jwt_issuer, validate_local_auth_token
@@ -41,6 +42,23 @@ auth_dependency_responses: dict[int | str, dict[str, Any]] = {
             }
         },
         "description": "Token doesn't grand enough permissions",
+    },
+}
+runner_dependency_responses: dict[int | str, dict[str, Any]] = {
+    401: {
+        "model": ErrorResponse,
+        "headers": {
+            "WWW-Authenticate": {
+                "type": "string",
+            }
+        },
+        "description": "No runner with that token exists",
+    },
+}
+online_runner_dependency_responses: dict[int | str, dict[str, Any]] = {
+    403: {
+        "model": ErrorResponse,
+        "description": "This runner is currently not registered as online, or session_token is invalid",
     },
 }
 
@@ -138,12 +156,19 @@ async def validate_runner(
 
 
 async def validate_online_runner(
-    runner_id: Annotated[int, Depends(validate_runner)],
+    runner_id: Annotated[int, Depends(validate_runner)], session_token: str
 ) -> OnlineRunner:
     if not (online_runner := await dp.ch.get_online_runner_by_id(runner_id)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This runner is currently not registered as online!",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token_hash = hash_runner_token(session_token)
+    if online_runner.session_token_hash != token_hash:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The session token is invalid. Your runner token might have been compromised and used to re-register this runner on a different machine, if this wasn't you then immediately invalidate this runner! Refer to the documentation for how to do so",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

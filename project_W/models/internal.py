@@ -94,4 +94,5 @@ class OnlineRunner(RunnerRegisterRequest):
 
     id: int
     assigned_job_id: int | None = None
-    in_process_job_id: int | None = None
+    in_process: bool = False
+    session_token_hash: str = Field(min_length=43, max_length=43)

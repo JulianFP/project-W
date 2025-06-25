@@ -53,14 +53,14 @@ jobs:
           if git ls-remote --exit-code --heads https://github.com/julianfp/project-w-frontend ${{ github.ref_name }}; then
             FRONTEND_BRANCH_NAME="${{ github.ref_name }}"
           else
-            FRONTEND_BRANCH_NAME="dev"
+            FRONTEND_BRANCH_NAME="main"
           fi
           echo "FRONTEND_BRANCH_NAME=${FRONTEND_BRANCH_NAME}" >> "$GITHUB_ENV"
           echo "frontend-branch-name=${FRONTEND_BRANCH_NAME}" >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --heads https://github.com/julianfp/project-w-runner ${{ github.ref_name }}; then
             RUNNER_BRANCH_NAME="${{ github.ref_name }}"
           else
-            RUNNER_BRANCH_NAME="dev"
+            RUNNER_BRANCH_NAME="main"
           fi
           echo "RUNNER_BRANCH_NAME=${RUNNER_BRANCH_NAME}" >> "$GITHUB_ENV"
           echo "runner-branch-name=${RUNNER_BRANCH_NAME}" >> "$GITHUB_OUTPUT"
@@ -192,6 +192,7 @@ jobs:
         with:
           context: .
           file: ./backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

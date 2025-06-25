@@ -75,7 +75,8 @@ async def lifespan(app: FastAPI):
 
     # enqueue all jobs from the database that are not finished yet
     for job_id, user_id in await dp.db.get_all_unfinished_jobs():
-        await dp.ch.enqueue_new_job(job_id, 0, user_id)
+        await dp.ch.enqueue_new_job(job_id, job_id * -1)
+        await dp.ch.assign_job_to_runner_if_possible(job_id, user_id)
 
     yield
 

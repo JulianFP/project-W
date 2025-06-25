@@ -20,11 +20,23 @@ class ComputeTypeEnum(str, Enum):
     INT8 = "int8"
 
 
+class ModelPrefetchingEnum(str, Enum):
+    NONE = "none"
+    WITHOUT_ALIGNMENT_AND_DIARIZATION = "without_alignment_and_diarization"
+    WITHOUT_ALIGNMENT = "without_alignment"
+    ALL = "all"
+
+
 class WhisperSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     model_cache_dir: DirectoryPath = Field(
         default=user_cache_path(appname=program_name, ensure_exists=True),
         description="The directory in which whisperx should download/read models from",
+        validate_default=True,
+    )
+    model_prefetching: ModelPrefetchingEnum = Field(
+        default=ModelPrefetchingEnum.ALL,
+        description="Which models to prefetch before connecting to the backend. It is recommended to leave this to 'all' in production since otherwise users might have to wait for the runner to fetch models first (which could very well fail, especially for the diarization model)",
         validate_default=True,
     )
     hf_token: SecretStr = Field(
@@ -86,9 +98,4 @@ class Settings(BaseModel):
     backend_settings: BackendSettings = Field(description="How to connect to the Project-W Backend")
     whisper_settings: WhisperSettings = Field(
         description="Settings related to performing the actual transcription and running the whisper and other ML models",
-    )
-    skip_model_prefetch: bool = Field(
-        default=False,
-        description="Whether to register to backend without to prefetch all models first. It is not recommended to enable this in production since it leads to users having to wait for the runner to fetch models first (which could very well fail, especially for the diarization model)",
-        validate_default=True,
     )

@@ -1,3 +1,4 @@
+import secrets
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 
@@ -6,9 +7,13 @@ from pydantic import ValidationError
 from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 
+import project_W.dependencies as dp
+from project_W.models.request_data import RunnerRegisterRequest
+
 from .logger import get_logger
 from .models.internal import InProcessJob, OnlineRunner
 from .models.settings import RedisConnection
+from .utils import hash_runner_token
 
 
 class CachingAdapter(ABC):
@@ -29,9 +34,12 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def register_new_online_runner(self, new_online_runner: OnlineRunner):
+    async def register_new_online_runner(
+        self, runner_id: int, runner_data: RunnerRegisterRequest
+    ) -> str:
         """
         This method registers a runner as online
+        Returns the new runner session token
         """
         pass
 
@@ -43,11 +51,9 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def set_online_runner(
-        self, runner_id: int, mapping: dict[str, bytes | str | int | float]
-    ):
+    async def mark_job_of_runner_in_progress(self, runner_id: int):
         """
-        Set in online runner attributes
+        Marks an assigned job of the runner with id runner_id as in progress
         """
         pass
 
@@ -60,18 +66,9 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def assign_job_to_online_runner(self, job_id: int, user_id: int) -> bool:
-        """
-        Assign a job with job_id to an online runner
-        Return True if successful
-        Return False if there was no free runner available
-        """
-        pass
-
-    @abstractmethod
     async def finish_job_of_online_runner(self, runner: OnlineRunner):
         """
-        Marks that runner as free, removes the job from processing jobs and readds the runner to the runner queue
+        Marks that runner as free, removes the job from processing jobs and re-adds the runner to the runner queue
         """
         pass
 
@@ -91,24 +88,9 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def enqueue_new_job(self, job_id: int, job_priority: int, user_id: int):
+    async def enqueue_new_job(self, job_id: int, job_priority: int):
         """
         Push a new job into the job queue
-        """
-        pass
-
-    @abstractmethod
-    async def number_of_enqueued_jobs(self) -> int:
-        """
-        Returns the amount of jobs that are currently in the job queue
-        """
-        pass
-
-    @abstractmethod
-    async def pop_job_with_highest_priority(self) -> int | None:
-        """
-        Returns id of job with highest priority in queue, removes it from queue
-        Returns None if there are no jobs in the queue
         """
         pass
 
@@ -120,6 +102,22 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
+    async def assign_job_to_runner_if_possible(self, job_id: int, user_id: int):
+        """
+        Assigns the provided job to a free runner (if there is one)
+        Does nothing if not
+        """
+        pass
+
+    @abstractmethod
+    async def assign_queue_job_to_runner_if_possible(self):
+        """
+        Assigns an unassigned job from the queue to a free runner (if both exist)
+        Does nothing if not
+        """
+        pass
+
+    @abstractmethod
     async def get_in_process_job(self, job_id: int) -> InProcessJob | None:
         """
         Returns InProcessJob attributes for job_id, or None if there are no in process jobs with that id
@@ -127,17 +125,23 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def set_in_process_job(self, job_id: int, mapping: dict[str, bytes | str | int | float]):
+    async def abort_in_process_job(self, job_id: int):
         """
-        Set in process job attributes
+        Mark an in process job for abortion
         """
         pass
 
     @abstractmethod
-    async def get_job_pos_in_queue(self, job_id: int) -> int | None:
+    async def report_progress_of_in_process_job(self, job_id: int, progress: float):
         """
-        Returns the position of the job in the queue
-        Returns None if the job isn't in the queue
+        Sets the progress value of a job
+        """
+        pass
+
+    @abstractmethod
+    async def queue_contains_job(self, job_id: int) -> bool:
+        """
+        Returns whether the queue contains a job
         """
         pass
 
@@ -214,29 +218,37 @@ class RedisAdapter(CachingAdapter):
         self.logger.info("Closing Redis connections...")
         await self.client.close()
 
-    async def register_new_online_runner(self, new_online_runner: OnlineRunner):
+    async def register_new_online_runner(
+        self, runner_id: int, runner_data: RunnerRegisterRequest
+    ) -> str:
+        token = secrets.token_urlsafe()
+        token_hash = hash_runner_token(token)
         async with self.client.pipeline(transaction=True) as pipe:
-            key_name = self.__get_runner_key(new_online_runner.id)
-            pipe.hset(
-                key_name, mapping=new_online_runner.model_dump(exclude_none=True, exclude={"id"})
-            )
+            key_name = self.__get_runner_key(runner_id)
+            runner_dump = runner_data.model_dump(exclude_none=True)
+            runner_dump["in_process"] = 0
+            runner_dump["session_token_hash"] = token_hash
+            pipe.hset(key_name, mapping=runner_dump)
             pipe.expire(key_name, self.__heartbeat_timeout)
             pipe.zadd(
                 self.__runner_sorted_set_name,
-                {str(new_online_runner.id): new_online_runner.priority},
+                {str(runner_id): runner_data.priority},
             )
             await pipe.execute()
+        return token
 
     async def reset_runner_expiration(self, runner_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
+            pipe.hget(self.__get_runner_key(runner_id), "assigned_job_id")
+            (job_id,) = await pipe.execute()
+            if job_id is not None:
+                pipe.expire(self.__get_job_key(job_id), self.__heartbeat_timeout)
             pipe.expire(self.__get_runner_key(runner_id), self.__heartbeat_timeout)
             await pipe.execute()
 
-    async def set_online_runner(
-        self, runner_id: int, mapping: dict[str, bytes | str | int | float]
-    ):
+    async def mark_job_of_runner_in_progress(self, runner_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
-            pipe.hset(self.__get_runner_key(runner_id), mapping=mapping)
+            pipe.hset(self.__get_runner_key(runner_id), "in_process", "1")
             await pipe.execute()
 
     async def get_online_runner_by_id(self, runner_id: int) -> OnlineRunner | None:
@@ -254,59 +266,20 @@ class RedisAdapter(CachingAdapter):
                 )
                 return None
 
-    async def assign_job_to_online_runner(self, job_id: int, user_id: int):
-        async with self.client.pipeline(transaction=True) as pipe:
-            pipe.zpopmax(self.__runner_sorted_set_name)
-            (ids_returned,) = await pipe.execute()
-            if len(ids_returned) == 0:
-                return False
-            else:
-                runner_id = ids_returned[0][0]
-            key_name = self.__get_runner_key(runner_id)
-            pipe.hgetall(key_name)
-            (runner_dict,) = await pipe.execute()
-            while not runner_dict:
-                pipe.zpopmax(self.__runner_sorted_set_name)
-                (ids_returned,) = await pipe.execute()
-                if len(ids_returned) == 0:
-                    return False
-                else:
-                    runner_id = ids_returned[0][0]
-                key_name = self.__get_runner_key(runner_id)
-                pipe.hgetall(key_name)
-                (runner_dict,) = await pipe.execute()
-
-            online_runner = OnlineRunner.model_validate(runner_dict | {"id": int(runner_id)})
-            if online_runner.assigned_job_id is None:
-                online_runner.assigned_job_id = job_id
-                pipe.hset(key_name, mapping=online_runner.model_dump(exclude_none=True))
-                pipe.hset(
-                    self.__get_job_key(job_id),
-                    mapping={
-                        "runner_id": runner_id,
-                        "user_id": user_id,
-                        "progress": 0.0,
-                        "abort": 0,
-                    },
-                )
-                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
-                await pipe.execute()
-                return True
-            else:
-                return False
-
     async def finish_job_of_online_runner(self, runner: OnlineRunner):
-        assert runner.in_process_job_id is not None
+        assert runner.assigned_job_id is not None
+        assert runner.in_process is True
         async with self.client.pipeline(transaction=True) as pipe:
-            pipe.hget(self.__get_job_key(runner.in_process_job_id), "user_id")
+            pipe.hget(self.__get_job_key(runner.assigned_job_id), "user_id")
             (user_id,) = await pipe.execute()
-            pipe.delete(self.__get_job_key(runner.in_process_job_id))
-            pipe.hdel(self.__get_runner_key(runner.id), *["in_process_job_id", "assigned_job_id"])
+            pipe.delete(self.__get_job_key(runner.assigned_job_id))
+            pipe.hdel(self.__get_runner_key(runner.id), *["in_process", "assigned_job_id"])
+            pipe.zrem(self.__job_queue_sorted_set_name, runner.assigned_job_id)
             pipe.zadd(
                 self.__runner_sorted_set_name,
                 {str(runner.id): runner.priority},
             )
-            pipe.publish(self.__get_pubsub_channel(user_id), runner.in_process_job_id)
+            pipe.publish(self.__get_pubsub_channel(user_id), runner.assigned_job_id)
             await pipe.execute()
 
     async def unregister_online_runner(self, runner_id: int):
@@ -321,6 +294,7 @@ class RedisAdapter(CachingAdapter):
                 pipe.delete(self.__get_job_key(job_id))
                 pipe.publish(self.__get_pubsub_channel(user_id), job_id)
                 await pipe.execute()
+                await self.assign_job_to_runner_if_possible(job_id, user_id)
 
     async def get_online_runner_id_by_assigned_job(self, job_id: int) -> int | None:
         async with self.client.pipeline(transaction=True) as pipe:
@@ -330,34 +304,93 @@ class RedisAdapter(CachingAdapter):
                 return None
             return int(runner_id)
 
-    async def enqueue_new_job(self, job_id: int, job_priority: int, user_id: int):
-        if not (
-            await self.assign_job_to_online_runner(job_id, user_id)
-        ):  # try to assign job to a free runner first
-            async with self.client.pipeline(transaction=True) as pipe:
-                pipe.zadd(self.__job_queue_sorted_set_name, {str(job_id): job_priority})
-                await pipe.execute()
-
-    async def number_of_enqueued_jobs(self) -> int:
+    async def enqueue_new_job(self, job_id: int, job_priority: int):
         async with self.client.pipeline(transaction=True) as pipe:
-            pipe.zcard(self.__job_queue_sorted_set_name)
-            (length,) = await pipe.execute()
-            return length
+            pipe.zadd(self.__job_queue_sorted_set_name, {str(job_id): job_priority})
+            await pipe.execute()
 
     async def remove_job_from_queue(self, job_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.zrem(self.__job_queue_sorted_set_name, job_id)
             await pipe.execute()
 
-    async def pop_job_with_highest_priority(self) -> int | None:
+    async def assign_job_to_runner_if_possible(self, job_id: int, user_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
-            pipe.zpopmax(self.__job_queue_sorted_set_name)
+            # get runner to assign this to
+            pipe.zpopmax(self.__runner_sorted_set_name)
             (ids_returned,) = await pipe.execute()
             if len(ids_returned) == 0:
-                return None
+                return
             else:
-                job_id = ids_returned[0][0]
-                return int(job_id)
+                runner_id = ids_returned[0][0]
+            key_name = self.__get_runner_key(runner_id)
+            pipe.hgetall(key_name)
+            (runner_dict,) = await pipe.execute()
+            while not runner_dict:
+                pipe.zpopmax(self.__runner_sorted_set_name)
+                (ids_returned,) = await pipe.execute()
+                if len(ids_returned) == 0:
+                    return
+                else:
+                    runner_id = ids_returned[0][0]
+                key_name = self.__get_runner_key(runner_id)
+                pipe.hgetall(key_name)
+                (runner_dict,) = await pipe.execute()
+
+            online_runner = OnlineRunner.model_validate(runner_dict | {"id": int(runner_id)})
+            if online_runner.assigned_job_id is None:
+                online_runner.assigned_job_id = job_id
+                runner_dump = online_runner.model_dump(exclude_none=True)
+                runner_dump["in_process"] = int(runner_dump["in_process"])
+                pipe.hset(key_name, mapping=runner_dump)
+                pipe.hset(
+                    self.__get_job_key(job_id),
+                    mapping={
+                        "runner_id": runner_id,
+                        "user_id": user_id,
+                        "progress": 0.0,
+                        "abort": 0,
+                    },
+                )
+                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+                await pipe.execute()
+                await self.reset_runner_expiration(
+                    runner_id
+                )  # to sync expiration between runner and job hash
+
+    async def assign_queue_job_to_runner_if_possible(self):
+        # TODO: If we have runner tags, only assign job if it has the right tag.
+        async with self.client.pipeline(transaction=True) as pipe:
+            i = 0
+            pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
+            (ids_returned,) = await pipe.execute()
+            if len(ids_returned) == 0:
+                return
+            else:
+                job_id = int(ids_returned[0])
+            pipe.exists(self.__get_job_key(job_id))
+            (job_in_progress,) = await pipe.execute()
+            while job_in_progress:
+                i += 1
+                pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
+                values = await pipe.execute()
+                print(values)
+                (ids_returned,) = values
+                if len(ids_returned) == 0:
+                    return
+                else:
+                    job_id = int(ids_returned[0])
+                pipe.exists(self.__get_job_key(job_id))
+                (job_in_progress,) = await pipe.execute()
+
+            # query user id from database for event publish
+            user_id = await dp.db.get_user_id_of_job(job_id)
+            if user_id is None:
+                raise Exception(
+                    f"Redis/Postgresql data mismatch: Read a job with id {job_id} from redis that doesn't exist in Postgresql!"
+                )
+
+            await self.assign_job_to_runner_if_possible(job_id, user_id)
 
     async def get_in_process_job(self, job_id: int) -> InProcessJob | None:
         async with self.client.pipeline(transaction=True) as pipe:
@@ -374,21 +407,29 @@ class RedisAdapter(CachingAdapter):
                 )
                 return None
 
-    async def set_in_process_job(self, job_id: int, mapping: dict[str, bytes | str | int | float]):
+    async def abort_in_process_job(self, job_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
             pipe.hget(self.__get_job_key(job_id), "user_id")
             (user_id,) = await pipe.execute()
-            pipe.hset(self.__get_job_key(job_id), mapping=mapping)
+            pipe.hset(self.__get_job_key(job_id), "abort", "1")
             pipe.publish(self.__get_pubsub_channel(user_id), job_id)
             await pipe.execute()
 
-    async def get_job_pos_in_queue(self, job_id: int) -> int | None:
+    async def report_progress_of_in_process_job(self, job_id: int, progress: float):
         async with self.client.pipeline(transaction=True) as pipe:
-            pipe.zrevrank(self.__job_queue_sorted_set_name, job_id)
-            (position,) = await pipe.execute()
-            if not position:
-                return None
-            return int(position)
+            pipe.hget(self.__get_job_key(job_id), "user_id")
+            (user_id,) = await pipe.execute()
+            pipe.hset(self.__get_job_key(job_id), "progress", str(progress))
+            pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+            await pipe.execute()
+
+    async def queue_contains_job(self, job_id: int) -> bool:
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.zmscore(self.__job_queue_sorted_set_name, [str(job_id)])
+            ((score,),) = await pipe.execute()
+            if score is None:
+                return False
+            return True
 
     async def event_generator(self, user_id: int) -> AsyncGenerator[str, None]:
         async with self.client.pubsub() as pubsub:

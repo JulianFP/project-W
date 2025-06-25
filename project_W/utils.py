@@ -1,3 +1,7 @@
+import base64
+import hashlib
+
+
 def parse_version_tuple(version_tuple: tuple[int | str, ...]) -> tuple[int, int, int, int, bool]:
     assert len(version_tuple) >= 3
 
@@ -14,4 +18,18 @@ def parse_version_tuple(version_tuple: tuple[int | str, ...]) -> tuple[int, int,
         int(version_tuple[2]),
         revisions,
         is_dirty,
+    )
+
+
+def hash_runner_token(token: str):
+    """
+    We only store the hash of the token, otherwise a db leak would make
+    it possible to impersonate any runner. We don't need to use a salted hash
+    because the token is created by the server and already has sufficient entropy.
+    The hash itself is stored using base64.
+    """
+    return (
+        base64.urlsafe_b64encode(hashlib.sha256(token.encode("ascii")).digest())
+        .rstrip(b"=")
+        .decode("ascii")
     )

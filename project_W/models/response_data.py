@@ -58,6 +58,11 @@ class RunnerCreatedInfo(BaseModel):
     token: str
 
 
+class RegisteredResponse(BaseModel):
+    id: int
+    session_token: str
+
+
 class HeartbeatResponse(BaseModel):
     abort: bool = False
     job_assigned: bool = False
