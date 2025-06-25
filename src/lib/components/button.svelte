@@ -19,4 +19,4 @@ let classes = $derived.by(() => {
 	return returnVal;
 });
 </script>
-<Button class={classes} disabled={disabled} {...rest}/>
+<Button class={classes} disabled={props.disabled} {...rest}/>
