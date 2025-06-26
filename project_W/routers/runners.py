@@ -72,8 +72,6 @@ async def unregister_runner(
     """
     await dp.ch.unregister_online_runner(runner_id)
 
-    await dp.ch.unregister_online_runner(runner_id)
-
     return "Success"
 
 

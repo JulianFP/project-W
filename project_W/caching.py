@@ -279,8 +279,13 @@ class RedisAdapter(CachingAdapter):
                 self.__runner_sorted_set_name,
                 {str(runner.id): runner.priority},
             )
-            pipe.publish(self.__get_pubsub_channel(user_id), runner.assigned_job_id)
+            if user_id is not None:
+                pipe.publish(self.__get_pubsub_channel(user_id), runner.assigned_job_id)
             await pipe.execute()
+            if user_id is None:
+                raise Exception(
+                    f"Redis didn't return a user_id for the job with id {runner.assigned_job_id}!"
+                )
 
     async def unregister_online_runner(self, runner_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
@@ -292,8 +297,11 @@ class RedisAdapter(CachingAdapter):
                 pipe.hget(self.__get_job_key(job_id), "user_id")
                 (user_id,) = await pipe.execute()
                 pipe.delete(self.__get_job_key(job_id))
-                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+                if user_id is not None:
+                    pipe.publish(self.__get_pubsub_channel(user_id), job_id)
                 await pipe.execute()
+                if user_id is None:
+                    raise Exception(f"Redis didn't return a user_id for the job with id {job_id}!")
                 await self.assign_job_to_runner_if_possible(job_id, user_id)
 
     async def get_online_runner_id_by_assigned_job(self, job_id: int) -> int | None:
@@ -326,7 +334,7 @@ class RedisAdapter(CachingAdapter):
             key_name = self.__get_runner_key(runner_id)
             pipe.hgetall(key_name)
             (runner_dict,) = await pipe.execute()
-            while not runner_dict:
+            while (not runner_dict) or (runner_dict.get("assigned_job_id") is not None):
                 pipe.zpopmax(self.__runner_sorted_set_name)
                 (ids_returned,) = await pipe.execute()
                 if len(ids_returned) == 0:
@@ -338,25 +346,24 @@ class RedisAdapter(CachingAdapter):
                 (runner_dict,) = await pipe.execute()
 
             online_runner = OnlineRunner.model_validate(runner_dict | {"id": int(runner_id)})
-            if online_runner.assigned_job_id is None:
-                online_runner.assigned_job_id = job_id
-                runner_dump = online_runner.model_dump(exclude_none=True)
-                runner_dump["in_process"] = int(runner_dump["in_process"])
-                pipe.hset(key_name, mapping=runner_dump)
-                pipe.hset(
-                    self.__get_job_key(job_id),
-                    mapping={
-                        "runner_id": runner_id,
-                        "user_id": user_id,
-                        "progress": 0.0,
-                        "abort": 0,
-                    },
-                )
-                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
-                await pipe.execute()
-                await self.reset_runner_expiration(
-                    runner_id
-                )  # to sync expiration between runner and job hash
+            online_runner.assigned_job_id = job_id
+            runner_dump = online_runner.model_dump(exclude_none=True)
+            runner_dump["in_process"] = int(runner_dump["in_process"])
+            pipe.hset(key_name, mapping=runner_dump)
+            pipe.hset(
+                self.__get_job_key(job_id),
+                mapping={
+                    "runner_id": runner_id,
+                    "user_id": user_id,
+                    "progress": 0.0,
+                    "abort": 0,
+                },
+            )
+            pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+            await pipe.execute()
+            await self.reset_runner_expiration(
+                runner_id
+            )  # to sync expiration between runner and job hash
 
     async def assign_queue_job_to_runner_if_possible(self):
         # TODO: If we have runner tags, only assign job if it has the right tag.
@@ -412,8 +419,11 @@ class RedisAdapter(CachingAdapter):
             pipe.hget(self.__get_job_key(job_id), "user_id")
             (user_id,) = await pipe.execute()
             pipe.hset(self.__get_job_key(job_id), "abort", "1")
-            pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+            if user_id is not None:
+                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
             await pipe.execute()
+            if user_id is None:
+                raise Exception(f"Redis didn't return a user_id for the job with id {job_id}!")
 
     async def report_progress_of_in_process_job(self, job_id: int, progress: float):
         async with self.client.pipeline(transaction=True) as pipe:
