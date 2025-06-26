@@ -147,6 +147,7 @@ async def lookup_oidc_user_in_db_from_token(user_token_data: DecodedAuthTokenDat
         provider_name=provider_name,
         is_admin=user_token_data.is_admin,
         is_verified=user_token_data.is_verified,
+        accepted_tos=oidc_user.accepted_tos,
     )
 
 
@@ -170,4 +171,5 @@ async def lookup_oidc_user_in_db_from_api_token(user_token_data: DecodedAuthToke
         provider_name=provider_name,
         is_admin=user_token_data.is_admin,
         is_verified=user_token_data.is_verified,
+        accepted_tos=oidc_user.accepted_tos,
     )

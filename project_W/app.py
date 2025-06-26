@@ -21,15 +21,6 @@ from .smtp import SmtpClient
 # startup database connections before spinning up application
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
-    # add imprint info to app attributes (so that it is displayed in OpenAPI docs as well)
-    if dp.config.imprint:
-        app.contact = {
-            "name": dp.config.imprint.name,
-            "email": dp.config.imprint.email.root,
-            "url": f"{dp.config.client_url}/about",
-        }
-
     # connect to database
     dp.db = PostgresAdapter(str(dp.config.postgres_connection_string))
     await dp.db.open()
@@ -151,6 +142,17 @@ app = FastAPI(
         else ""
     ),
     root_path_in_servers=False,
+    # add imprint info to app attributes (so that it is displayed in OpenAPI docs as well)
+    contact=(
+        {
+            "name": dp.config.imprint.name,
+            "email": dp.config.imprint.email.root,
+            "url": f"{dp.config.client_url}/about",
+        }
+        if dp.config.imprint
+        else None
+    ),
+    terms_of_service=f"{dp.config.client_url}/tos" if dp.config.terms_of_services else None,
 )
 # middleware required by authlib for oidc
 app.add_middleware(
@@ -182,6 +184,7 @@ async def about() -> AboutResponse:
         version=__version__,
         git_hash=str(__version_tuple__[-1]).split(".")[0].removeprefix("g"),
         imprint=dp.config.imprint,
+        terms_of_services=dp.config.terms_of_services,
     )
 
 

@@ -2,9 +2,13 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .base import EmailValidated, InProcessJobBase, UserInDb
+from .base import AdditionalUserInfo, EmailValidated, InProcessJobBase, UserInDb
 from .request_data import JobSettings, RunnerRegisterRequest
 from .response_data import TokenSecretInfo, UserTypeEnum
+
+
+class UserInDbAll(UserInDb, AdditionalUserInfo):
+    pass
 
 
 # user models for the database
@@ -15,14 +19,26 @@ class LocalUserInDb(UserInDb):
     provision_number: int | None
 
 
+class LocalUserInDbAll(LocalUserInDb, AdditionalUserInfo):
+    pass
+
+
 class OidcUserInDb(UserInDb):
     iss: str
     sub: str
 
 
+class OidcUserInDbAll(OidcUserInDb, AdditionalUserInfo):
+    pass
+
+
 class LdapUserInDb(UserInDb):
     provider_name: str
     dn: str
+
+
+class LdapUserInDbAll(LdapUserInDb, AdditionalUserInfo):
+    pass
 
 
 class RunnerInDb(BaseModel):

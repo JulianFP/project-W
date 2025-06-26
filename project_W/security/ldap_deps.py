@@ -204,4 +204,5 @@ async def lookup_ldap_user_in_db_from_token(user_token_data: DecodedAuthTokenDat
         provider_name=ldap_user.provider_name,
         is_admin=user_token_data.is_admin,
         is_verified=user_token_data.is_verified,
+        accepted_tos=ldap_user.accepted_tos,
     )

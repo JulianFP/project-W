@@ -15,16 +15,20 @@ from pydantic import SecretStr
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .models.base import EmailValidated, JobBase, PasswordValidated, UserInDb
+from .models.base import EmailValidated, JobBase, PasswordValidated
 from .models.internal import (
     JobSettingsInDb,
     JobSortKey,
     LdapUserInDb,
+    LdapUserInDbAll,
     LocalUserInDb,
+    LocalUserInDbAll,
     OidcUserInDb,
+    OidcUserInDbAll,
     OnlineRunner,
     RunnerInDb,
     TokenSecret,
+    UserInDbAll,
 )
 from .models.request_data import JobSettings, Transcript, TranscriptTypeEnum
 from .models.response_data import JobAndSettings, RunnerCreatedInfo, TokenSecretInfo
@@ -183,7 +187,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_user_by_id(self, user_id: int) -> UserInDb | None:
+    async def get_user_by_id(self, user_id: int) -> UserInDbAll | None:
         """
         Return the user with the specified id, regardless of whether this user is a local, oidc or ldap user.
         Return None if no such user exists
@@ -191,28 +195,35 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
+    async def accept_tos_of_user(self, user_id: int, tos_id: int, tos_version: int):
+        """
+        Marks the term of service with the specified id and version as accepted for the user with the specified id
+        """
+        pass
+
+    @abstractmethod
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDbAll | None:
         """
         Return a local user with the matching email, or None if the email doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDbAll | None:
         """
         Return an oidc user with the matching iss/sub pair, or None if iss/sub doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDb | None:
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDbAll | None:
         """
         Return an oidc user with the matching user id, or None if user_id doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDbAll | None:
         """
         Return an ldap user with the matching user id, or None if user_id doesn't match any user
         """
@@ -674,6 +685,7 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.users (
                     id int GENERATED ALWAYS AS IDENTITY,
+                    accepted_tos jsonb NOT NULL DEFAULT '{{}}'::jsonb,
                     primary key (id)
                 )
             """
@@ -1250,9 +1262,9 @@ class PostgresAdapter(DatabaseAdapter):
                     (runner_id,),
                 )
 
-    async def get_user_by_id(self, user_id: int) -> UserInDb | None:
+    async def get_user_by_id(self, user_id: int) -> UserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(UserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(UserInDbAll)) as cur:
                 # check local_accounts
                 await cur.execute(
                     f"""
@@ -1293,53 +1305,69 @@ class PostgresAdapter(DatabaseAdapter):
                 # not found
                 return None
 
-    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
+    async def accept_tos_of_user(self, user_id: int, tos_id: int, tos_version: int):
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.users
+                    SET accepted_tos[%s] = to_jsonb(%s)
+                    WHERE id = %s
+                    """,
+                    (tos_id, tos_version, user_id),
+                )
+
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDbAll | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(LocalUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
-                    FROM {self.schema}.local_accounts
-                    WHERE email = %s
+                    FROM {self.schema}.local_accounts la, {self.schema}.users users
+                    WHERE la.id = users.id
+                    AND la.email = %s
                 """,
                     (email.root,),
                 )
                 return await cur.fetchone()
 
-    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(OidcUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
-                        FROM {self.schema}.oidc_accounts
-                        WHERE iss = %s AND sub = %s
+                        FROM {self.schema}.oidc_accounts oa, {self.schema}.users users
+                        WHERE oa.id = users.id
+                        AND oa.iss = %s AND oa.sub = %s
                     """,
                     (iss, sub),
                 )
                 return await cur.fetchone()
 
-    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDb | None:
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(OidcUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
-                        FROM {self.schema}.oidc_accounts
-                        WHERE id = %s
+                        FROM {self.schema}.oidc_accounts oa, {self.schema}.users users
+                        WHERE oa.id = users.id
+                        AND oa.id = %s
                     """,
                     (user_id,),
                 )
                 return await cur.fetchone()
 
-    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(LdapUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
-                        FROM {self.schema}.ldap_accounts
-                        WHERE id = %s
+                        FROM {self.schema}.ldap_accounts lda, {self.schema}.users users
+                        WHERE lda.id = users.id
+                        AND lda.id = %s
                     """,
                     (str(user_id),),
                 )

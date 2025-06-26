@@ -19,4 +19,5 @@ async def lookup_local_user_in_db_from_token(user_token_data: DecodedAuthTokenDa
         provider_name="project-W",
         is_admin=local_user.is_admin,
         is_verified=local_user.is_verified,
+        accepted_tos=local_user.accepted_tos,
     )

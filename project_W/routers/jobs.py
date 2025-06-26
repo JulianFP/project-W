@@ -48,7 +48,12 @@ router = APIRouter(
 @router.post("/submit_settings")
 async def submit_settings(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_settings: JobSettings,
     is_new_default: bool = False,
@@ -62,7 +67,12 @@ async def submit_settings(
 @router.get("/default_settings")
 async def get_default_settings(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
     ],
 ) -> JobSettings:
     """
@@ -85,7 +95,12 @@ async def get_default_settings(
 )
 async def submit_job(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     audio_file: UploadFile,
     job_settings_id: int | None = None,
@@ -118,7 +133,12 @@ async def submit_job(
 @router.get("/count")
 async def job_count(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     exclude_finished: bool,
     exclude_downloaded: bool,
@@ -135,7 +155,12 @@ async def job_count(
 @router.get("/get")
 async def get(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     start_index: int,
     end_index: int,
@@ -162,7 +187,12 @@ async def get(
 @router.get("/info")
 async def job_info(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_ids: Annotated[list[int], Query()],
 ) -> list[JobInfo]:
@@ -204,7 +234,12 @@ async def job_info(
 )
 async def abort_jobs(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_ids: list[int],
 ) -> str:
@@ -244,7 +279,12 @@ async def abort_jobs(
 )
 async def delete_jobs(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_ids: list[int],
 ) -> str:
@@ -276,7 +316,12 @@ async def delete_jobs(
 )
 async def download_transcript(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_id: int,
     transcript_type: TranscriptTypeEnum,
@@ -301,7 +346,12 @@ async def download_transcript(
 @router.get("/events")
 async def events(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
 ) -> StreamingResponse:
     """

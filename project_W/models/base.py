@@ -54,6 +54,10 @@ class UserInDb(BaseModel):
     email: EmailValidated
 
 
+class AdditionalUserInfo(BaseModel):
+    accepted_tos: dict[int, int]
+
+
 class JobBase(BaseModel):
     id: int
     creation_timestamp: datetime

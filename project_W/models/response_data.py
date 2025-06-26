@@ -4,6 +4,7 @@ from typing import Mapping
 from pydantic import BaseModel, Field
 
 from .base import (
+    AdditionalUserInfo,
     InProcessJobBase,
     JobBase,
     JobSettingsBase,
@@ -12,7 +13,7 @@ from .base import (
     UserInDb,
 )
 from .request_data import JobSettings
-from .settings import ImprintSettings
+from .settings import ImprintSettings, TosSettings
 
 
 class UserTypeEnum(str, Enum):
@@ -22,7 +23,7 @@ class UserTypeEnum(str, Enum):
 
 
 # user model for the api
-class User(UserInDb):
+class User(UserInDb, AdditionalUserInfo):
     provider_name: str
     user_type: UserTypeEnum
     is_admin: bool
@@ -45,6 +46,7 @@ class AboutResponse(BaseModel):
     version: str
     git_hash: str
     imprint: ImprintSettings | None
+    terms_of_services: dict[int, TosSettings]
 
 
 class TokenSecretInfo(BaseModel):

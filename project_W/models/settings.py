@@ -303,6 +303,20 @@ class ImprintSettings(BaseModel):
     )
 
 
+class TosSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(
+        description="The name of this term of service. This will be shown as a title above the tos_html content in the frontend",
+    )
+    version: int = Field(
+        ge=1,
+        description="The version of this term of service. Start by putting this to 1. When incremented then users will have to re-accept these terms.",
+    )
+    tos_html: str = Field(
+        description="The terms of services in html format. You may include links to external websites if you want.",
+    )
+
+
 class SslSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cert_file: FilePath = Field(
@@ -395,3 +409,9 @@ class Settings(BaseModel):
         default=None,
         validate_default=None,
     )
+    terms_of_services: Annotated[
+        dict[int, TosSettings],
+        Field(
+            description="Attribute set of terms of services. The user will have to accept to every one of these separately before they can use the service. The name of the set will be id of the term of service, don't change it once set!",
+        ),
+    ] = {}
