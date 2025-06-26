@@ -5,7 +5,8 @@ import type { LayoutLoad } from "./$types";
 
 type User = components["schemas"]["User"];
 
-export const load: LayoutLoad = async ({ fetch }) => {
+export const load: LayoutLoad = async ({ fetch, depends }) => {
+	depends("app:user_info");
 	try {
 		const user_info = await getLoggedIn<User>("users/info", {}, fetch);
 		return { user_info: user_info };

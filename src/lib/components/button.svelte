@@ -11,7 +11,7 @@ let classes = $derived.by(() => {
 	} else {
 		returnVal = `${props.class}`;
 	}
-	if (disabled) {
+	if (props.disabled) {
 		returnVal += " cursor-not-allowed";
 	} else {
 		returnVal += " cursor-pointer";

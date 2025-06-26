@@ -1,10 +1,9 @@
 <script lang="ts">
 import "../app.css";
-
-import { routing } from "$lib/utils/global_state.svelte";
-
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+import { routing } from "$lib/utils/global_state.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
+import type { components } from "$lib/utils/schema";
 import {
 	Alert,
 	Avatar,
@@ -25,10 +24,19 @@ import {
 	LockSolid,
 	UserEditSolid,
 } from "flowbite-svelte-icons";
+import type { Snippet } from "svelte";
 
 let dropDownOpen = $state(false);
 
-let { children } = $props();
+type Data = {
+	about: components["schemas"]["AboutResponse"];
+	user_info: components["schemas"]["User"];
+};
+interface Props {
+	data: Data;
+	children: Snippet;
+}
+let { data, children }: Props = $props();
 </script>
 <!--fixed: position is relative to browser window, w-full: full width, z-20: 3d pos (closer)-->
 <header class="fixed w-full z-20 top-0 start-0">
@@ -58,6 +66,9 @@ let { children } = $props();
     <NavUl activeUrl={routing.location}>
       <NavLi href="#/">Home</NavLi>
       <NavLi href="#/about">About</NavLi>
+      {#if Object.keys(data.about.terms_of_services).length !== 0}
+        <NavLi href="#/tos">Terms of Services</NavLi>
+      {/if}
       <NavLi href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API-docs</NavLi>
       <NavLi href="https://project-w.readthedocs.io" target="_blank" rel="noopener noreferrer">Docs</NavLi>
       <NavLi href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="mx-auto"/></NavLi>
