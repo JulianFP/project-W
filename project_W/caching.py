@@ -294,6 +294,7 @@ class RedisAdapter(CachingAdapter):
             pipe.zrem("online_runners_sorted", runner_id)
             (job_id, _, _) = await pipe.execute()
             if job_id is not None:
+                job_id = int(job_id)
                 pipe.hget(self.__get_job_key(job_id), "user_id")
                 (user_id,) = await pipe.execute()
                 pipe.delete(self.__get_job_key(job_id))
@@ -381,7 +382,6 @@ class RedisAdapter(CachingAdapter):
                 i += 1
                 pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
                 values = await pipe.execute()
-                print(values)
                 (ids_returned,) = values
                 if len(ids_returned) == 0:
                     return
