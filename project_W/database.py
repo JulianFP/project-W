@@ -135,7 +135,7 @@ class DatabaseAdapter(ABC):
 
     @abstractmethod
     async def ensure_ldap_user_exists(
-        self, provider_name: str, dn: str, email: EmailValidated
+        self, provider_name: str, uid: str, email: EmailValidated
     ) -> int:
         """
         Add a database entry for an ldap user if it doesn't exist yet. Will be called at first login of this user.
@@ -771,10 +771,10 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.ldap_accounts (
                     provider_name text NOT NULL,
-                    dn text NOT NULL,
+                    uid text NOT NULL,
                     id int NOT NULL UNIQUE,
                     email varchar(254) NOT NULL,
-                    PRIMARY KEY (provider_name, dn),
+                    PRIMARY KEY (provider_name, uid),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
                 )
             """
@@ -1119,7 +1119,7 @@ class PostgresAdapter(DatabaseAdapter):
                     )
 
     async def ensure_ldap_user_exists(
-        self, provider_name: str, dn: str, email: EmailValidated
+        self, provider_name: str, uid: str, email: EmailValidated
     ) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
@@ -1127,9 +1127,9 @@ class PostgresAdapter(DatabaseAdapter):
                     f"""
                     SELECT *
                     FROM {self.schema}.ldap_accounts
-                    WHERE provider_name = %s AND dn = %s
+                    WHERE provider_name = %s AND uid = %s
                 """,
-                    (provider_name, dn),
+                    (provider_name, uid),
                 )
                 if user := await cur.fetchone():
                     if user.email.root != email:
@@ -1137,9 +1137,9 @@ class PostgresAdapter(DatabaseAdapter):
                             f"""
                             UPDATE {self.schema}.ldap_accounts
                             SET email = %s
-                            WHERE provider_name = %s AND dn = %s
+                            WHERE provider_name = %s AND uid = %s
                             """,
-                            (email.root, provider_name, dn),
+                            (email.root, provider_name, uid),
                         )
                     return user.id
 
@@ -1154,10 +1154,10 @@ class PostgresAdapter(DatabaseAdapter):
                 if user_id := await cur.fetchone():
                     await cur.execute(
                         f"""
-                        INSERT INTO {self.schema}.ldap_accounts (provider_name, dn, id, email)
+                        INSERT INTO {self.schema}.ldap_accounts (provider_name, uid, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (provider_name, dn, user_id, email.root),
+                        (provider_name, uid, user_id, email.root),
                     )
                     await cur.execute(
                         f"""

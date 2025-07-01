@@ -115,10 +115,12 @@ Add an `admin_query` section to your LDAP provider config:
       user_query:
         base_dn: <base dn under which normal users can be found>
         filter: <ldap filter expression>
+        uid_attribute_name: <ldap attribute contaning unique user identifier>
         mail_attribute_name: <ldap attribute which contains normal users mail address>
       admin_query:
         base_dn: <base dn under which admin users can be found (can be the same as above if filter is different)>
         filter: <ldap filter expression (can be the same as above if base_dn is different)>
+        uid_attribute_name: <ldap attribute contaning unique user identifier>
         mail_attribute_name: <ldap attribute which contains admin users mail address>
 
 Now each user that gets returned by an ldap query under the specified base_dn using the specified filter expression can login as an admin user.
@@ -137,6 +139,7 @@ Alternatively if you want to setup a new ldap provider just for admin users then
        user_query:
          base_dn: <base dn under which normal users can be found>
          filter: <ldap filter expression>
+         uid_attribute_name: <ldap attribute contaning unique user identifier>
          mail_attribute_name: <ldap attribute which contains normal users mail address>
      LDAP for admin users:
        hidden: true
@@ -147,6 +150,7 @@ Alternatively if you want to setup a new ldap provider just for admin users then
        admin_query:
          base_dn: <base dn under which admin users can be found (can be the same as above if filter is different)>
          filter: <ldap filter expression (can be the same as above if base_dn is different)>
+         uid_attribute_name: <ldap attribute contaning unique user identifier>
          mail_attribute_name: <ldap attribute which contains admin users mail address>
 
 The `hidden=true` attribute hides this LDAP provider as a login option from the frontend, similarly how the `no_signup_hidden` option did it for local accounts. Again please note that this is not a security option, users can still try to login through that LDAP provider if they want, so your passwords must remain strong! The LDAP for admin users is just not promoted on the main frontend as a login option.

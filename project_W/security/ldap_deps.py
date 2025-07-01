@@ -131,7 +131,9 @@ class LdapAdapter:
                 )
                 raise http_exc
             elif (
-                (user_dn := admins[0].get("dn"))
+                (user_uid := admins[0].get(prov.admin_query.uid_attribute_name))
+                and len(user_uid) > 0
+                and (user_dn := admins[0].get("dn"))
                 and (user_email := admins[0].get(prov.admin_query.mail_attribute_name))
                 and len(user_email) > 0
             ):
@@ -139,10 +141,12 @@ class LdapAdapter:
                     validated_email = EmailValidated.model_validate(str(user_email[0]))
                 except ValidationError:
                     raise invalid_email_exc
-                user = LdapUserInfo(dn=str(user_dn), is_admin=True, email=validated_email)
+                user = LdapUserInfo(
+                    dn=str(user_dn), uid=str(user_uid[0]), is_admin=True, email=validated_email
+                )
             else:
                 self.logger.error(
-                    f"Couldn't get dn or email address for admin LDAP user {username} in LDAP directory {idp_name}"
+                    f"Couldn't get uid or email address for admin LDAP user {username} in LDAP directory {idp_name}"
                 )
                 raise http_exc
         elif prov.user_query and (users := await self.__query_normal_user(idp_name, username)):
@@ -152,7 +156,9 @@ class LdapAdapter:
                 )
                 raise http_exc
             elif (
-                (user_dn := users[0].get("dn"))
+                (user_uid := users[0].get(prov.user_query.uid_attribute_name))
+                and len(user_uid) > 0
+                and (user_dn := users[0].get("dn"))
                 and (user_email := users[0].get(prov.user_query.mail_attribute_name))
                 and len(user_email) > 0
             ):
@@ -160,10 +166,12 @@ class LdapAdapter:
                     validated_email = EmailValidated.model_validate(str(user_email[0]))
                 except ValidationError:
                     raise invalid_email_exc
-                user = LdapUserInfo(dn=str(user_dn), is_admin=False, email=validated_email)
+                user = LdapUserInfo(
+                    dn=str(user_dn), uid=str(user_uid[0]), is_admin=False, email=validated_email
+                )
             else:
                 self.logger.error(
-                    f"Couldn't get dn or email address for normal LDAP user {username} in LDAP directory {idp_name}"
+                    f"Couldn't get uid or email address for normal LDAP user {username} in LDAP directory {idp_name}"
                 )
                 raise http_exc
         else:
@@ -171,12 +179,12 @@ class LdapAdapter:
 
         return user
 
-    async def authenticate_user(self, idp_name: str, user_dn: str, password: str) -> bool:
+    async def authenticate_user(self, idp_name: str, dn: str, password: str) -> bool:
         prov = self.ldap_prov[idp_name]
         ldap_client = copy.deepcopy(
             self.clients[idp_name]
         )  # copy so that client with credentials gets thrown away after this function
-        ldap_client.set_credentials(prov.service_account_auth.mechanism, user_dn, password)
+        ldap_client.set_credentials(prov.service_account_auth.mechanism, dn, password)
         try:
             async with ldap_client.connect(is_async=True) as conn:
                 if await conn.whoami():

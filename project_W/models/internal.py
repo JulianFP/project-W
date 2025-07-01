@@ -34,7 +34,7 @@ class OidcUserInDbAll(OidcUserInDb, AdditionalUserInfo):
 
 class LdapUserInDb(UserInDb):
     provider_name: str
-    dn: str
+    uid: str
 
 
 class LdapUserInDbAll(LdapUserInDb, AdditionalUserInfo):
@@ -79,6 +79,7 @@ class TokenSecret(TokenSecretInfo):
 
 class LdapUserInfo(BaseModel):
     dn: str
+    uid: str
     is_admin: bool
     email: EmailValidated
 

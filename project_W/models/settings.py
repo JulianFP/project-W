@@ -149,8 +149,15 @@ class LdapQuerySettings(BaseModel):
             "(&(class=person)(memberof=spn=project-W-admins@localhost)(mail=%s))"
         ],
     )
+    uid_attribute_name: str = Field(
+        description="The attribute/field name that contains a unique user identifier. Doesn't have to be the same as the login name that is used in the filter expression, but can be. Make sure that this identifier is unique to a user across the LDAP directory and will never change/be reassigned to a different user! Every LDAP user that the filter expression can return should have this attribute exactly ones.",
+        examples=[
+            "uid",
+            "uuid",
+        ],
+    )
     mail_attribute_name: str = Field(
-        description="The attribute/field name that contains the email address of a user. Every user that should be able to authenticate with Project-W should have this attribute.",
+        description="The attribute/field name that contains the email address of a user.  Every LDAP user that the filter expression can return should have this attribute exactly ones.",
         examples=[
             "mail",
             "email",
