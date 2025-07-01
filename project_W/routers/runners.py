@@ -170,30 +170,43 @@ async def submit_job_result(
         raise Exception("Trying to submit a job that belongs to a non-existing user!")
 
     if submitted_data.error_msg is not None:
-        await dp.db.finish_failed_job(
-            online_runner.assigned_job_id, submitted_data.error_msg, online_runner
-        )
-        if settings.email_notification:
-            background_tasks.add_task(
-                dp.smtp.send_job_failed_email,
-                user.email,
-                in_process_job.id,
-                submitted_data.error_msg,
-                dp.config.client_url,
-            )
+        job_failed = True
     elif submitted_data.transcript is not None:
-        await dp.db.finish_successful_job(online_runner, submitted_data.transcript)
-        if settings.email_notification:
-            background_tasks.add_task(
-                dp.smtp.send_job_success_email, user.email, in_process_job.id, dp.config.client_url
-            )
+        job_failed = False
     else:
         raise Exception(
             "Pydantic model validation failed, job submission has neither error_msg nor a transcript attached to it"
         )
 
-    await dp.ch.finish_job_of_online_runner(online_runner)
+    # processing the result can take some time for larger jobs, especially the database operations
+    # so do this as a background task
+    async def process_job_result():
+        assert online_runner.assigned_job_id is not None
+        if job_failed:
+            assert submitted_data.error_msg is not None
+            await dp.db.finish_failed_job(
+                online_runner.assigned_job_id, submitted_data.error_msg, online_runner
+            )
+        else:
+            assert submitted_data.transcript is not None
+            await dp.db.finish_successful_job(online_runner, submitted_data.transcript)
 
+        await dp.ch.finish_job_of_online_runner(online_runner.assigned_job_id)
+
+        if settings.email_notification:
+            if job_failed:
+                assert submitted_data.error_msg is not None
+                await dp.smtp.send_job_failed_email(
+                    user.email, in_process_job.id, submitted_data.error_msg, dp.config.client_url
+                )
+            else:
+                await dp.smtp.send_job_success_email(
+                    user.email, in_process_job.id, dp.config.client_url
+                )
+
+    background_tasks.add_task(process_job_result)
+
+    await dp.ch.unassign_current_job_from_online_runner(online_runner)
     await dp.ch.assign_queue_job_to_runner_if_possible()
 
     return "Success"

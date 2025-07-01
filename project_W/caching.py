@@ -67,9 +67,17 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
-    async def finish_job_of_online_runner(self, runner: OnlineRunner):
+    async def unassign_current_job_from_online_runner(self, runner: OnlineRunner):
         """
-        Marks that runner as free, removes the job from processing jobs and re-adds the runner to the runner queue
+        Unassign a job from an online runner and add the runner back to the runner queue making it available to be assigned to new jobs.
+        This is called when the runner submits the job before the backend processed the job result
+        """
+        pass
+
+    @abstractmethod
+    async def finish_job_of_online_runner(self, job_id: int):
+        """
+        Removes the job from processing jobs. Call unassign_current_job_from_online_runner In conjunction with this
         """
         pass
 
@@ -270,26 +278,30 @@ class RedisAdapter(CachingAdapter):
                 )
                 return None
 
-    async def finish_job_of_online_runner(self, runner: OnlineRunner):
+    async def unassign_current_job_from_online_runner(self, runner: OnlineRunner):
         assert runner.assigned_job_id is not None
         assert runner.in_process is True
         async with self.client.pipeline(transaction=True) as pipe:
-            pipe.hget(self.__get_job_key(runner.assigned_job_id), "user_id")
-            (user_id,) = await pipe.execute()
-            pipe.delete(self.__get_job_key(runner.assigned_job_id))
+            # to give the backend some time to process the submitted transcript, reset it's expiration here
+            await self.__reset_runner_expiration(pipe, runner.id)
             pipe.hdel(self.__get_runner_key(runner.id), *["in_process", "assigned_job_id"])
-            pipe.zrem(self.__job_queue_sorted_set_name, runner.assigned_job_id)
             pipe.zadd(
                 self.__runner_sorted_set_name,
                 {str(runner.id): runner.priority},
             )
+            await pipe.execute()
+
+    async def finish_job_of_online_runner(self, job_id: int):
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.hget(self.__get_job_key(job_id), "user_id")
+            (user_id,) = await pipe.execute()
+            pipe.delete(self.__get_job_key(job_id))
+            pipe.zrem(self.__job_queue_sorted_set_name, job_id)
             if user_id is not None:
-                pipe.publish(self.__get_pubsub_channel(user_id), runner.assigned_job_id)
+                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
             await pipe.execute()
             if user_id is None:
-                raise Exception(
-                    f"Redis didn't return a user_id for the job with id {runner.assigned_job_id}!"
-                )
+                raise Exception(f"Redis didn't return a user_id for the job with id {job_id}!")
 
     async def unregister_online_runner(self, runner_id: int):
         async with self.client.pipeline(transaction=True) as pipe:
