@@ -108,13 +108,14 @@ If you want to use LDAP instead of OIDC for logging in your users this guide is 
           service_account_auth:
             user: "dn=token"
             password: <redacted>
+          username_attributes:
+            - "name"
+            - "mail"
+          uid_attribute: "uuid"
+          mail_attribute: "mail"
           user_query:
             base_dn: "dc=localhost"
-            filter: "(&(class=account)(memberof=spn=project-W-users@localhost)(name=%s))"
-            uid_attribute_name: "uuid"
-            mail_attribute_name: "mail"
+            filter: "&(class=account)(memberof=spn=project-W-users@localhost)"
           admin_query:
             base_dn: "dc=localhost"
-            filter: "(&(class=account)(memberof=spn=project-W-admins@localhost)(name=%s))"
-            uid_attribute_name: "uuid"
-            mail_attribute_name: "mail"
+            filter: "&(class=account)(memberof=spn=project-W-admins@localhost)"

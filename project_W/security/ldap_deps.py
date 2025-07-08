@@ -46,14 +46,14 @@ class LdapAdapter:
         prov = self.ldap_prov[idp_name]
 
         async def query(conn: AIOLDAPConnection):
-            if prov.user_query and (
-                users := await conn.search(
-                    prov.user_query.base_dn, 2, prov.user_query.filter % username
-                )
-            ):
-                return users
-            else:
-                return []
+            if prov.user_query is not None:
+                filter_expression = ""
+                for user_attr in prov.username_attributes:
+                    filter_expression += f"({user_attr}={username})"
+                filter_expression = f"(&({prov.user_query.filter})(|{filter_expression}))"
+                if users := await conn.search(prov.user_query.base_dn, 2, filter_expression):
+                    return users
+            return []
 
         users = await self.__exec_lambda(idp_name, query)
         return users
@@ -62,14 +62,14 @@ class LdapAdapter:
         prov = self.ldap_prov[idp_name]
 
         async def query(conn: AIOLDAPConnection):
-            if prov.admin_query and (
-                admins := await conn.search(
-                    prov.admin_query.base_dn, 2, prov.admin_query.filter % username
-                )
-            ):
-                return admins
-            else:
-                return []
+            if prov.admin_query is not None:
+                filter_expression = ""
+                for admin_attr in prov.username_attributes:
+                    filter_expression += f"({admin_attr}={username})"
+                filter_expression = f"(&({prov.admin_query.filter})(|{filter_expression}))"
+                if admins := await conn.search(prov.admin_query.base_dn, 2, filter_expression):
+                    return admins
+            return []
 
         admins = await self.__exec_lambda(idp_name, query)
         return admins
@@ -131,10 +131,10 @@ class LdapAdapter:
                 )
                 raise http_exc
             elif (
-                (user_uid := admins[0].get(prov.admin_query.uid_attribute_name))
+                (user_uid := admins[0].get(prov.uid_attribute))
                 and len(user_uid) > 0
                 and (user_dn := admins[0].get("dn"))
-                and (user_email := admins[0].get(prov.admin_query.mail_attribute_name))
+                and (user_email := admins[0].get(prov.mail_attribute))
                 and len(user_email) > 0
             ):
                 try:
@@ -156,10 +156,10 @@ class LdapAdapter:
                 )
                 raise http_exc
             elif (
-                (user_uid := users[0].get(prov.user_query.uid_attribute_name))
+                (user_uid := users[0].get(prov.uid_attribute))
                 and len(user_uid) > 0
                 and (user_dn := users[0].get("dn"))
-                and (user_email := users[0].get(prov.user_query.mail_attribute_name))
+                and (user_email := users[0].get(prov.mail_attribute))
                 and len(user_email) > 0
             ):
                 try:

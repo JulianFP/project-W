@@ -142,26 +142,11 @@ class LdapQuerySettings(BaseModel):
         examples=["dc=example,dc=org"],
     )
     filter: str = Field(
-        description="Ldap filter expression that should return only one user with a specific username that has the required permissions. Use %s as a placeholder for the username as the user enters it into on the login form.",
+        description="Ldap filter expression that that will be merged with the user attribute filters.",
         examples=[
-            "(&(class=person)(person=%s))"
-            "(&(class=person)(memberof=spn=project-W-users@localhost)(name=%s))"
-            "(&(class=person)(memberof=spn=project-W-admins@localhost)(mail=%s))"
-        ],
-    )
-    uid_attribute_name: str = Field(
-        description="The attribute/field name that contains a unique user identifier. Doesn't have to be the same as the login name that is used in the filter expression, but can be. Make sure that this identifier is unique to a user across the LDAP directory and will never change/be reassigned to a different user! Every LDAP user that the filter expression can return should have this attribute exactly ones.",
-        examples=[
-            "uid",
-            "uuid",
-        ],
-    )
-    mail_attribute_name: str = Field(
-        description="The attribute/field name that contains the email address of a user.  Every LDAP user that the filter expression can return should have this attribute exactly ones.",
-        examples=[
-            "mail",
-            "email",
-            "mail1",
+            "(class=person)"
+            "(&(class=person)(memberof=spn=project-W-users@localhost)"
+            "(&(class=account)(memberof=spn=project-W-admins@localhost))"
         ],
     )
 
@@ -199,6 +184,29 @@ class LdapProviderSettings(ProviderSettings):
             "ldap://example.org",
             "ldaps://example.org",
             "ldapi://%2Frun%2Fslapd%2Fldapi",
+        ],
+    )
+    username_attributes: list[str] = Field(
+        description="A list of attribute/field names which contain strings that can be used by the user as a username during login. Project-W will use them to generate an LDAP filter expression and merge it with your provided filter expression like this: (&(<your filter expression>)(|(<username_attribute1>=<username>)(<username_attribute2>=<username>)...))",
+        examples=[
+            ["name"],
+            ["name", "mail"],
+            ["displayname", "email"],
+        ],
+    )
+    uid_attribute: str = Field(
+        description="The attribute/field name that contains a unique user identifier. Doesn't have to be the same as one of the username_attributes, but can be. Make sure that this identifier is unique to a user across the LDAP directory and will never change/be reassigned to a different user! Every LDAP user that the filter expression can return should have this attribute exactly ones. This attribute in combination with the filter expression will be used to query users outside of the regular login flow.",
+        examples=[
+            "uid",
+            "uuid",
+        ],
+    )
+    mail_attribute: str = Field(
+        description="The attribute/field name that contains the email address of a user.  Every LDAP user that the filter expression can return should have this attribute exactly ones.",
+        examples=[
+            "mail",
+            "email",
+            "mail1",
         ],
     )
     user_query: LdapQuerySettings | None = Field(
