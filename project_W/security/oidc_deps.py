@@ -50,6 +50,7 @@ async def register_with_oidc_providers(config: Settings):
                 client_id=idp.client_id,
                 client_secret=idp.client_secret.get_secret_value(),
                 server_metadata_url=metadata_uri,
+                code_challenge_method="S256" if idp.enable_pkce_s256_challenge else None,
                 client_kwargs={
                     "scope": "openid email",
                     "verify": ctx,

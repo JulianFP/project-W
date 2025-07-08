@@ -125,6 +125,10 @@ class OidcProviderSettings(ProviderSettings):
     client_secret: SecretStr = Field(
         description="The client_secret string as returned by the identity provider after setting up this application"
     )
+    enable_pkce_s256_challenge: bool = Field(
+        default=True,
+        description="Whether the PKCE flow using the S256 challenge method should be enabled. The OIDC provider has to support this.",
+    )
     user_role: OidcRoleSettings | None = Field(
         default=None,
         description="Configure the role that users should have to be able to access this Project-W instance. Every user who doesn't have this role in their id token won't be able to use this service. Set to None if all users of this IdP should be able to access it",
