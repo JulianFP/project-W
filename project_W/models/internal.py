@@ -2,7 +2,13 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .base import AdditionalUserInfo, EmailValidated, InProcessJobBase, UserInDb
+from .base import (
+    AdditionalUserInfo,
+    EmailValidated,
+    InProcessJobBase,
+    JobBase,
+    UserInDb,
+)
 from .request_data import JobSettings, RunnerRegisterRequest
 from .response_data import TokenSecretInfo, UserTypeEnum
 
@@ -44,6 +50,17 @@ class LdapUserInDbAll(LdapUserInDb, AdditionalUserInfo):
 class RunnerInDb(BaseModel):
     id: int
     token_hash: str
+
+
+class JobInDb(JobBase):
+    aborting: bool
+    user_id: int
+    job_settings_id: int | None = None
+    audio_oid: int | None = None
+
+
+class JobAndSettingsInDb(JobInDb):
+    settings: JobSettings = JobSettings()
 
 
 class JobSettingsInDb(BaseModel):

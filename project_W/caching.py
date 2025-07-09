@@ -312,8 +312,13 @@ class RedisAdapter(CachingAdapter):
             if job_id is not None:
                 job_id = int(job_id)
                 pipe.hget(self.__get_job_key(job_id), "user_id")
-                (user_id,) = await pipe.execute()
+                pipe.hget(self.__get_job_key(job_id), "abort")
+                (user_id, abort) = await pipe.execute()
                 pipe.delete(self.__get_job_key(job_id))
+                if bool(int(abort)):
+                    pipe.zrem(self.__job_queue_sorted_set_name, job_id)
+                    await pipe.execute()
+                    await dp.db.finish_failed_job(job_id, "Job was aborted")
                 if user_id is not None:
                     pipe.publish(self.__get_pubsub_channel(user_id), job_id)
                 await pipe.execute()
@@ -396,8 +401,21 @@ class RedisAdapter(CachingAdapter):
             else:
                 job_id = int(ids_returned[0])
             pipe.exists(self.__get_job_key(job_id))
-            (job_in_progress,) = await pipe.execute()
-            while job_in_progress:
+            (skip_job,) = await pipe.execute()
+            if not skip_job:
+                job = await dp.db.get_job_by_id(job_id)
+                if job is None:
+                    raise Exception(
+                        f"Redis/Postgresql data mismatch: Read a job with id {job_id} from redis that doesn't exist in Postgresql!"
+                    )
+                if job.aborting:
+                    pipe.zrem(self.__job_queue_sorted_set_name, job_id)
+                    await pipe.execute()
+                    await dp.db.finish_failed_job(job_id, "Job was aborted")
+                    pipe.publish(self.__get_pubsub_channel(job.user_id), job_id)
+                    await pipe.execute()
+                    skip_job = True
+            while skip_job:
                 i += 1
                 pipe.zrevrange(self.__job_queue_sorted_set_name, i, i)
                 values = await pipe.execute()
@@ -407,7 +425,20 @@ class RedisAdapter(CachingAdapter):
                 else:
                     job_id = int(ids_returned[0])
                 pipe.exists(self.__get_job_key(job_id))
-                (job_in_progress,) = await pipe.execute()
+                (skip_job,) = await pipe.execute()
+                if not skip_job:
+                    job = await dp.db.get_job_by_id(job_id)
+                    if job is None:
+                        raise Exception(
+                            f"Redis/Postgresql data mismatch: Read a job with id {job_id} from redis that doesn't exist in Postgresql!"
+                        )
+                    if job.aborting:
+                        pipe.zrem(self.__job_queue_sorted_set_name, job_id)
+                        await pipe.execute()
+                        await dp.db.finish_failed_job(job_id, "Job was aborted")
+                        pipe.publish(self.__get_pubsub_channel(job.user_id), job_id)
+                        await pipe.execute()
+                        skip_job = True
 
             # query user id from database for event publish
             user_id = await dp.db.get_user_id_of_job(job_id)

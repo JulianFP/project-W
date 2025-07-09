@@ -94,6 +94,9 @@ class JobStatus(str, Enum):
     # A runner has been assigned, and is currently processing
     # the request
     RUNNER_IN_PROGRESS = "runner_in_progress"
+    # The job is currently being aborted, i.e. the backend waits
+    # for the runner to stop processing this job
+    ABORTING = "aborting"
     # The runner successfully completed the job and
     # the transcript is ready for retrieval
     SUCCESS = "success"

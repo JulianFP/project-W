@@ -82,6 +82,10 @@ async def unregister_runner(
             "model": ErrorResponse,
             "description": "No job assigned or job not in database",
         },
+        405: {
+            "model": ErrorResponse,
+            "description": "The assigned job was aborted by the user",
+        },
         **online_runner_dependency_responses,
     },
 )
@@ -96,14 +100,22 @@ async def retrieve_job_info(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This runner has currently no job assigned",
         )
-    if (
-        job_settings := await dp.db.get_job_settings_by_job_id(online_runner.assigned_job_id)
-    ) is None:
+    if (job := await dp.db.get_job_by_id(online_runner.assigned_job_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The job id assigned to this runner doesn't appear in the database!",
+        )
+    if job.aborting:
+        raise HTTPException(
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+            detail="This job was aborted by a user. Can't get job info of an aborted job!",
+        )
+    if (job_settings := await dp.db.get_job_settings_by_job_id(job.id)) is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="The job id of this runner doesn't appear in the database!",
         )
-    return RunnerJobInfoResponse(id=online_runner.assigned_job_id, settings=job_settings)
+    return RunnerJobInfoResponse(id=job.id, settings=job_settings)
 
 
 @router.post(
@@ -112,6 +124,10 @@ async def retrieve_job_info(
         400: {
             "model": ErrorResponse,
             "description": "No job assigned",
+        },
+        405: {
+            "model": ErrorResponse,
+            "description": "The assigned job was aborted by the user",
         },
         **online_runner_dependency_responses,
     },
@@ -129,13 +145,21 @@ async def retrieve_job_audio(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This runner has currently no job assigned",
         )
+    if (job := await dp.db.get_job_by_id(online_runner.assigned_job_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The job id assigned to this runner doesn't appear in the database!",
+        )
+    if job.aborting:
+        raise HTTPException(
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+            detail="This job was aborted by a user. Can't get job audio of an aborted job!",
+        )
 
     if not online_runner.in_process:
         await dp.ch.mark_job_of_runner_in_progress(online_runner.id)
 
-    return StreamingResponse(
-        dp.db.get_job_audio(online_runner.assigned_job_id), media_type="audio/"
-    )
+    return StreamingResponse(dp.db.get_job_audio(job.id), media_type="audio/")
 
 
 @router.post(
