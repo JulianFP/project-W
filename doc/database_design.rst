@@ -5,7 +5,7 @@ The PostgreSQL database schema is carefully designed to closely reflect Project-
 
 For this I created and maintained an ER model that served as the basis for the current database design:
 
-.. image:: ./database_er_model.jpg
+.. image:: ./database_er_model.png
    :width: 800
    :alt: An exported drawio diagram that shows Project-W's ER model
 
