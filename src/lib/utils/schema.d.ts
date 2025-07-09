@@ -797,6 +797,8 @@ export interface components {
 			terms_of_services: {
 				[key: string]: components["schemas"]["TosSettings"];
 			};
+			/** Job Retention In Days */
+			job_retention_in_days: number | null;
 		};
 		/** AlignmentProcessingSettings */
 		AlignmentProcessingSettings: {

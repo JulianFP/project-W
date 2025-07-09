@@ -2,6 +2,7 @@
 import { EventSource } from "eventsource";
 import {
 	A,
+	Alert,
 	ButtonGroup,
 	Checkbox,
 	P,
@@ -26,6 +27,7 @@ import {
 	CloseOutline,
 	DownloadSolid,
 	EditSolid,
+	InfoCircleSolid,
 	PlusOutline,
 	RefreshOutline,
 	StopSolid,
@@ -47,6 +49,14 @@ import {
 	postLoggedIn,
 } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
+
+type Data = {
+	about: components["schemas"]["AboutResponse"];
+};
+interface Props {
+	data: Data;
+}
+let { data }: Props = $props();
 
 type SortKey = components["schemas"]["JobSortKey"];
 type Job = components["schemas"]["JobInfo"];
@@ -376,6 +386,13 @@ evtSource.addEventListener("job_updated", (event) => {
 
 <CenterPage title="Your transcription jobs">
   <div class="flex flex-col gap-4">
+    {#if data.about.job_retention_in_days !== null}
+      <Alert>
+        {#snippet icon()}<InfoCircleSolid class="h-5 w-5" />{/snippet}
+        After a job has finished you have {data.about.job_retention_in_days} days to download the transcript before it gets deleted
+      </Alert>
+    {/if}
+
     <div class="flex justify-between items-center">
       <div class="flex items-center gap-4">
         {#if fetchingJobs}
