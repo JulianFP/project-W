@@ -1,0 +1,15 @@
+name: Delete untagged containers
+
+on:
+  workflow_dispatch:
+
+jobs:
+  delete-untagged-containers:
+    steps:
+      - name: Delete untagged containers
+        uses: actions/delete-package-versions@v5
+        with:
+          delete-only-untagged-versions: true
+          min_versions_to_keep: 0
+          package_name: 'your-docker-container-package-name'
+          package_type: 'container'
