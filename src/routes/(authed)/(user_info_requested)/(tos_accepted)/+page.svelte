@@ -480,6 +480,9 @@ evtSource.addEventListener("job_updated", (event) => {
                   <Progressbar color="red" progress={100} size="h-4"/>
                 {:else if job.step === "downloaded"}
                   <Progressbar color="indigo" precision={2} progress={(job.progress < 0) ? 0 : job.progress} size="h-4" labelInside/>
+                {:else if job.step === "aborting"}
+                  <P class="text-orange-700 dark:text-orange-500" size="sm">aborting...</P>
+                  <Progressbar progress={100} size="h-4"/>
                 {:else}
                   <Progressbar color="gray" precision={2} progress={(job.progress < 0) ? 0 : job.progress} size="h-4" labelInside/>
                 {/if}

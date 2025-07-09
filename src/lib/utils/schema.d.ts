@@ -1351,6 +1351,7 @@ export interface components {
 			| "pending_runner"
 			| "runner_assigned"
 			| "runner_in_progress"
+			| "aborting"
 			| "success"
 			| "failed"
 			| "downloaded";
@@ -1494,7 +1495,7 @@ export interface components {
 			version: number;
 			/**
 			 * Tos Html
-			 * @description The terms of services in html format. Include links (with <a>) to external websites if the terms are very long
+			 * @description The terms of services in html format. You may include links to external websites if you want.
 			 */
 			tos_html: string;
 		};
@@ -2676,6 +2677,15 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
+			/** @description The assigned job was aborted by the user */
+			405: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
 			/** @description Validation Error */
 			422: {
 				headers: {
@@ -2728,6 +2738,15 @@ export interface operations {
 			};
 			/** @description This runner is currently not registered as online, or session_token is invalid */
 			403: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description The assigned job was aborted by the user */
+			405: {
 				headers: {
 					[name: string]: unknown;
 				};
@@ -3587,6 +3606,7 @@ export const jobStatusValues: ReadonlyArray<
 	"pending_runner",
 	"runner_assigned",
 	"runner_in_progress",
+	"aborting",
 	"success",
 	"failed",
 	"downloaded",
