@@ -1,7 +1,12 @@
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 
-from aiosmtplib import SMTP, SMTPServerDisconnected
+from aiosmtplib import (
+    SMTP,
+    SMTPRecipientRefused,
+    SMTPRecipientsRefused,
+    SMTPServerDisconnected,
+)
 
 from project_W.models.base import EmailValidated
 
@@ -57,10 +62,23 @@ class SmtpClient:
 
         try:
             await self.client.send_message(msg)
+        except (SMTPRecipientRefused, SMTPRecipientsRefused) as e:
+            # this error is likely due to the users email becoming invalid i.e. because the mail account got deleted
+            self.logger.error(
+                f"The SMTP server refused the recipient email address {receiver.root}: {e}"
+            )
+            return
         except SMTPServerDisconnected:
             # reconnect and try again
             await self.open()
-            await self.client.send_message(msg)
+            try:
+                await self.client.send_message(msg)
+            except (SMTPRecipientRefused, SMTPRecipientsRefused) as e:
+                # this error is likely due to the users email becoming invalid i.e. because the mail account got deleted
+                self.logger.error(
+                    f"The SMTP server refused the recipient email address {receiver.root}: {e}"
+                )
+                return
 
         self.logger.info(f"-> Sent {msg_type} email to {receiver.root}")
 
@@ -118,3 +136,15 @@ class SmtpClient:
         )
         msg_subject = f"Project-W: Job {job_id} failed!"
         await self.__send_email(receiver, "notif-failed", msg_subject, msg_body)
+
+    async def send_account_deletion_reminder(
+        self, receiver: EmailValidated, client_url: str, days_until_deletion: int
+    ):
+        url = f"{client_url}/"
+        msg_body = (
+            f"We noticed that you haven't used the Project-W transcription service {url} for a while.\n"
+            f"If you want to keep using Project-W then please perform a login with your account within the next {days_until_deletion} days.\n"
+            f"Otherwise your account including all it's data will be automatically deleted."
+        )
+        msg_subject = f"Project-W: {days_until_deletion} days account deletion warning"
+        await self.__send_email(receiver, "acc-del-warn", msg_subject, msg_body)

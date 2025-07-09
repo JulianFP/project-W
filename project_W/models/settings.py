@@ -399,6 +399,20 @@ class WebServerSettings(BaseModel):
     )
 
 
+class CleanupSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    finished_job_retention_in_days: int | None = Field(
+        description="For how long to keep finished jobs. If a job is older than this it can be cleaned up by the database cleanup task (please note that you have to setup this task as a cronjob or use the cronjob docker container!). If set to None then job cleanup is disabled",
+        default=None,
+        ge=1,
+    )
+    user_retention_in_days: int | None = Field(
+        description="For how long to keep users and their data. If a user hasn't logged in to Project-W in the specified time frame then the user may be deleted (please note that you have to setup this task as a cronjob or use the cronjob docker container!). If set to None then job cleanup is disabled",
+        default=None,
+        ge=90,
+    )
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_url: str = Field(
@@ -434,3 +448,8 @@ class Settings(BaseModel):
             description="Attribute set of terms of services. The user will have to accept to every one of these separately before they can use the service. The name of the set will be id of the term of service, don't change it once set!",
         ),
     ] = {}
+    cleanup: CleanupSettings = Field(
+        description="Settings regarding cleanups of this server's database. This requires the cronjob to be set up correctly!",
+        default=CleanupSettings(),
+        validate_default=True,
+    )

@@ -163,17 +163,6 @@ jobs:
           path: frontend
           fetch-depth: 0
 
-      - name: Metadata for docker container
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/julianfp/project-w
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
       - name: Setup qemu
         uses: docker/setup-qemu-action@v3
 
@@ -187,7 +176,29 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push Project-W docker image
+      - name: Metadata for backend docker container
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/julianfp/project-w
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Metadata for cron docker container
+        id: meta-cron
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/julianfp/project-w_cron
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build & Push Project-W backend docker image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -198,3 +209,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=ghcr.io/julianfp/project-w:buildcache
           cache-to: type=registry,ref=ghcr.io/julianfp/project-w:buildcache,mode=max
+
+      - name: Build & Push Project-W cron docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./backend/Dockerfile.cron
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-cron.outputs.tags }}
+          labels: ${{ steps.meta-cron.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/julianfp/project-w_cron:buildcache
+          cache-to: type=registry,ref=ghcr.io/julianfp/project-w_cron:buildcache,mode=max

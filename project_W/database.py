@@ -1,6 +1,6 @@
 import secrets
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncGenerator, LiteralString
 
 from argon2 import PasswordHasher
@@ -12,6 +12,8 @@ from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 from pydantic import SecretStr
+
+import project_W.dependencies as dp
 
 from ._version import version, version_tuple
 from .logger import get_logger
@@ -497,6 +499,27 @@ class DatabaseAdapter(ABC):
         token_hash = hash_runner_token(token)
         return await self._get_runner_by_token_hashed(token_hash)
 
+    @abstractmethod
+    async def general_cleanup(self):
+        """
+        Generic cleanup of database entries like orphaned rows and the like
+        """
+        pass
+
+    @abstractmethod
+    async def user_cleanup(self, retention_time_in_days: int):
+        """
+        Cleanup of users and their data who haven't logged in the specified retention time.
+        """
+        pass
+
+    @abstractmethod
+    async def job_cleanup(self, retention_time_in_days: int):
+        """
+        Cleanup of jobs and their data (most notably transcripts!) which are older than the specified retention time (after finishing time, not creation time)
+        """
+        pass
+
 
 class PostgresAdapter(DatabaseAdapter):
     apool: AsyncConnectionPool
@@ -566,6 +589,9 @@ class PostgresAdapter(DatabaseAdapter):
                         raise Exception(
                             f"Critical: The metadata table exists but the {table_name} table is missing. Either restore the {table_name} table with its previous contents or drop the metadata table as well!"
                         )
+
+                # check when the last cleanups were performed and warn the user if it was too long ago
+                await self.__warn_about_missing_cleanups()
 
         self.logger.info("Database is ready to use")
 
@@ -685,10 +711,9 @@ class PostgresAdapter(DatabaseAdapter):
                 [Jsonb(application_metadata)],
             )
             cleanup_metadata = {
+                "general_last_cleanup": datetime.min.isoformat(),
                 "jobs_last_cleanup": datetime.min.isoformat(),
                 "users_last_cleanup": datetime.min.isoformat(),
-                "runners_last_cleanup": datetime.min.isoformat(),
-                "runners_last_cleanup": datetime.min.isoformat(),
             }
             await cur.execute(
                 f"""
@@ -703,6 +728,7 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.users (
                     id int GENERATED ALWAYS AS IDENTITY,
+                    last_login timestamptz NOT NULL DEFAULT NOW(),
                     accepted_tos jsonb NOT NULL DEFAULT '{{}}'::jsonb,
                     primary key (id)
                 )
@@ -839,7 +865,7 @@ class PostgresAdapter(DatabaseAdapter):
                     id int GENERATED ALWAYS AS IDENTITY,
                     user_id int NOT NULL,
                     job_settings_id int,
-                    creation_timestamp timestamptz NOT NULL DEFAULT now(),
+                    creation_timestamp timestamptz NOT NULL DEFAULT NOW(),
                     file_name text NOT NULL,
                     aborting boolean NOT NULL DEFAULT false,
                     audio_oid oid,
@@ -980,6 +1006,49 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     self.logger.info("No database schema migration required")
 
+    async def __warn_about_missing_cleanups(self):
+        async with self.apool.connection() as conn:
+            async with conn.cursor() as cur:
+                self.logger.info("Checking cleanup metadata...")
+                await cur.execute(
+                    f"""
+                        SELECT data['general_last_cleanup'], data['users_last_cleanup'], data['jobs_last_cleanup']
+                        FROM {self.schema}.metadata
+                        WHERE topic = 'cleanup'
+                    """
+                )
+                cleanup_info = await cur.fetchone()
+                if cleanup_info is None:
+                    raise Exception(
+                        "Database doesn't contain cleanup timestamps in the metadata table!"
+                    )
+                (
+                    general_last_cleanup_isoformat,
+                    users_last_cleanup_isoformat,
+                    jobs_last_cleanup_isoformat,
+                ) = cleanup_info
+                general_last_cleanup = datetime.fromisoformat(general_last_cleanup_isoformat)
+                time_since_general_last_cleanup = datetime.now() - general_last_cleanup
+                if time_since_general_last_cleanup.total_seconds() > 86400:
+                    self.logger.warning(
+                        "It's more than 24 hours ago since the general database cleanup was last executed. This may indicate a mistake in your server setup, the general cleanup should always run at least once a day!"
+                    )
+
+                if dp.config.cleanup.user_retention_in_days is not None:
+                    users_last_cleanup = datetime.fromisoformat(users_last_cleanup_isoformat)
+                    time_since_users_last_cleanup = datetime.now() - users_last_cleanup
+                    if time_since_users_last_cleanup.total_seconds() > 86400:
+                        self.logger.warning(
+                            "It's more than 24 hours ago since the users database cleanup was last executed, even though you enabled user database cleanups in the config. This may indicate a mistake in your server setup, the user cleanup should run at least once a day if enabled!"
+                        )
+                if dp.config.cleanup.finished_job_retention_in_days is not None:
+                    jobs_last_cleanup = datetime.fromisoformat(jobs_last_cleanup_isoformat)
+                    time_since_jobs_last_cleanup = datetime.now() - jobs_last_cleanup
+                    if time_since_jobs_last_cleanup.total_seconds() > 86400:
+                        self.logger.warning(
+                            "It's more than 24 hours ago since the jobs database cleanup was last executed, even though you enabled finished jobs database cleanups in the config. This may indicate a mistake in your server setup, the finished job cleanup should run at least once a day if enabled!"
+                        )
+
     async def _add_local_user_hashed(
         self,
         email: EmailValidated,
@@ -1117,6 +1186,14 @@ class PostgresAdapter(DatabaseAdapter):
                             """,
                             (email.root, iss, sub),
                         )
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.users
+                        SET last_login = NOW()
+                        WHERE id = %s
+                        """,
+                        (user.id,),
+                    )
                     return user.id
 
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -1164,6 +1241,14 @@ class PostgresAdapter(DatabaseAdapter):
                             """,
                             (email.root, provider_name, uid),
                         )
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.users
+                        SET last_login = NOW()
+                        WHERE id = %s
+                        """,
+                        (user.id,),
+                    )
                     return user.id
 
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -1352,7 +1437,17 @@ class PostgresAdapter(DatabaseAdapter):
                 """,
                     (email.root,),
                 )
-                return await cur.fetchone()
+                user = await cur.fetchone()
+                if user is not None:
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.users
+                        SET last_login = NOW()
+                        WHERE id = %s
+                        """,
+                        (user.id,),
+                    )
+                return user
 
     async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDbAll | None:
         async with self.apool.connection() as conn:
@@ -1911,7 +2006,7 @@ class PostgresAdapter(DatabaseAdapter):
                 await cur.execute(
                     f"""
                         UPDATE {self.schema}.jobs
-                        SET (audio_oid, finish_timestamp, aborting, downloaded, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url) = (NULL, now(), false, false, %s, %s, %s, %s, %s)
+                        SET (audio_oid, finish_timestamp, aborting, downloaded, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url) = (NULL, NOW(), false, false, %s, %s, %s, %s, %s)
                         WHERE id = %s
                     """,
                     (
@@ -1985,7 +2080,7 @@ class PostgresAdapter(DatabaseAdapter):
                 await cur.execute(
                     f"""
                         UPDATE {self.schema}.jobs
-                        SET (audio_oid, finish_timestamp, aborting, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, error_msg) = (NULL, now(), false, %s, %s, %s, %s, %s, %s)
+                        SET (audio_oid, finish_timestamp, aborting, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, error_msg) = (NULL, NOW(), false, %s, %s, %s, %s, %s, %s)
                         WHERE id = %s
                     """,
                     (
@@ -2005,3 +2100,259 @@ class PostgresAdapter(DatabaseAdapter):
                         """,
                         (audio_oid,),
                     )
+
+    async def general_cleanup(self):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                self.logger.info("Starting general database cleanup...")
+                await cur.execute(
+                    f"""
+                    SELECT data['general_last_cleanup']
+                    FROM {self.schema}.metadata
+                    WHERE topic = 'cleanup'
+                    """
+                )
+                last_cleanup_isoformat = await cur.fetchone()
+                if last_cleanup_isoformat is None:
+                    raise Exception(
+                        "Couldn't find general_last_cleanup timestamp in cleanup topic of the metadata table!"
+                    )
+                last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
+                time_since_last_cleanup = datetime.now() - last_cleanup
+                if time_since_last_cleanup.total_seconds() < 86400:
+                    self.logger.info(
+                        "General cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
+                    )
+                    return
+
+                self.logger.info("Cleaning up orphaned large objects...")
+                await cur.execute(
+                    f"""
+                    SELECT lo_unlink(lo.oid)
+                    FROM pg_largeobject_metadata lo, pg_roles roles
+                    WHERE roles.rolname = current_user
+                    AND lo.lomowner = roles.oid
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM {self.schema}.jobs
+                        WHERE audio_oid = lo.oid
+                    )
+                    """
+                )
+                self.logger.info("Cleaning up orphaned job settings rows...")
+                await cur.execute(
+                    f"""
+                    DELETE FROM {self.schema}.job_settings job_settings
+                    WHERE NOT is_default
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM {self.schema}.jobs
+                        WHERE job_settings_id = job_settings.id
+                    )
+                    """
+                )
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.metadata
+                    SET data['general_last_cleanup'] = %s
+                    WHERE topic = 'cleanup'
+                """,
+                    (Jsonb(datetime.now().isoformat()),),
+                )
+        self.logger.info("General database cleanup complete")
+
+    async def user_cleanup(self, retention_time_in_days: int):
+        assert dp.config.cleanup.user_retention_in_days is not None
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                self.logger.info("Starting user database cleanup...")
+                await cur.execute(
+                    f"""
+                    SELECT data['users_last_cleanup']
+                    FROM {self.schema}.metadata
+                    WHERE topic = 'cleanup'
+                    """
+                )
+                last_cleanup_isoformat = await cur.fetchone()
+                if last_cleanup_isoformat is None:
+                    raise Exception(
+                        "Couldn't find users_last_cleanup timestamp in cleanup topic of the metadata table!"
+                    )
+                last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
+                time_since_last_cleanup = datetime.now() - last_cleanup
+                if time_since_last_cleanup.total_seconds() < 86400:
+                    self.logger.info(
+                        "User cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
+                    )
+                    return
+
+                self.logger.info(
+                    f"Cleaning up users that haven't logged in {retention_time_in_days} days..."
+                )
+                # first send emails out to users who's accounts will be deleted in 30 days/7 days
+                users_30_days_notif = []
+                users_7_days_notif = []
+                await cur.execute(
+                    f"""
+                    SELECT la.email
+                    FROM {self.schema}.users users, {self.schema}.local_accounts la
+                    WHERE users.id = la.id
+                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    AND la.provision_number IS NULL
+                    """,
+                    (
+                        timedelta(days=retention_time_in_days - 31),
+                        timedelta(days=retention_time_in_days - 30),
+                    ),
+                )
+                users_30_days_notif += await cur.fetchall()
+                await cur.execute(
+                    f"""
+                    SELECT oa.email
+                    FROM {self.schema}.users users, {self.schema}.oidc_accounts oa
+                    WHERE users.id = oa.id
+                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    """,
+                    (
+                        timedelta(days=retention_time_in_days - 31),
+                        timedelta(days=retention_time_in_days - 30),
+                    ),
+                )
+                users_30_days_notif += await cur.fetchall()
+                await cur.execute(
+                    f"""
+                    SELECT lda.email
+                    FROM {self.schema}.users users, {self.schema}.ldap_accounts lda
+                    WHERE users.id = lda.id
+                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    """,
+                    (
+                        timedelta(days=retention_time_in_days - 31),
+                        timedelta(days=retention_time_in_days - 30),
+                    ),
+                )
+                users_30_days_notif += await cur.fetchall()
+                await cur.execute(
+                    f"""
+                    SELECT la.email
+                    FROM {self.schema}.users users, {self.schema}.local_accounts la
+                    WHERE users.id = la.id
+                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    AND la.provision_number IS NULL
+                    """,
+                    (
+                        timedelta(days=retention_time_in_days - 8),
+                        timedelta(days=retention_time_in_days - 7),
+                    ),
+                )
+                users_7_days_notif += await cur.fetchall()
+                await cur.execute(
+                    f"""
+                    SELECT oa.email
+                    FROM {self.schema}.users users, {self.schema}.oidc_accounts oa
+                    WHERE users.id = oa.id
+                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    """,
+                    (
+                        timedelta(days=retention_time_in_days - 8),
+                        timedelta(days=retention_time_in_days - 7),
+                    ),
+                )
+                users_7_days_notif += await cur.fetchall()
+                await cur.execute(
+                    f"""
+                    SELECT lda.email
+                    FROM {self.schema}.users users, {self.schema}.ldap_accounts lda
+                    WHERE users.id = lda.id
+                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    """,
+                    (
+                        timedelta(days=retention_time_in_days - 8),
+                        timedelta(days=retention_time_in_days - 7),
+                    ),
+                )
+                users_7_days_notif += await cur.fetchall()
+                for email in users_30_days_notif:
+                    await dp.smtp.send_account_deletion_reminder(
+                        EmailValidated(email), dp.config.client_url, 30
+                    )
+                self.logger.info(
+                    f"Sent 30 day account deletion reminder to {len(users_30_days_notif)} users"
+                )
+                for email in users_7_days_notif:
+                    await dp.smtp.send_account_deletion_reminder(
+                        EmailValidated(email), dp.config.client_url, 7
+                    )
+                self.logger.info(
+                    f"Sent 7 day account deletion reminder to {len(users_7_days_notif)} users"
+                )
+
+                await cur.execute(
+                    f"""
+                    DELETE
+                    FROM {self.schema}.users users
+                    WHERE users.last_login < NOW() - %s
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM {self.schema}.local_accounts la
+                        WHERE la.id = users.id
+                        AND la.provision_number IS NOT NULL
+                    )
+                    """,
+                    (timedelta(days=retention_time_in_days),),
+                )
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.metadata
+                    SET data['users_last_cleanup'] = %s
+                    WHERE topic = 'cleanup'
+                """,
+                    (Jsonb(datetime.now().isoformat()),),
+                )
+        self.logger.info("User database cleanup complete")
+
+    async def job_cleanup(self, retention_time_in_days: int):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                self.logger.info("Starting job database cleanup...")
+                await cur.execute(
+                    f"""
+                    SELECT data['jobs_last_cleanup']
+                    FROM {self.schema}.metadata
+                    WHERE topic = 'cleanup'
+                    """
+                )
+                last_cleanup_isoformat = await cur.fetchone()
+                if last_cleanup_isoformat is None:
+                    raise Exception(
+                        "Couldn't find jobs_last_cleanup timestamp in cleanup topic of the metadata table!"
+                    )
+                last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
+                time_since_last_cleanup = datetime.now() - last_cleanup
+                if time_since_last_cleanup.total_seconds() < 86400:
+                    self.logger.info(
+                        "Job cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
+                    )
+                    return
+
+                self.logger.info(
+                    f"Cleaning up jobs that have finished more than {retention_time_in_days} days ago..."
+                )
+                await cur.execute(
+                    f"""
+                    DELETE
+                    FROM {self.schema}.jobs
+                    WHERE finish_timestamp IS NOT NULL
+                    AND finish_timestamp < NOW() - %s
+                    """,
+                    (timedelta(days=retention_time_in_days),),
+                )
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.metadata
+                    SET data['jobs_last_cleanup'] = %s
+                    WHERE topic = 'cleanup'
+                """,
+                    (Jsonb(datetime.now().isoformat()),),
+                )
+        self.logger.info("Job database cleanup complete")

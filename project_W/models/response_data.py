@@ -47,6 +47,7 @@ class AboutResponse(BaseModel):
     git_hash: str
     imprint: ImprintSettings | None
     terms_of_services: dict[int, TosSettings]
+    job_retention_in_days: int | None
 
 
 class TokenSecretInfo(BaseModel):

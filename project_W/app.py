@@ -187,6 +187,7 @@ async def about() -> AboutResponse:
         git_hash=str(__version_tuple__[-1]).split(".")[0].removeprefix("g"),
         imprint=dp.config.imprint,
         terms_of_services=dp.config.terms_of_services,
+        job_retention_in_days=dp.config.cleanup.finished_job_retention_in_days,
     )
 
 
