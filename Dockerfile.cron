@@ -12,6 +12,6 @@ COPY ./backend .
 RUN --mount=source=./backend/.git,target=.git,type=bind \
     pip install --no-cache-dir --upgrade -e .
 
-RUN crontab -l | { cat; echo "0 0 * * * python -m project_W --run_periodic_tasks"; } | crontab -
+RUN crontab -l | { cat; echo "0 0 * * * python -m project_W --run_periodic_tasks > /dev/stdout 2>&1"; } | crontab -
 
-CMD cron
+CMD ["cron", "-f"]
