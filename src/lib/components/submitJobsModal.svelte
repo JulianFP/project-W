@@ -135,7 +135,7 @@ async function submitAction(event: Event): Promise<void> {
   <Heading tag="h3">{files !== null && files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"}</Heading>
   <JobSettingsForm onsubmit={submitAction} bind:get_job_settings={get_job_settings}>
     <div class="flex gap-2 items-center">
-      <Checkbox bind:checked={makeNewDefaults}><P>Make these job settings the new account defaults</P></Checkbox>
+      <Checkbox id="make_new_account_defaults" bind:checked={makeNewDefaults}><P>Make these job settings the new account defaults</P></Checkbox>
       <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
       <Tooltip placement="bottom">The current job settings will become the new account-wide default. Every job you create in the future will have these settings set by default. You can view, change and reset the defaults in the account settings at any time.</Tooltip>
     </div>

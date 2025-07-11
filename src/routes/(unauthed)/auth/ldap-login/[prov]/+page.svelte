@@ -58,7 +58,7 @@ async function postLogin(event: Event): Promise<void> {
     <div class="mb-6">
       <Label for="username" color={error ? "red" : "gray"} class="mb-2">Username</Label>
       <!-- set type, id, name and autocomplete  according to chromes recommendations: https://www.chromium.org/developers/design-documents/form-styles-that-chromium-understands//>-->
-      <Input type="text" id="username" name="username" autocomplete="username" color={error ? "red" : "default"} placeholder="alice" required bind:value={username} tabindex={1}/>
+      <Input id="username" type="text" name="username" autocomplete="username" color={error ? "red" : "default"} placeholder="alice" required bind:value={username} tabindex={1}/>
     </div>
     <PasswordField bind:value={password} bind:error={error} tabindex={2}>Password</PasswordField>
 

@@ -46,7 +46,7 @@ async function changeUserEmail(): Promise<void> {
 
 <form onsubmit={openModal}>
   <Label for="email" color={error ? "red" : "gray"} class="mb-2">Email address</Label>
-  <Input class="ps-10" type="email" id="email" name="email" autocomplete="email" color={error ? "red" : "default"} required oninput={() => {error = false}} bind:value={email} readonly={lockedInput || null} {...rest}>
+  <Input id="email" class="ps-10" type="email" name="email" autocomplete="email" color={error ? "red" : "default"} required oninput={() => {error = false}} bind:value={email} readonly={lockedInput || null} {...rest}>
     {#snippet left()}
 			<button type="button" class="pointer-events-auto cursor-pointer" onclick={toggleLock}>
 	      {#if lockedInput}

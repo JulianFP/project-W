@@ -335,7 +335,7 @@ function onTranslationChange() {
           <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
           <Tooltip placement="bottom">In the audio are at least this many different people speaking. Set this to the same as 'Max speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
         </div>
-        <Input type="number" min="0" step="1" id="diarization_min_speakers" bind:value={diarization_min_speakers}/>
+        <Input id="diarization_min_speakers" type="number" min="0" step="1" bind:value={diarization_min_speakers}/>
       </div>
       <div class="w-full">
         <div class="flex gap-2 items-center mb-2">
@@ -343,7 +343,7 @@ function onTranslationChange() {
           <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
           <Tooltip placement="bottom">In the audio are at most this many different people speaking. Set this to the same as 'Min speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
         </div>
-        <Input type="number" min="0" step="1" id="diarization_max_speakers" bind:value={diarization_max_speakers}/>
+        <Input id="diarization_max_speakers" type="number" min="0" step="1" bind:value={diarization_max_speakers}/>
       </div>
     </div>
   {/if}
@@ -386,11 +386,11 @@ function onTranslationChange() {
           <div class="flex gap-4">
             <div class="w-full">
               <div class="flex gap-2 items-center mb-2">
-                <Label for="aligment_processing_max_line_width">Max line width</Label>
+                <Label for="alignment_processing_max_line_width">Max line width</Label>
                 <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
                 <Tooltip placement="bottom">The maximum number of characters in a line before breaking the line.</Tooltip>
               </div>
-              <Input type="number" min="1" step="1" id="alignment_processing_max_line_width" bind:value={alignment_processing_max_line_width} placeholder="Leave empty for no limit"/>
+              <Input id="alignment_processing_max_line_width" type="number" min="1" step="1" bind:value={alignment_processing_max_line_width} placeholder="Leave empty for no limit"/>
             </div>
             <div class="w-full">
               <div class="flex gap-2 items-center mb-2">
@@ -398,7 +398,7 @@ function onTranslationChange() {
                 <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
                 <Tooltip placement="bottom">The maximum number of lines in a segment (can only be set if 'Max line width' is also set).</Tooltip>
               </div>
-              <Input type="number" min="1" step="1" id="alignment_processing_max_line_count" bind:value={alignment_processing_max_line_count} placeholder="Leave empty for no limit"/>
+              <Input id="alignment_processing_max_line_count" type="number" min="1" step="1" bind:value={alignment_processing_max_line_count} placeholder="Leave empty for no limit"/>
             </div>
           </div>
           <div>
@@ -460,7 +460,7 @@ function onTranslationChange() {
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
             <Tooltip placement="bottom">Number of beams in beam search, only applicable when temperature is zero.</Tooltip>
           </div>
-          <Input type="number" min="1" step="1" id="asr_beam_size" bind:value={asr_beam_size}/>
+          <Input id="asr_beam_size" type="number" min="1" step="1" bind:value={asr_beam_size}/>
         </div>
         <div>
           <div class="flex gap-2 items-center mb-2">
@@ -468,7 +468,7 @@ function onTranslationChange() {
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
             <Tooltip placement="bottom">Optional patience value to use in beam decoding, the default (1.0) is equivalent to conventional beam search.</Tooltip>
           </div>
-          <Input type="number" min="0.0" step="0.001" id="asr_patience" bind:value={asr_patience}/>
+          <Input id="asr_patience" type="number" min="0.0" step="0.001" bind:value={asr_patience}/>
         </div>
         <div>
           <div class="flex gap-2 items-center mb-2">
@@ -476,7 +476,7 @@ function onTranslationChange() {
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
             <Tooltip placement="bottom">Optional token length penalty coefficient (alpha), uses simple length normalization by default.</Tooltip>
           </div>
-          <RangeWithField min="0.0" max="1.0" step="0.001" id="asr_length_penalty" bind:value={asr_length_penalty}/>
+          <RangeWithField id="asr_length_penalty" min="0.0" max="1.0" step="0.001" bind:value={asr_length_penalty}/>
         </div>
         <div class="flex gap-4">
           <div class="w-full">
@@ -485,7 +485,7 @@ function onTranslationChange() {
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
               <Tooltip placement="bottom">Temperature to use for sampling.</Tooltip>
             </div>
-            <Input type="number" min="0.0" step="0.001" id="asr_temperature" bind:value={asr_temperature}/>
+            <Input id="asr_temperature" type="number" min="0.0" step="0.001" bind:value={asr_temperature}/>
           </div>
           <div class="w-full">
             <div class="flex gap-2 items-center mb-2">
@@ -493,7 +493,7 @@ function onTranslationChange() {
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
               <Tooltip placement="bottom">Temperature to increase when falling back when the decoding fails to meet either of the thresholds below.</Tooltip>
             </div>
-            <Input type="number" min="0.0" step="0.001" id="asr_temperature_increment_on_fallback" bind:value={asr_temperature_increment_on_fallback}/>
+            <Input id="asr_temperature_increment_on_fallback" type="number" min="0.0" step="0.001" bind:value={asr_temperature_increment_on_fallback}/>
           </div>
         </div>
         <div>
@@ -502,7 +502,7 @@ function onTranslationChange() {
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
               <Tooltip placement="bottom">If the gzip compression ratio is higher than this value, treat the decoding as failed.</Tooltip>
           </div>
-          <Input type="number" min="0.0" step="0.001" id="asr_compression_ratio_threshold" bind:value={asr_compression_ratio_threshold}/>
+          <Input id="asr_compression_ratio_threshold" type="number" min="0.0" step="0.001" bind:value={asr_compression_ratio_threshold}/>
         </div>
         <div>
           <div class="flex gap-2 items-center mb-2">
@@ -510,7 +510,7 @@ function onTranslationChange() {
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
             <Tooltip placement="bottom">If the average log probability is lower than this value, treat the decoding as failed.</Tooltip>
           </div>
-          <Input type="number" id="asr_log_prob_threshold" bind:value={asr_log_prob_threshold}/>
+          <Input id="asr_log_prob_threshold" type="number" bind:value={asr_log_prob_threshold}/>
         </div>
         <div>
           <div class="flex gap-2 items-center mb-2">
@@ -518,7 +518,7 @@ function onTranslationChange() {
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
             <Tooltip placement="bottom">If the probability of the &lt;&#124;nospeech&#124;&gt; token is higher than this value AND the decoding has failed due to 'Log prob threshold', consider the segment as silence.</Tooltip>
           </div>
-          <Input type="number" step="0.001" id="asr_no_speech_threshold" bind:value={asr_no_speech_threshold}/>
+          <Input id="asr_no_speech_threshold" type="number" step="0.001" bind:value={asr_no_speech_threshold}/>
         </div>
         <div>
           <div class="flex gap-2 items-center mb-2">
@@ -526,7 +526,7 @@ function onTranslationChange() {
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
             <Tooltip placement="bottom">Comma-separated list of token ids to suppress during sampling; '-1' will suppress most special characters except common punctuations.</Tooltip>
           </div>
-          <Input type="text" id="asr_suppressed_tokens" bind:value={asr_suppressed_tokens}/>
+          <Input id="asr_suppressed_tokens" type="text" bind:value={asr_suppressed_tokens}/>
         </div>
         <div class="flex gap-2 items-center">
           <Checkbox id="asr_suppress_numerals" bind:checked={asr_suppress_numerals}>

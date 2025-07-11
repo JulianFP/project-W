@@ -75,7 +75,7 @@ async function acceptTos(): Promise<void> {
           <div class="flowbite-anchors text-gray-900 dark:text-white my-2">
             {@html data.about.terms_of_services[tos_id].tos_html}
           </div>
-          <Checkbox bind:checked={not_accepted_tos[i][1]} tabindex={i+1}><P>I have read the terms and conditions above ({data.about.terms_of_services[tos_id].name}) and hereby agree to them</P></Checkbox>
+          <Checkbox id={`accept_tos_${tos_id}`} bind:checked={not_accepted_tos[i][1]} tabindex={i+1}><P>I have read the terms and conditions above ({data.about.terms_of_services[tos_id].name}) and hereby agree to them</P></Checkbox>
         </div>
       {/each}
       {#if error}
