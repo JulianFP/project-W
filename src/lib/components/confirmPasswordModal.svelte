@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Heading, Helper, Modal, P } from "flowbite-svelte";
+import { Helper, Modal, P } from "flowbite-svelte";
 
 import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 import PasswordField from "./passwordField.svelte";
@@ -25,9 +25,8 @@ let {
 	children,
 }: Props = $props();
 
-async function submitAction(event: Event): Promise<void> {
+async function submitAction(): Promise<void> {
 	waitingForPromise = true;
-	event.preventDefault();
 	error = false;
 	errorMsg = "";
 
@@ -53,16 +52,20 @@ async function submitAction(event: Event): Promise<void> {
 
 	waitingForPromise = false;
 }
+
+function onAction(params: { action: string; data: FormData }): boolean {
+	if (params.action === "submit") {
+		submitAction();
+	}
+	return false;
+}
 </script>
 
-<Modal bind:open={open} autoclose={false} class="w-fit">
-  <form class="flex flex-col space-y-6" onsubmit={submitAction}>
-    <Heading tag="h3">Confirm by entering your password</Heading>
-    <P>{@render children?.()}</P>
-    <PasswordField bind:value={value} bind:error={error}>Your password</PasswordField>
-    {#if error}
-      <Helper color="red">{errorMsg}</Helper>
-    {/if}
-    <WaitingSubmitButton class="w-full1" waiting={waitingForPromise}>Confirm</WaitingSubmitButton>
-  </form>
+<Modal form title="Confirm by entering your password" bind:open={open} onaction={onAction} class="w-fit">
+  <P>{@render children?.()}</P>
+  <PasswordField bind:value={value} bind:error={error}>Your password</PasswordField>
+  {#if error}
+    <Helper color="red">{errorMsg}</Helper>
+  {/if}
+  <WaitingSubmitButton value="submit" class="w-full" waiting={waitingForPromise}>Confirm</WaitingSubmitButton>
 </Modal>

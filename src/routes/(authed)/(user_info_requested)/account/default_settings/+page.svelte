@@ -44,7 +44,8 @@ async function submitAction(reset: boolean) {
 </script>
 
 <CenterPage title="Account default job settings">
-  <JobSettingsForm onsubmit={async () => {await submitAction(false);}} bind:get_job_settings={get_job_settings} bind:re_query={requery_job_settings}>
+  <form onsubmit={async () => {await submitAction(false);}}>
+    <JobSettingsForm bind:get_job_settings={get_job_settings} bind:re_query={requery_job_settings}/>
     {#if error}
       <Helper class="mb-2" color="red">{errorMsg}</Helper>
     {/if}
@@ -53,5 +54,5 @@ async function submitAction(reset: boolean) {
       <WaitingSubmitButton class="w-full" waiting={waiting}>Set default to selected values</WaitingSubmitButton>
       <WaitingSubmitButton class="w-full" color="alternative" type="button" onclick={async () => {await submitAction(true);}} waiting={waiting}>Reset to application-wide defaults</WaitingSubmitButton>
     </div>
-  </JobSettingsForm>
+  </form>
 </CenterPage>

@@ -403,8 +403,8 @@ evtSource.addEventListener("job_updated", (event) => {
           <Button pill size="sm" class="p-2!" onclick={fetch_jobs}><RefreshOutline class="h-6 w-6"/></Button>
         {/if}
         <div>
-          <Checkbox id="hide_finished_jobs" bind:checked={exclude_finished} onchange={fetch_jobs}><P>Hide finished jobs</P></Checkbox>
-          <Checkbox id="hide_downloaded_jobs" bind:checked={exclude_downloaded} disabled={exclude_finished} onchange={fetch_jobs}><P>Hide downloaded jobs</P></Checkbox>
+          <Checkbox id="hide_finished_jobs" bind:checked={exclude_finished} onchange={fetch_jobs}>Hide finished jobs</Checkbox>
+          <Checkbox id="hide_downloaded_jobs" bind:checked={exclude_downloaded} disabled={exclude_finished} onchange={fetch_jobs}>Hide downloaded jobs</Checkbox>
         </div>
       </div>
       <Button pill onclick={() => openSubmitModal()}><PlusOutline class="mr-2"/>New Job</Button>

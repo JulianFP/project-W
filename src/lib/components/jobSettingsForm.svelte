@@ -8,7 +8,6 @@ import {
 	Heading,
 	Input,
 	Label,
-	P,
 	Select,
 	Textarea,
 	Tooltip,
@@ -25,12 +24,7 @@ import {
 import RangeWithField from "./rangeWithField.svelte";
 import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-let {
-	onsubmit,
-	children,
-	get_job_settings = $bindable(),
-	re_query = $bindable(),
-} = $props();
+let { get_job_settings = $bindable(), re_query = $bindable() } = $props();
 
 get_job_settings = () => {
 	return job_settings;
@@ -280,10 +274,10 @@ function onTranslationChange() {
 }
 </script>
 
-<form class="flex flex-col gap-4" {onsubmit}>
+<div class="flex flex-col gap-4">
   <div class="flex gap-2 items-center">
     <Checkbox id="email_notification" bind:checked={email_notification}>
-      <P>Receive an email notification upon job completion</P>
+      Receive an email notification upon job completion
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
     <Tooltip placement="bottom">You will receive an email once the job has finished or failed.</Tooltip>
@@ -305,7 +299,7 @@ function onTranslationChange() {
 
   <div class="flex gap-2 items-center">
     <Checkbox id="translate" bind:checked={translate} disabled={language === "en"} onchange={onTranslationChange}>
-      <P>Translate into English</P>
+      Translate into English
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
     <Tooltip placement="bottom">Translate the transcription into English (starting from any other language). Currently English is the only supported target language.</Tooltip>
@@ -313,7 +307,7 @@ function onTranslationChange() {
 
   <div class="flex gap-2 items-center">
     <Checkbox id="alignment-enabled" bind:checked={alignment} disabled={(language !== "detect" && !supportedAlignmentLangs.includes(language)) || translate}>
-      <P>Enable improved timestamp alignment</P>
+      Enable improved timestamp alignment
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
     <Tooltip placement="bottom">This will align each part of the transcript with timestamps at which it was being spoken. Only supported for some languages.</Tooltip>
@@ -321,7 +315,7 @@ function onTranslationChange() {
 
   <div class="flex gap-2 items-center">
     <Checkbox id="diarization-enable" bind:checked={diarization}>
-      <P>Enable speaker diarization</P>
+      Enable speaker diarization
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
     <Tooltip placement="bottom">Adds speaker labels to the transcript that will indicate who was speaking at any given part.</Tooltip>
@@ -370,14 +364,14 @@ function onTranslationChange() {
           <div class="flex gap-4">
             <div class="w-full flex gap-2 items-center">
               <Checkbox id="alignment_processing_highlight_words" bind:checked={alignment_processing_highlight_words}>
-                <P>Highlight words</P>
+                Highlight words
               </Checkbox>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
               <Tooltip placement="bottom">Underline each word as it is spoken in the .srt and .vtt outputs. For example if used for subtitles this would mean that the word that is currently being spoken is underlined in the subtitle.</Tooltip>
             </div>
             <div class="w-full flex gap-2 items-center">
               <Checkbox id="alignment_return_char_alignments" bind:checked={alignment_return_char_alignments}>
-                <P>Return character alignments</P>
+                Return character alignments
               </Checkbox>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
               <Tooltip placement="bottom">Return character-level alignments/timestamps in the .json output.</Tooltip>
@@ -530,7 +524,7 @@ function onTranslationChange() {
         </div>
         <div class="flex gap-2 items-center">
           <Checkbox id="asr_suppress_numerals" bind:checked={asr_suppress_numerals}>
-            <P>Suppress numerals</P>
+            Suppress numerals
           </Checkbox>
           <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
           <Tooltip placement="bottom">Whether to suppress numeric symbols and currency symbols during sampling, since wav2vec2 cannot align them correctly.</Tooltip>
@@ -539,6 +533,4 @@ function onTranslationChange() {
     </AccordionItem>
   </Accordion>
   <WaitingSubmitButton type="button" color="alternative" onclick={setToDefault} waiting={wait_for_reset}><RedoOutline class="mr-2"/>Reset values to account defaults</WaitingSubmitButton>
-
-  {@render children?.()}
-</form>
+</div>
