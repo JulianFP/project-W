@@ -12,7 +12,7 @@ from .base import (
     ProviderSettingsBase,
     UserInDb,
 )
-from .request_data import JobSettings
+from .request_data import JobSettings, SiteBanner
 from .settings import ImprintSettings, TosSettings
 
 
@@ -40,6 +40,10 @@ class ErrorResponse(BaseModel):
         }
 
 
+class SiteBannerResponse(SiteBanner):
+    id: int
+
+
 class AboutResponse(BaseModel):
     description: str
     source_code: str
@@ -48,6 +52,7 @@ class AboutResponse(BaseModel):
     imprint: ImprintSettings | None
     terms_of_services: dict[int, TosSettings]
     job_retention_in_days: int | None
+    site_banners: list[SiteBannerResponse]
 
 
 class TokenSecretInfo(BaseModel):

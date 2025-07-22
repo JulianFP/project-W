@@ -35,7 +35,7 @@ from .models.internal import (
     UserInDbAll,
 )
 from .models.request_data import JobSettings, Transcript, TranscriptTypeEnum
-from .models.response_data import RunnerCreatedInfo, TokenSecretInfo
+from .models.response_data import RunnerCreatedInfo, SiteBannerResponse, TokenSecretInfo
 from .utils import hash_runner_token, parse_version_tuple
 
 
@@ -520,6 +520,27 @@ class DatabaseAdapter(ABC):
         """
         pass
 
+    @abstractmethod
+    async def add_site_banner(self, urgency: int, html: str) -> int | None:
+        """
+        Creates a new site banner. Returns it's id if Successful, returns None if not
+        """
+        pass
+
+    @abstractmethod
+    async def list_site_banners(self) -> list[SiteBannerResponse]:
+        """
+        List all site banners
+        """
+        pass
+
+    @abstractmethod
+    async def delete_site_banner(self, id: int):
+        """
+        List site banner with provided id
+        """
+        pass
+
 
 class PostgresAdapter(DatabaseAdapter):
     apool: AsyncConnectionPool
@@ -552,6 +573,7 @@ class PostgresAdapter(DatabaseAdapter):
             await self.__ensure_postgresql_version(conn)
 
             table_names: list[LiteralString] = [
+                "site_data",
                 "users",
                 "local_accounts",
                 "oidc_accounts",
@@ -731,6 +753,18 @@ class PostgresAdapter(DatabaseAdapter):
                     last_login timestamptz NOT NULL DEFAULT NOW(),
                     accepted_tos jsonb NOT NULL DEFAULT '{{}}'::jsonb,
                     primary key (id)
+                )
+            """
+            )
+
+            self.logger.info("Creating site_data table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.site_data (
+                    id int GENERATED ALWAYS AS IDENTITY,
+                    type text NOT NULL,
+                    urgency int NOT NULL,
+                    html text NOT NULL
                 )
             """
             )
@@ -2356,3 +2390,42 @@ class PostgresAdapter(DatabaseAdapter):
                     (Jsonb(datetime.now().isoformat()),),
                 )
         self.logger.info("Job database cleanup complete")
+
+    async def add_site_banner(self, urgency: int, html: str) -> int | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.site_data (type, urgency, html)
+                    VALUES ('banner', %s, %s)
+                    RETURNING id
+                """,
+                    (urgency, html),
+                )
+                return await cur.fetchone()
+
+    async def list_site_banners(self) -> list[SiteBannerResponse]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(SiteBannerResponse)) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT id,urgency,html
+                    FROM {self.schema}.site_data
+                    WHERE type = 'banner'
+                    ORDER BY urgency DESC
+                    """
+                )
+                return await cur.fetchall()
+
+    async def delete_site_banner(self, id: int):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(SiteBannerResponse)) as cur:
+                await cur.execute(
+                    f"""
+                    DELETE
+                    FROM {self.schema}.site_data
+                    WHERE type = 'banner'
+                    AND id = %s
+                    """,
+                    (id,),
+                )

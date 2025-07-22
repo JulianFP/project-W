@@ -149,7 +149,7 @@ app = FastAPI(
         {
             "name": dp.config.imprint.name,
             "email": dp.config.imprint.email.root,
-            "url": f"{dp.config.client_url}/about",
+            "url": f"{dp.config.client_url}/imprint",
         }
         if dp.config.imprint
         else None
@@ -188,6 +188,7 @@ async def about() -> AboutResponse:
         imprint=dp.config.imprint,
         terms_of_services=dp.config.terms_of_services,
         job_retention_in_days=dp.config.cleanup.finished_job_retention_in_days,
+        site_banners=await dp.db.list_site_banners(),
     )
 
 

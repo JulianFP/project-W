@@ -61,3 +61,8 @@ class HeartbeatRequest(BaseModel):
         le=100.0,
         default=0.0,
     )
+
+
+class SiteBanner(BaseModel):
+    html: str
+    urgency: int
