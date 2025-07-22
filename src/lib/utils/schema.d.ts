@@ -184,6 +184,44 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	"/api/admins/add_site_banner": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Add Site Banner
+		 * @description Add a new banner to the website that will be broadcasted to all users. Returns the id of the created banner.
+		 *     Banners with higher urgency will be displayed first. Banners with an urgency of 100 and more will additionally be highlighted in red.
+		 */
+		post: operations["add_site_banner_api_admins_add_site_banner_post"];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	"/api/admins/delete_site_banner": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Delete Site Banner */
+		delete: operations["delete_site_banner_api_admins_delete_site_banner_delete"];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	"/api/jobs/submit_settings": {
 		parameters: {
 			query?: never;
@@ -799,6 +837,8 @@ export interface components {
 			};
 			/** Job Retention In Days */
 			job_retention_in_days: number | null;
+			/** Site Banners */
+			site_banners: components["schemas"]["SiteBannerResponse"][];
 		};
 		/** AlignmentProcessingSettings */
 		AlignmentProcessingSettings: {
@@ -1469,6 +1509,22 @@ export interface components {
 			email: components["schemas"]["EmailValidated"];
 			password: components["schemas"]["PasswordValidated"];
 		};
+		/** SiteBanner */
+		SiteBanner: {
+			/** Html */
+			html: string;
+			/** Urgency */
+			urgency: number;
+		};
+		/** SiteBannerResponse */
+		SiteBannerResponse: {
+			/** Html */
+			html: string;
+			/** Urgency */
+			urgency: number;
+			/** Id */
+			id: number;
+		};
 		/**
 		 * TaskEnum
 		 * @enum {string}
@@ -1969,6 +2025,110 @@ export interface operations {
 				};
 				content: {
 					"application/json": string;
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
+		};
+	};
+	add_site_banner_api_admins_add_site_banner_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				"application/json": components["schemas"]["SiteBanner"];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": number;
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
+		};
+	};
+	delete_site_banner_api_admins_delete_site_banner_delete: {
+		parameters: {
+			query: {
+				banner_id: number;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": unknown;
 				};
 			};
 			/** @description Validation error of JWT token */

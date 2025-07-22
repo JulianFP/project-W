@@ -507,18 +507,18 @@ evtSource.addEventListener("job_updated", (event) => {
               <TableBodyCell class="pr-4 py-4 whitespace-nowrap font-medium text-center">
                 <ButtonGroup>
                   {#if (["not_queued", "pending_runner", "runner_assigned", "runner_in_progress"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e) => {e.stopPropagation(); openAbortModal([job.id]);}}>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e: MouseEvent) => {e.stopPropagation(); openAbortModal([job.id]);}}>
 
                       <StopSolid color="red"/>
                     </Button>
                   {:else if (["success", "downloaded", "failed"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e) => {e.stopPropagation(); openDeleteModal([job.id]);}}>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e: MouseEvent) => {e.stopPropagation(); openDeleteModal([job.id]);}}>
 
                       <TrashBinSolid color="red"/>
                     </Button>
                   {/if}
                   {#if (["success", "downloaded"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e) => {e.stopPropagation(); openDownloadModal(job_id, job.file_name);}}>
+                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e: MouseEvent) => {e.stopPropagation(); openDownloadModal(job_id, job.file_name);}}>
                       <DownloadSolid/>
                     </Button>
                   {/if}

@@ -23,28 +23,6 @@ let [frontend_version, frontend_git_hash] = version.split("|");
     <P>Project W is a self-hostable <Span class="decoration-blue-400 dark:decoration-blue-600" underline>platform</Span> on which users can create <Span class="decoration-orange-400 dark:decoration-orange-500" underline>transcripts</Span> of their audio files (<Span class="decoration-green-400 dark:decoration-green-600" underline>speech-to-text</Span>). It leverages <Span class="decoration-violet-400 dark:decoration-violet-600" underline>OpenAIs Whisper</Span> model for the actual transcription while providing an <Span class="decoration-fuchsia-400 dark:decoration-fuchsia-600" underline>easy-to-use</Span> interface on which users can create and manage their transcription jobs.</P>
   </div>
 
-  {#if data.about.imprint}
-    <Hr class="bg-gray-400 w-96 h-1 mx-auto my-0 rounded"/>
-
-    <div class="flowbite-anchors">
-      <Heading tag="h4" class="mb-2">Imprint of this instance</Heading>
-      <dl class="text-gray-900 dark:text-white flex flex-col gap-2">
-        <div>
-          <dt><strong>Name:</strong></dt>
-          <dd><Span highlight="blue">{data.about.imprint.name}</Span></dd>
-        </div>
-        <div>
-          <dt><strong>Email:</strong></dt>
-          <dt><A href="mailto:{data.about.imprint.email}">{data.about.imprint.email}</A></dt>
-        </div>
-
-        {#if data.about.imprint.additional_imprint_html}
-          {@html data.about.imprint.additional_imprint_html}
-        {/if}
-      </dl>
-    </div>
-  {/if}
-
   <Hr class="bg-gray-400 w-96 h-1 mx-auto my-0 rounded"/>
 
   <div>
