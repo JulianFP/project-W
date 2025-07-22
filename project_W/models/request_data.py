@@ -66,3 +66,8 @@ class HeartbeatRequest(BaseModel):
 class SiteBanner(BaseModel):
     html: str
     urgency: int
+
+
+class EmailToUsers(BaseModel):
+    subject: str
+    body: str

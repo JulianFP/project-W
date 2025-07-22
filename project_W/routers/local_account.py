@@ -330,7 +330,10 @@ async def change_user_email(
     """
     Change the email address of a local Project-W account. This change will only take effect after the user has clicked on the link in the activation email that this route sends to the new email address.
     """
-    if new_email.get_domain() not in dp.config.security.local_account.allowed_email_domains:
+    if (
+        dp.config.security.local_account.allowed_email_domains
+        and new_email.get_domain() not in dp.config.security.local_account.allowed_email_domains
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"'{new_email.get_domain()}' is not not an allowed email domain on this server",

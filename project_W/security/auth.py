@@ -107,7 +107,7 @@ def validate_user(require_verified: bool, require_admin: bool):
         if require_verified and not token_data.is_verified:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Your email address needs to be verified to access this route. Please click on the link sent to {token_data.email} or request a new confirmation email.",
+                detail=f"Your email address needs to be verified to access this route. Please click on the link sent to '{token_data.email.root}' or request a new confirmation email.",
             )
 
         if require_admin and not token_data.is_admin:

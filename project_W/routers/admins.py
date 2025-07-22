@@ -1,9 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 import project_W.dependencies as dp
-from project_W.models.request_data import SiteBanner
+from project_W.models.request_data import EmailToUsers, SiteBanner
 
 from ..models.internal import DecodedAuthTokenData
 from ..models.response_data import RunnerCreatedInfo
@@ -75,3 +75,24 @@ async def delete_site_banner(
     banner_id: int,
 ):
     await dp.db.delete_site_banner(banner_id)
+
+
+@router.post("/send_email_to_all_users")
+async def send_email_to_all_users(
+    _: Annotated[
+        DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
+    ],
+    background_tasks: BackgroundTasks,
+    email: EmailToUsers,
+):
+    """
+    Sends out an email with the provided content to all users of this Project-W instance, regardless whether they are local accounts, oidc accounts or ldap accounts. The body is in plaintext format, don't forget to include line breaks for longer emails.
+    """
+    user_emails = await dp.db.get_all_user_emails()
+    background_tasks.add_task(
+        dp.smtp.send_email,
+        user_emails,
+        "broadcast",
+        email.subject,
+        email.body,
+    )

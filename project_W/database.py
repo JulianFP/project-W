@@ -11,7 +11,7 @@ from psycopg.connection_async import AsyncConnection
 from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 import project_W.dependencies as dp
 
@@ -251,6 +251,13 @@ class DatabaseAdapter(ABC):
     async def get_info_of_all_tokens_of_user(self, user_id: int) -> list[TokenSecretInfo]:
         """
         Return a list of all stripped token secret objects a user has
+        """
+        pass
+
+    @abstractmethod
+    async def get_all_user_emails(self) -> list[EmailValidated]:
+        """
+        Returns a list of all email addresses of all Project-W users, regardless of whether they are local, oidc or ldap users
         """
         pass
 
@@ -1568,6 +1575,32 @@ class PostgresAdapter(DatabaseAdapter):
                     rows.append(TokenSecretInfo(id=row[0], name=row[1], temp_token_secret=row[2]))
                 return rows
 
+    async def get_all_user_emails(self) -> list[EmailValidated]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT email
+                        FROM {self.schema}.local_accounts
+                        UNION
+                        SELECT email
+                        FROM {self.schema}.oidc_accounts
+                        UNION
+                        SELECT email
+                        FROM {self.schema}.ldap_accounts
+                    """
+                )
+                email_list = await cur.fetchall()
+                validated_email_list = []
+                for email in email_list:
+                    try:
+                        validated_email_list.append(EmailValidated.model_validate(email))
+                    except ValidationError:
+                        self.logger.error(
+                            f"Database contained invalid email address {email}, ignoring..."
+                        )
+                return validated_email_list
+
     async def _update_password_hash(self, user_id: int, new_password_hash: str):
         async with self.apool.connection() as conn:
             async with conn.cursor() as cur:
@@ -2224,102 +2257,88 @@ class PostgresAdapter(DatabaseAdapter):
                     f"Cleaning up users that haven't logged in {retention_time_in_days} days..."
                 )
                 # first send emails out to users who's accounts will be deleted in 30 days/7 days
-                users_30_days_notif = []
-                users_7_days_notif = []
                 await cur.execute(
                     f"""
                     SELECT la.email
                     FROM {self.schema}.users users, {self.schema}.local_accounts la
                     WHERE users.id = la.id
-                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
                     AND la.provision_number IS NULL
-                    """,
-                    (
-                        timedelta(days=retention_time_in_days - 31),
-                        timedelta(days=retention_time_in_days - 30),
-                    ),
-                )
-                users_30_days_notif += await cur.fetchall()
-                await cur.execute(
-                    f"""
+                    UNION
                     SELECT oa.email
                     FROM {self.schema}.users users, {self.schema}.oidc_accounts oa
                     WHERE users.id = oa.id
-                    AND NOW() - users.last_login BETWEEN %s AND %s
-                    """,
-                    (
-                        timedelta(days=retention_time_in_days - 31),
-                        timedelta(days=retention_time_in_days - 30),
-                    ),
-                )
-                users_30_days_notif += await cur.fetchall()
-                await cur.execute(
-                    f"""
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
+                    UNION
                     SELECT lda.email
                     FROM {self.schema}.users users, {self.schema}.ldap_accounts lda
                     WHERE users.id = lda.id
-                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
                     """,
-                    (
-                        timedelta(days=retention_time_in_days - 31),
-                        timedelta(days=retention_time_in_days - 30),
-                    ),
+                    {
+                        "interval_begin": timedelta(days=retention_time_in_days - 31),
+                        "interval_end": timedelta(days=retention_time_in_days - 30),
+                    },
                 )
-                users_30_days_notif += await cur.fetchall()
+                users_30_days_notif = await cur.fetchall()
                 await cur.execute(
                     f"""
                     SELECT la.email
                     FROM {self.schema}.users users, {self.schema}.local_accounts la
                     WHERE users.id = la.id
-                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
                     AND la.provision_number IS NULL
-                    """,
-                    (
-                        timedelta(days=retention_time_in_days - 8),
-                        timedelta(days=retention_time_in_days - 7),
-                    ),
-                )
-                users_7_days_notif += await cur.fetchall()
-                await cur.execute(
-                    f"""
+                    UNION
                     SELECT oa.email
                     FROM {self.schema}.users users, {self.schema}.oidc_accounts oa
                     WHERE users.id = oa.id
-                    AND NOW() - users.last_login BETWEEN %s AND %s
-                    """,
-                    (
-                        timedelta(days=retention_time_in_days - 8),
-                        timedelta(days=retention_time_in_days - 7),
-                    ),
-                )
-                users_7_days_notif += await cur.fetchall()
-                await cur.execute(
-                    f"""
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
+                    UNION
                     SELECT lda.email
                     FROM {self.schema}.users users, {self.schema}.ldap_accounts lda
                     WHERE users.id = lda.id
-                    AND NOW() - users.last_login BETWEEN %s AND %s
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
                     """,
-                    (
-                        timedelta(days=retention_time_in_days - 8),
-                        timedelta(days=retention_time_in_days - 7),
-                    ),
+                    {
+                        "interval_begin": timedelta(days=retention_time_in_days - 8),
+                        "interval_end": timedelta(days=retention_time_in_days - 7),
+                    },
                 )
-                users_7_days_notif += await cur.fetchall()
+                users_7_days_notif = await cur.fetchall()
+                users_30_days_notif_validated = []
                 for email in users_30_days_notif:
+                    try:
+                        users_30_days_notif_validated.append(EmailValidated.model_validate(email))
+                    except ValidationError:
+                        self.logger.error(
+                            f"Database contained invalid email address {email}, ignoring..."
+                        )
+                if len(users_30_days_notif_validated) > 0:
                     await dp.smtp.send_account_deletion_reminder(
-                        EmailValidated(email), dp.config.client_url, 30
+                        users_30_days_notif_validated, dp.config.client_url, 30
                     )
-                self.logger.info(
-                    f"Sent 30 day account deletion reminder to {len(users_30_days_notif)} users"
-                )
+                    self.logger.info(
+                        f"Sent 30 day account deletion reminder to {len(users_30_days_notif_validated)} users"
+                    )
+                else:
+                    self.logger.info("Didn't have to send any 30 day account deletion reminders")
+                users_7_days_notif_validated = []
                 for email in users_7_days_notif:
+                    try:
+                        users_7_days_notif_validated.append(EmailValidated.model_validate(email))
+                    except ValidationError:
+                        self.logger.error(
+                            f"Database contained invalid email address {email}, ignoring..."
+                        )
+                if len(users_7_days_notif_validated) > 0:
                     await dp.smtp.send_account_deletion_reminder(
-                        EmailValidated(email), dp.config.client_url, 7
+                        users_7_days_notif_validated, dp.config.client_url, 7
                     )
-                self.logger.info(
-                    f"Sent 7 day account deletion reminder to {len(users_7_days_notif)} users"
-                )
+                    self.logger.info(
+                        f"Sent 7 day account deletion reminder to {len(users_7_days_notif_validated)} users"
+                    )
+                else:
+                    self.logger.info("Didn't have to send any 7 day account deletion reminders")
 
                 await cur.execute(
                     f"""
