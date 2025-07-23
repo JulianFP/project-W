@@ -60,10 +60,16 @@ let { data }: Props = $props();
 
 type SortKey = components["schemas"]["JobSortKey"];
 type Job = components["schemas"]["JobInfo"];
+type ProcessedJob = Job & {
+	creation_date: Date;
+	creation_date_since: string;
+	finish_date: Date | null;
+	finish_date_since: string | null;
+};
 
 let fetchingJobs = $state(false);
 let jobs_ordered_selected: SvelteMap<number, boolean> = $state(new SvelteMap());
-let jobs_info: SvelteMap<number, Job> = $state(new SvelteMap());
+let jobs_info: SvelteMap<number, ProcessedJob> = $state(new SvelteMap());
 let job_count: number = $state(0);
 let job_count_total: number = $state(0);
 
@@ -98,6 +104,24 @@ let descending: boolean = $state(true);
 let exclude_finished = $state(false);
 let exclude_downloaded = $state(true);
 
+function process_job(job: Job): ProcessedJob {
+	const creation_date = new Date(job.creation_timestamp);
+	const creation_date_since = timeAgo(creation_date);
+	let finish_date: Date | null = null;
+	let finish_date_since: string | null = null;
+	if (job.finish_timestamp != null) {
+		finish_date = new Date(job.finish_timestamp);
+		finish_date_since = timeAgo(finish_date);
+	}
+	return {
+		...job,
+		creation_date: creation_date,
+		creation_date_since: creation_date_since,
+		finish_date: finish_date,
+		finish_date_since: finish_date_since,
+	};
+}
+
 async function fetch_jobs() {
 	fetchingJobs = true;
 	try {
@@ -130,8 +154,15 @@ async function fetch_jobs() {
 				jobs_ordered_selected = new SvelteMap(jobs_ordered_selected_loc);
 				let args_formatted: string[][] = [];
 				for (const job_id of jobs_ordered_selected_loc.keys()) {
-					if (!jobs_info.has(job_id)) {
+					let job = jobs_info.get(job_id);
+					if (!job) {
 						args_formatted.push(["job_ids", job_id.toString()]);
+					} else {
+						job.creation_date_since = timeAgo(job.creation_date);
+						if (job.finish_date != null) {
+							job.finish_date_since = timeAgo(job.finish_date);
+						}
+						jobs_info.set(job_id, { ...job });
 					}
 				}
 				if (args_formatted.length > 0) {
@@ -140,7 +171,7 @@ async function fetch_jobs() {
 						args_formatted,
 					);
 					for (const job of jobs_unsorted) {
-						jobs_info.set(job.id, job);
+						jobs_info.set(job.id, process_job(job));
 					}
 					for (const job_id of jobs_info.keys()) {
 						if (!jobs_ordered_selected_loc.has(job_id))
@@ -173,7 +204,7 @@ async function update_jobs(job_ids: number[]) {
 	try {
 		const jobs_unsorted = await getLoggedIn<Job[]>("jobs/info", args_formatted);
 		for (const job of jobs_unsorted) {
-			jobs_info.set(job.id, job);
+			jobs_info.set(job.id, process_job(job));
 		}
 	} catch (err: unknown) {
 		let errorMsg = "Error occured while updating job: ";
@@ -476,7 +507,7 @@ evtSource.addEventListener("job_updated", (event) => {
                 </TableBodyCell>
               {/if}
               <TableBodyCell>
-                <P size="sm">{timeAgo(new Date(job.creation_timestamp))}</P>
+                <P size="sm">{job.creation_date_since}</P>
                 <Tooltip type="auto">{job.creation_timestamp}</Tooltip>
               </TableBodyCell>
               <TableBodyCell>
@@ -537,10 +568,10 @@ evtSource.addEventListener("job_updated", (event) => {
                       <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
                       <P class="inline" size="sm">{job.step}</P>
                     </div>
-                    {#if job.finish_timestamp}
+                    {#if job.finish_date_since}
                       <div>
                         <P class="inline" weight="extrabold" size="sm">Finish time: </P>
-                        <P class="inline" size="sm">{timeAgo(new Date(job.finish_timestamp))}</P>
+                        <P class="inline" size="sm">{job.finish_date_since}</P>
                         <Tooltip type="auto">{job.finish_timestamp}</Tooltip>
                       </div>
                     {/if}
