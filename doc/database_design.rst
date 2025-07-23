@@ -9,7 +9,7 @@ For this I created and maintained an ER model that served as the basis for the c
    :width: 800
    :alt: An exported drawio diagram that shows Project-W's ER model
 
-The red annotations are the attributes how they are actually currently enforced in the PostgreSQL schema in contrary to the ideal attribute (in white). Parts of this ER model is implemented a bit differently than one would expect:
+The red annotations are the attributes how they are actually currently enforced in the PostgreSQL schema in contrary to the ideal attribute (in black). Parts of this ER model is implemented a bit differently than one would expect:
 
 - Inheritance like it occurs in the job is implemented with table constraints instead of PostgreSQL inheritance feature. The reason for this is that FOREIGN KEY constraints don't work well with PostgreSQL inheritance. See `PostgreSQL wiki's Don't Do This <https://wiki.postgresql.org/wiki/Don%27t_Do_This#Don.27t_use_table_inheritance>`_ for more information.
 

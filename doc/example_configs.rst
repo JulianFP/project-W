@@ -146,3 +146,27 @@ If you want to use LDAP instead of OIDC for logging in your users this guide is 
           admin_query:
             base_dn: "dc=localhost"
             filter: "&(class=account)(memberof=spn=project-W-admins@localhost)"
+
+Automatic user and job cleanups
+-------------------------------
+
+The backend always deletes the submitted audio files (which is both the most sensitive and storage consuming data) as soon as possible, i.e. immediately after the job has finished, failed or was aborted. However by default, all other data (like transcripts, job information and settings, user emails and account information, ...) will be kept indefinitely.
+
+For various reasons it might be desirable to change this behavior. For this Project-W provides automatic cleanup functionality for both jobs and users. This feature might proof especially useful to comply with possible regulatory requirements which dictate that user data can only be kept for a certain amount of time.
+
+   .. note::
+      This feature relies on the periodic tasks being executed at least daily. Please use the provided project-w_cron docker container or setup a cronjob or systemd timer for this if you haven't already. If the periodic tasks are misconfigured this feature will not work correctly or at all!
+
+Here is an example config that deletes jobs 7 days after they have finished and users 1 year after their last login:
+
+   .. code-block:: yaml
+
+      cleanup:
+        finished_job_retention_in_days: 7
+        user_retention_in_days: 365
+
+Of course you can also decide to activate only one of user or job deletion without the other. By default, both are deactivated.
+
+If a job gets deleted this means that all data attached to that job, most notably the transcript, will also be deleted. Since the transcript is almost as sensitive as the audio files themselves you might want to setup your Project-W instance to store jobs only very briefly to minimize the amount of sensitive data stored on the backend at every given time (e.g. to 7 days like in this example). If job deletion is active the users will be informed about that on the job submission page so that they can make sure to download the transcript of a finished job before it gets deleted.
+
+If a user gets deleted this means that all data attached to that user, most notably all of their jobs, transcripts and their account information and email address, will also be deleted. An email will be sent to affected users both 30 days and 7 days before their account will be deleted which gives them a chance to login to Project-W again and thus save their account from deletion.

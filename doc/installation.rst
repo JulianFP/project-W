@@ -15,15 +15,15 @@ The following installation guides are for Linux only. Theoretically all the comp
 Docker
 ------
 
-We provide two docker images, one for the backend that also serves the frontend at the same time, and one for the runner. The best way to use the backend's  In the following we assume that you want to host our backend and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
+We provide two docker images, one for the backend that also serves the frontend at the same time, one that runs cleanup jobs and other periodic tasks with cron, and one for the runner. In the following we assume that you want to host our backend, periodic background tasks, and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
 
 .. note::
-   For both docker images there are multiple docker image tags. The examples below will use the 'latest' tag which will pull the latest stable release (recommended). If you want to pull the development version (latest git commit on main branch), then choose the 'main' tag instead. Alternatively you can also pinpoint the docker image to a specific versions. Go to the Packages section of each GitHub repository to find out which tags are available. To use a tag other than 'latest' add it to the end of the 'image:' lines in the docker-compose.yml files below like this: image: <source>/<name>:<tag>
+   For both docker images there are multiple docker image tags. The examples below will use the 'latest' tag which will pull the latest stable release (recommended). If you want to pull the development version (latest git commit on main branch), then choose the 'main' tag instead. Alternatively you can also pinpoint the docker image to a specific version. Go to the Packages section of each GitHub repository to find out which tags are available. To use a tag other than 'latest' add it to the end of the 'image:' lines in the docker-compose.yml files below like this: image: <source>/<name>:<tag>
 
 .. _docker_backend_frontend-label:
 
-Backend & Frontend
-``````````````````
+Backend, Frontend & background jobs
+````````````````````````````````````
 
 Choose between the following instructions depending on your setup. If you are unsure which setup to choose and you want the SSL certificate generation to be as easy as possible then :ref:`reverse_proxy-label` is probably for you.
 
@@ -128,6 +128,20 @@ This will setup the backend/frontend without a reverse proxy or any additional c
             - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
           ports:
             - 443:5000
+        project-w_cron:
+          image: ghcr.io/julianfp/project-w_cron
+          restart: unless-stopped
+          depends_on:
+            postgres:
+              condition: service_healthy
+            redis:
+              condition: service_healthy
+          volumes:
+            - ./project-W-data/:/etc/xdg/project-W/
+          environment:
+            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
+            - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
+            - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
 
 6. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
 
@@ -258,6 +272,20 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
           environment:
             - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD}
+            - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
+            - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
+        project-w_cron:
+          image: ghcr.io/julianfp/project-w_cron
+          restart: unless-stopped
+          depends_on:
+            postgres:
+              condition: service_healthy
+            redis:
+              condition: service_healthy
+          volumes:
+            - ./project-W-data/:/etc/xdg/project-W/
+          environment:
+            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
             - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
             - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
         caddy:
@@ -471,8 +499,8 @@ Manual installation
 
 You can also run Project-W barebones. This can be a bit more difficult and the following steps will not be as detailed as the ones with Docker or NixOS. You will have to do stuff like configuring python virtual environments, setting up webservers or compiling the frontend yourself.
 
-Backend & Frontend
-``````````````````
+Backend, Frontend & background jobs
+````````````````````````````````````
 
 The frontend is written in Svelte and needs to be compiled into native Javascript. To do this you will need some build dependencies, however you can remove them after step 4. If you want you can even build it on a different machine and then just move the build directory to the server between step 4 and 5.
 
@@ -525,6 +553,12 @@ You can find the result in the ./build directory. Now we will now setup the back
    .. code-block:: console
 
       project_W --root_static_files <path to the build directory of the frontend>
+
+10. Run the background jobs once. This command should be executed at least once each day, so you probably want add a cron job or a systemd service + timer for it:
+
+   .. code-block:: console
+
+      project_W --run_periodic_tasks
 
 
 Runner

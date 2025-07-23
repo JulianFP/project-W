@@ -15,6 +15,7 @@ project W
    example_configs
    config
    connect_runner_backend
+   communicating_with_your_users
 
 .. toctree::
    :maxdepth: 2
