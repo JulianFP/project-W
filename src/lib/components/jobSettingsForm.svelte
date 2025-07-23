@@ -280,14 +280,14 @@ function onTranslationChange() {
       Receive an email notification upon job completion
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-    <Tooltip placement="bottom">You will receive an email once the job has finished or failed.</Tooltip>
+    <Tooltip placement="bottom" class="max-w-lg">You will receive an email once the job has finished or failed.</Tooltip>
   </div>
 
   <div>
     <div class="flex gap-2 items-center mb-2">
       <Label for="language">Language</Label>
       <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-      <Tooltip placement="bottom">Set the language that is spoken in your audio file. Automatic language detection only works well for audio longer than 30 seconds and might lead to errors if improved timestamp alignment is enabled and it detects a language incompatible with it.</Tooltip>
+      <Tooltip placement="bottom" class="max-w-lg">Set the language that is spoken in your audio file. Automatic language detection only works well for audio longer than 30 seconds and might lead to errors if improved timestamp alignment is enabled and it detects a language incompatible with it.</Tooltip>
     </div>
     <Select id="language" bind:value={language} onchange={onLanguageSelect}>
       <option value="detect">Automatic language detection</option>
@@ -302,7 +302,7 @@ function onTranslationChange() {
       Translate into English
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-    <Tooltip placement="bottom">Translate the transcription into English (starting from any other language). Currently English is the only supported target language.</Tooltip>
+    <Tooltip placement="bottom" class="max-w-lg">Translate the transcript into English (starting from any other language). Currently English is the only supported target language.</Tooltip>
   </div>
 
   <div class="flex gap-2 items-center">
@@ -310,7 +310,7 @@ function onTranslationChange() {
       Enable improved timestamp alignment
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-    <Tooltip placement="bottom">This will align each part of the transcript with timestamps at which it was being spoken. Only supported for some languages.</Tooltip>
+    <Tooltip placement="bottom" class="max-w-lg">This will align each part of the transcript with timestamps at which it was being spoken. Only supported for some languages.</Tooltip>
   </div>
 
   <div class="flex gap-2 items-center">
@@ -318,7 +318,7 @@ function onTranslationChange() {
       Enable speaker diarization
     </Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-    <Tooltip placement="bottom">Adds speaker labels to the transcript that will indicate who was speaking at any given part.</Tooltip>
+    <Tooltip placement="bottom" class="max-w-lg">Adds speaker labels to the transcript that will indicate who was speaking at any given part.</Tooltip>
   </div>
 
   {#if diarization}
@@ -327,17 +327,17 @@ function onTranslationChange() {
         <div class="flex gap-2 items-center mb-2">
           <Label for="diarization_min_speakers">Min speakers</Label>
           <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-          <Tooltip placement="bottom">In the audio are at least this many different people speaking. Set this to the same as 'Max speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
+          <Tooltip placement="bottom" class="max-w-lg">In the audio are at least this many different people speaking. Set this to the same as 'Max speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
         </div>
-        <Input id="diarization_min_speakers" type="number" min="0" step="1" bind:value={diarization_min_speakers}/>
+        <Input id="diarization_min_speakers" type="number" min="0" step="1" placeholder="Leave empty if unsure" bind:value={diarization_min_speakers}/>
       </div>
       <div class="w-full">
         <div class="flex gap-2 items-center mb-2">
           <Label for="diarization_max_speakers">Max speakers</Label>
           <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-          <Tooltip placement="bottom">In the audio are at most this many different people speaking. Set this to the same as 'Min speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
+          <Tooltip placement="bottom" class="max-w-lg">In the audio are at most this many different people speaking. Set this to the same as 'Min speakers' if you are exactly sure about the amount of people speaking, or leave it empty if you are very unsure.</Tooltip>
         </div>
-        <Input id="diarization_max_speakers" type="number" min="0" step="1" bind:value={diarization_max_speakers}/>
+        <Input id="diarization_max_speakers" type="number" min="0" step="1" placeholder="Leave empty if unsure" bind:value={diarization_max_speakers}/>
       </div>
     </div>
   {/if}
@@ -349,7 +349,7 @@ function onTranslationChange() {
         <div class="flex gap-2 items-center mb-2">
           <Label for="models">Select a model</Label>
           <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-          <Tooltip placement="bottom">Select the Whisper model to use for transcription. Larger models will be more accurate but will also take longer. Diarization requires a larger model for useful results. The models ending with '.en' only support the English language. The 'turbo' model is a more efficient version of the 'large' model with only small decreases in transcription quality.</Tooltip>
+          <Tooltip placement="bottom" class="max-w-lg">Select the Whisper model to use for transcription. Larger models will be more accurate but will also take longer. Diarization requires a larger model for useful results. The models ending with '.en' only support the English language, to use them please explicitly set the language to 'English'. The 'turbo' model is a more efficient version of the 'large' model with only small decreases in transcription quality.</Tooltip>
         </div>
         <Select id="models" bind:value={model}>
           {#each jobModelEnumValues as value}
@@ -367,14 +367,14 @@ function onTranslationChange() {
                 Highlight words
               </Checkbox>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-              <Tooltip placement="bottom">Underline each word as it is spoken in the .srt and .vtt outputs. For example if used for subtitles this would mean that the word that is currently being spoken is underlined in the subtitle.</Tooltip>
+              <Tooltip placement="bottom" class="max-w-lg">Underline each word as it is spoken in the .srt and .vtt outputs. For example if used for subtitles this would mean that the word that is currently being spoken in the movie is underlined in the subtitle.</Tooltip>
             </div>
             <div class="w-full flex gap-2 items-center">
               <Checkbox id="alignment_return_char_alignments" bind:checked={alignment_return_char_alignments}>
                 Return character alignments
               </Checkbox>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-              <Tooltip placement="bottom">Return character-level alignments/timestamps in the .json output.</Tooltip>
+              <Tooltip placement="bottom" class="max-w-lg">Whether the .json output should contain timestamps for each character of the transcript, not only for each word, i.e. you will know when each letter was spoken.</Tooltip>
             </div>
           </div>
           <div class="flex gap-4">
@@ -382,7 +382,7 @@ function onTranslationChange() {
               <div class="flex gap-2 items-center mb-2">
                 <Label for="alignment_processing_max_line_width">Max line width</Label>
                 <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-                <Tooltip placement="bottom">The maximum number of characters in a line before breaking the line.</Tooltip>
+                <Tooltip placement="bottom" class="max-w-lg">The maximum number of characters in a line before breaking the line.</Tooltip>
               </div>
               <Input id="alignment_processing_max_line_width" type="number" min="1" step="1" bind:value={alignment_processing_max_line_width} placeholder="Leave empty for no limit"/>
             </div>
@@ -390,7 +390,7 @@ function onTranslationChange() {
               <div class="flex gap-2 items-center mb-2">
                 <Label for="alignment_processing_max_line_count">Max line count</Label>
                 <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-                <Tooltip placement="bottom">The maximum number of lines in a segment (can only be set if 'Max line width' is also set).</Tooltip>
+                <Tooltip placement="bottom" class="max-w-lg">The maximum number of lines in a segment (can only be set if 'Max line width' is also set).</Tooltip>
               </div>
               <Input id="alignment_processing_max_line_count" type="number" min="1" step="1" bind:value={alignment_processing_max_line_count} placeholder="Leave empty for no limit"/>
             </div>
@@ -399,7 +399,7 @@ function onTranslationChange() {
             <div class="flex gap-2 items-center mb-2">
               <Label for="models">Interpolate method</Label>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-              <Tooltip placement="bottom">Method to assign timestamps to non-aligned words. Words are not able to be aligned when none of the characters occur in the align model dictionary. "nearest" copies timestamp of the nearest word within the segment. "linear" is linear interpolation. "ignore" removes that word from output.</Tooltip>
+              <Tooltip placement="bottom" class="max-w-lg">Method to assign timestamps to non-aligned words. Words are not able to be aligned when none of the characters occur in the align model dictionary. "nearest" copies timestamp of the nearest word within the segment. "linear" is linear interpolation. "ignore" removes that word from output.</Tooltip>
             </div>
             <Select id="alignment_interpolate_method" bind:value={alignment_interpolate_method}>
               {#each interpolateMethodEnumValues as value}
@@ -416,7 +416,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="vad_onset">VAD onset</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Onset threshold for VAD (see pyannote.audio), reduce this if speech is not being detected.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Onset threshold for VAD (see pyannote.audio), reduce this if speech is not being detected.</Tooltip>
           </div>
           <RangeWithField min="0.0" max="1.0" step="0.001" id="vad_onset" bind:value={vad_onset}/>
         </div>
@@ -424,7 +424,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="vad_offset">VAD offset</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Offset threshold for VAD (see pyannote.audio), reduce this if speech is not being detected.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Offset threshold for VAD (see pyannote.audio), reduce this if speech is not being detected.</Tooltip>
           </div>
           <RangeWithField min="0.0" max="1.0" step="0.001" id="vad_offset" bind:value={vad_offset}/>
         </div>
@@ -432,7 +432,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="vad_chunk_size">Chunk size</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Chunk size for merging VAD segments. Default is 30, reduce this if the chunk is too long.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Chunk size for merging VAD segments. Default is 30, reduce this if the chunk is too long.</Tooltip>
           </div>
           <RangeWithField min="1" max="30" step="1" id="vad_chunk_size" bind:value={vad_chunk_size}/>
         </div>
@@ -444,7 +444,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_initial_prompt">Initial prompt</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Optional text to provide as a prompt for the first window.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Optional text to provide as a prompt for the first window.</Tooltip>
           </div>
           <Textarea id="asr_initial_prompt" bind:value={asr_initial_prompt} placeholder="Enter prompt here"/>
         </div>
@@ -452,7 +452,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_beam_size">Beam size</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Number of beams in beam search, only applicable when temperature is zero.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Number of beams in beam search, only applicable when temperature is zero.</Tooltip>
           </div>
           <Input id="asr_beam_size" type="number" min="1" step="1" bind:value={asr_beam_size}/>
         </div>
@@ -460,7 +460,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_patience">Patience</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Optional patience value to use in beam decoding, the default (1.0) is equivalent to conventional beam search.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Optional patience value to use in beam decoding, the default (1.0) is equivalent to conventional beam search.</Tooltip>
           </div>
           <Input id="asr_patience" type="number" min="0.0" step="0.001" bind:value={asr_patience}/>
         </div>
@@ -468,7 +468,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_length_penalty">Length penalty</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Optional token length penalty coefficient (alpha), uses simple length normalization by default.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Optional token length penalty coefficient (alpha), uses simple length normalization by default.</Tooltip>
           </div>
           <RangeWithField id="asr_length_penalty" min="0.0" max="1.0" step="0.001" bind:value={asr_length_penalty}/>
         </div>
@@ -477,7 +477,7 @@ function onTranslationChange() {
             <div class="flex gap-2 items-center mb-2">
               <Label for="asr_temperature">Temperature</Label>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-              <Tooltip placement="bottom">Temperature to use for sampling.</Tooltip>
+              <Tooltip placement="bottom" class="max-w-lg">Temperature to use for sampling.</Tooltip>
             </div>
             <Input id="asr_temperature" type="number" min="0.0" step="0.001" bind:value={asr_temperature}/>
           </div>
@@ -485,7 +485,7 @@ function onTranslationChange() {
             <div class="flex gap-2 items-center mb-2">
               <Label for="asr_temperature_increment_on_fallback">Temperature increment on fallback</Label>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-              <Tooltip placement="bottom">Temperature to increase when falling back when the decoding fails to meet either of the thresholds below.</Tooltip>
+              <Tooltip placement="bottom" class="max-w-lg">Temperature to increase when falling back when the decoding fails to meet either of the thresholds below.</Tooltip>
             </div>
             <Input id="asr_temperature_increment_on_fallback" type="number" min="0.0" step="0.001" bind:value={asr_temperature_increment_on_fallback}/>
           </div>
@@ -494,7 +494,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_compression_ratio_threshold">Compression ratio threshold</Label>
               <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-              <Tooltip placement="bottom">If the gzip compression ratio is higher than this value, treat the decoding as failed.</Tooltip>
+              <Tooltip placement="bottom" class="max-w-lg">If the gzip compression ratio is higher than this value, treat the decoding as failed.</Tooltip>
           </div>
           <Input id="asr_compression_ratio_threshold" type="number" min="0.0" step="0.001" bind:value={asr_compression_ratio_threshold}/>
         </div>
@@ -502,7 +502,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_log_prob_threshold">Log prob threshold</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">If the average log probability is lower than this value, treat the decoding as failed.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">If the average log probability is lower than this value, treat the decoding as failed.</Tooltip>
           </div>
           <Input id="asr_log_prob_threshold" type="number" bind:value={asr_log_prob_threshold}/>
         </div>
@@ -510,7 +510,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_no_speech_threshold">No speech threshold</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">If the probability of the &lt;&#124;nospeech&#124;&gt; token is higher than this value AND the decoding has failed due to 'Log prob threshold', consider the segment as silence.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">If the probability of the &lt;&#124;nospeech&#124;&gt; token is higher than this value AND the decoding has failed due to 'Log prob threshold', consider the segment as silence.</Tooltip>
           </div>
           <Input id="asr_no_speech_threshold" type="number" step="0.001" bind:value={asr_no_speech_threshold}/>
         </div>
@@ -518,7 +518,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-2">
             <Label for="asr_suppressed_tokens">Suppressed tokens</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom">Comma-separated list of token ids to suppress during sampling; '-1' will suppress most special characters except common punctuations.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Comma-separated list of token ids to suppress during sampling; '-1' will suppress most special characters except common punctuations.</Tooltip>
           </div>
           <Input id="asr_suppressed_tokens" type="text" bind:value={asr_suppressed_tokens}/>
         </div>
@@ -527,7 +527,7 @@ function onTranslationChange() {
             Suppress numerals
           </Checkbox>
           <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-          <Tooltip placement="bottom">Whether to suppress numeric symbols and currency symbols during sampling, since wav2vec2 cannot align them correctly.</Tooltip>
+          <Tooltip placement="bottom" class="max-w-lg">Whether to suppress numeric symbols and currency symbols during sampling, since wav2vec2 cannot align them correctly.</Tooltip>
         </div>
       </div>
     </AccordionItem>

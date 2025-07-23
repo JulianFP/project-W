@@ -45,7 +45,8 @@ interface Props {
 }
 let { data, children }: Props = $props();
 </script>
-<div class="min-h-screen flex flex-col gap-8">
+<!-- On smaller screens (height <1250px) the login site will be expanded to the size of the screen pushing the footer outside the screen. Looks better that way-->
+<div class={`flex flex-col gap-8 ${routing.location.startsWith("#/auth") ? "min-h-[min(calc(100vh+180px),max(100vh,1250px))]" : "min-h-screen"}`}>
   <header>
     <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-300 dark:bg-slate-900">
       <NavHamburger />
@@ -77,9 +78,9 @@ let { data, children }: Props = $props();
     </Navbar>
 
     {#each data.about.site_banners as banner}
-      <Banner color={banner.urgency >= 200 ? "primary" : "gray"} class={`relative md:p-3 p-1.5 ${banner.urgency >= 200 ? "bg-primary-500" : ""}`} dismissable={false}>
-        <div class={banner.urgency >= 100 && banner.urgency < 200 ? "text-primary-700 dark:text-primary-600" : "text-gray-900 dark:text-white"}>
-          <BullhornSolid size="sm" class="inline mr-2"/>
+      <Banner color={banner.urgency >= 200 ? "primary" : "gray"} class={`relative z-10 md:p-3 p-1.5 ${banner.urgency >= 200 ? "bg-primary-500" : ""}`} dismissable={false}>
+        <div class={`flowbite-anchors flex items-center gap-3 ${banner.urgency >= 100 && banner.urgency < 200 ? "text-primary-500 dark:text-primary-400" : "text-gray-900 dark:text-white"}`}>
+          <BullhornSolid size="sm"/>
           {@html banner.html}
         </div>
       </Banner>

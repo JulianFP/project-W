@@ -137,7 +137,7 @@ function onAction(params: { action: string; data: FormData }): boolean {
   <div class="flex gap-2 items-center">
     <Checkbox id="make_new_account_defaults" bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-    <Tooltip placement="bottom">The current job settings will become the new account-wide default. Every job you create in the future will have these settings set by default. You can view, change and reset the defaults in the account settings at any time.</Tooltip>
+    <Tooltip placement="bottom" class="max-w-lg">The current job settings will become the new account-wide default. Every job you create in the future will have these settings set by default. You can view, change and reset the defaults in the account settings at any time.</Tooltip>
   </div>
   <div>
     <Label class="mb-2" for="upload_files">Upload one or more audio files. A transcription job will be created for each of the uploaded files</Label>
