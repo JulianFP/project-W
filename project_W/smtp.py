@@ -102,11 +102,28 @@ class SmtpClient:
             f"please confirm your email address by clicking on the following link:\n\n"
             f"{url}\n\n"
             f"This link will expire within the next 24 hours. "
-            f"After this period you will have to request a new activation email over the website\n\n"
+            f"After this period you will have to request a new activation email over the website.\n\n"
             f"If you did not sign up for an account please disregard this email."
         )
         msg_subject = "Project-W account activation"
         await self.send_email(receiver, "activation", msg_subject, msg_body)
+
+    async def send_confirm_email_change_email(
+        self, receiver: EmailValidated, token: str, client_url: str
+    ):
+        url = f"{client_url}/local/activate?token={token}"
+        msg_body = (
+            f"To confirm the change of the email address of your Project-W account\n"
+            f"to '{receiver.root}', please click on the following link:\n\n"
+            f"{url}\n\n"
+            f"The email change will only be performed once you click on this link.\n"
+            f"Until then your old address will remain the active email address of your Project-W account.\n\n"
+            f"This link will expire within the next 24 hours. "
+            f"After this period you will have to re-perform the email changing procedure on the website.\n\n"
+            f"If you don't have a Project-W account or didn't request your email to be changed then you can ignore this email."
+        )
+        msg_subject = "Project-W email address change request"
+        await self.send_email(receiver, "mail-change", msg_subject, msg_body)
 
     async def send_password_reset_email(
         self, receiver: EmailValidated, token: str, client_url: str
@@ -117,7 +134,7 @@ class SmtpClient:
             f"please open the following link and enter a new password:\n\n"
             f"{url}\n\n"
             f"This link will expire within the next hour. "
-            f"After this period you will have to request a new password reset email over the website\n\n"
+            f"After this period you will have to request a new password reset email over the website.\n\n"
             f"If you did not request a password reset then you can disregard this email"
         )
         msg_subject = "Project-W password reset request"

@@ -349,7 +349,7 @@ async def change_user_email(
         dp.config, AccountActivationTokenData(old_email=current_token.email, new_email=new_email)
     )
     background_tasks.add_task(
-        dp.smtp.send_account_activation_email,
+        dp.smtp.send_confirm_email_change_email,
         new_email,
         account_activation_token,
         dp.config.client_url,
