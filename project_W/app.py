@@ -8,7 +8,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import project_W.dependencies as dp
 
-from ._version import __version__, __version_tuple__
+from ._version import __git_hash__, __version__
 from .caching import RedisAdapter
 from .database import PostgresAdapter
 from .models.base import LocalAccountOperationModeEnum
@@ -184,7 +184,7 @@ async def about() -> AboutResponse:
         description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
         source_code="https://github.com/JulianFP/project-W",
         version=__version__,
-        git_hash=str(__version_tuple__[-1]).split(".")[0].removeprefix("g"),
+        git_hash=__git_hash__.removeprefix("g"),
         imprint=dp.config.imprint,
         terms_of_services=dp.config.terms_of_services,
         job_retention_in_days=dp.config.cleanup.finished_job_retention_in_days,
