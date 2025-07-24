@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Helper, Input, Label } from "flowbite-svelte";
-import { LockOpenSolid, LockSolid } from "flowbite-svelte-icons";
+import { Helper, Input, Label, Span } from "flowbite-svelte";
+import { CloseOutline, PenSolid } from "flowbite-svelte-icons";
 
 import { alerts } from "$lib/utils/global_state.svelte";
 import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
@@ -46,19 +46,19 @@ async function changeUserEmail(): Promise<void> {
 
 <form onsubmit={openModal}>
   <Label for="email" color={error ? "red" : "gray"} class="mb-2">Email address</Label>
-  <Input class="ps-10" type="email" id="email" name="email" autocomplete="email" color={error ? "red" : "default"} required oninput={() => {error = false}} bind:value={email} readonly={lockedInput || null} {...rest}>
+  <Input id="email" class="ps-10" type="email" name="email" autocomplete="email" color={error ? "red" : "default"} required oninput={() => {error = false}} bind:value={email} readonly={lockedInput || null} {...rest}>
     {#snippet left()}
 			<button type="button" class="pointer-events-auto cursor-pointer" onclick={toggleLock}>
 	      {#if lockedInput}
-	        <LockSolid class="w-6 h-6"/>
+	        <PenSolid class="w-6 h-6"/>
 	      {:else}
-	        <LockOpenSolid class="w-6 h-6"/>
+	        <CloseOutline class="w-6 h-6"/>
 	      {/if}
 	    </button>
 		{/snippet}
     {#snippet right()}
-      {#if !disabledSubmit}
-          <Button size="sm" type="submit">Change Email</Button>
+      {#if !lockedInput}
+        <Button size="sm" type="submit" disabled={disabledSubmit}>Change Email</Button>
       {/if}
     {/snippet}
   </Input>
@@ -68,5 +68,5 @@ async function changeUserEmail(): Promise<void> {
 </form>
 
 <ConfirmPasswordModal bind:open={modalOpen} bind:value={password} action={changeUserEmail} onerror={(err: BackendCommError) => {errorMsg = err.message; error = true;}}>
-  You are about to change this accounts email address to {email}. We will send you an email to this address. The actual change of the address will only occur ones you clicked on the link in the email.
+  You are about to change this accounts email address to <Span highlight="blue" class="font-bold">{email}</Span>. We will send you an email to this address. The actual change of the address will only occur once you clicked on the link in the email.
 </ConfirmPasswordModal>

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { ButtonGroup, Heading, Helper, Label, Modal, P } from "flowbite-svelte";
+import { ButtonGroup, Helper, Label, Modal, P } from "flowbite-svelte";
 
 import { BackendCommError, getLoggedIn } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
@@ -100,35 +100,39 @@ async function downloadTranscript(): Promise<void> {
 		error = true;
 	}
 
+	open = false;
 	waiting = false;
 	await post_action();
 }
+
+function onAction(params: { action: string; data: FormData }): boolean {
+	if (params.action === "submit") {
+		downloadTranscript();
+	}
+	return false;
+}
 </script>
 
-<Modal bind:open={open} autoclose={false}>
-  <form class="flex flex-col gap-4" onsubmit={downloadTranscript}>
-    <Heading tag="h3">Download transcript of job {job_id}</Heading>
+<Modal form title={`Download transcript of job ${job_id}`} bodyClass="flex flex-col gap-4" bind:open={open} onaction={onAction}>
+  <div>
+    <Label class="mb-2">Format of the transcript</Label>
+    <ButtonGroup class="w-full">
+      <Button class="w-full" onclick={() => format = "as_txt"} color={format === "as_txt" ? "primary" : "alternative"}>.txt</Button>
+      <Button class="w-full" onclick={() => format = "as_srt"} color={format === "as_srt" ? "primary" : "alternative"}>.srt</Button>
+      <Button class="w-full" onclick={() => format = "as_tsv"} color={format === "as_tsv" ? "primary" : "alternative"}>.tsv</Button>
+      <Button class="w-full" onclick={() => format = "as_vtt"} color={format === "as_vtt" ? "primary" : "alternative"}>.vtt</Button>
+      <Button class="w-full" onclick={() => format = "as_json"} color={format === "as_json" ? "primary" : "alternative"}>.json</Button>
+    </ButtonGroup>
+  </div>
 
-    <div>
-      <Label class="mb-2">Format of the transcript</Label>
-      <ButtonGroup class="w-full">
-        <Button class="w-full" onclick={() => format = "as_txt"} color={format === "as_txt" ? "primary" : "alternative"}>.txt</Button>
-        <Button class="w-full" onclick={() => format = "as_srt"} color={format === "as_srt" ? "primary" : "alternative"}>.srt</Button>
-        <Button class="w-full" onclick={() => format = "as_tsv"} color={format === "as_tsv" ? "primary" : "alternative"}>.tsv</Button>
-        <Button class="w-full" onclick={() => format = "as_vtt"} color={format === "as_vtt" ? "primary" : "alternative"}>.vtt</Button>
-        <Button class="w-full" onclick={() => format = "as_json"} color={format === "as_json" ? "primary" : "alternative"}>.json</Button>
-      </ButtonGroup>
-    </div>
+  <div>
+    <Label class="mb-2">Preview of the format</Label>
+    <P space="tighter" italic size="xs"><pre>{@html format_preview}</pre></P>
+  </div>
 
-    <div>
-      <Label class="mb-2">Preview of the format</Label>
-      <P space="tighter" italic size="xs"><pre>{@html format_preview}</pre></P>
-    </div>
+  {#if error}
+    <Helper color="red">{errorMsg}</Helper>
+  {/if}
 
-    {#if error}
-      <Helper color="red">{errorMsg}</Helper>
-    {/if}
-
-    <WaitingSubmitButton waiting={waiting}>Download as .{format_ending}</WaitingSubmitButton>
-  </form>
+  <WaitingSubmitButton waiting={waiting} value="submit">Download as .{format_ending}</WaitingSubmitButton>
 </Modal>

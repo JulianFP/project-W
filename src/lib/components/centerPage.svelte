@@ -10,7 +10,7 @@ interface Props {
 let { title, limitWidth = true, children }: Props = $props();
 </script>
 
-<div class={`flex flex-col gap-8 mx-auto my-8 ${(limitWidth ? "max-w-screen-md" : "max-w-full lg:mx-24")}`}>
+<div class={`flex flex-col gap-8 mx-auto w-full ${(limitWidth ? "max-w-screen-md" : "max-w-full lg:mx-24")}`}>
   <Heading tag="h2" class="w-fit">
     {title}
   </Heading>

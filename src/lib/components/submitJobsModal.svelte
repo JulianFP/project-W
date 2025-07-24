@@ -4,10 +4,8 @@ import {
 	Badge,
 	Checkbox,
 	Dropzone,
-	Heading,
 	Label,
 	Modal,
-	P,
 	Tooltip,
 } from "flowbite-svelte";
 import { QuestionCircleOutline } from "flowbite-svelte-icons";
@@ -24,7 +22,6 @@ interface Props {
 let { open = $bindable(false), post_action = async () => {} }: Props = $props();
 
 let files: FileList | null = $state(null);
-$inspect(files);
 
 let makeNewDefaults: boolean = $state(false);
 let get_job_settings = $state(() => {
@@ -71,9 +68,7 @@ async function postJob(file: File, job_settings_id: number) {
 	);
 }
 
-async function submitAction(event: Event): Promise<void> {
-	event.preventDefault();
-
+async function submitJob(): Promise<void> {
 	if (files !== null && files.length > 0) {
 		waitingForPromise = true;
 
@@ -124,41 +119,45 @@ async function submitAction(event: Event): Promise<void> {
 		}
 
 		open = false;
+		waitingForPromise = false;
+		await post_action();
 	}
-	waitingForPromise = false;
+}
 
-	await post_action();
+function onAction(params: { action: string; data: FormData }): boolean {
+	if (params.action === "submit") {
+		submitJob();
+	}
+	return false;
 }
 </script>
 
-<Modal bind:open={open} autoclose={false}>
-  <Heading tag="h3">{files !== null && files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"}</Heading>
-  <JobSettingsForm onsubmit={submitAction} bind:get_job_settings={get_job_settings}>
-    <div class="flex gap-2 items-center">
-      <Checkbox bind:checked={makeNewDefaults}><P>Make these job settings the new account defaults</P></Checkbox>
-      <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-      <Tooltip placement="bottom">The current job settings will become the new account-wide default. Every job you create in the future will have these settings set by default. You can view, change and reset the defaults in the account settings at any time.</Tooltip>
-    </div>
-    <div>
-      <Label class="mb-2" for="upload_files">Upload one or more audio files. A transcription job will be created for each of the uploaded files</Label>
-      <Dropzone
-        multiple
-        id="upload_files"
-        bind:files={files}
-        ondrop={dropHandle}
-        ondragover={(event) => {
-          event.preventDefault();
-        }}
-        onchange={handleChange}>
-        <svg aria-hidden="true" class="mb-3 w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-        {#if files === null || files.length === 0}
-          <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">Audio files (mp3, m4a, aac, ...)</p>
-        {:else}
-          <p>{showFileNames(files)}</p>
-        {/if}
-      </Dropzone>
-    </div>
-    <WaitingSubmitButton class="w-full1" waiting={waitingForPromise}>Submit</WaitingSubmitButton>
-  </JobSettingsForm>
+<Modal form title={files !== null && files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction}>
+  <JobSettingsForm bind:get_job_settings={get_job_settings}/>
+  <div class="flex gap-2 items-center">
+    <Checkbox id="make_new_account_defaults" bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>
+    <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
+    <Tooltip placement="bottom" class="max-w-lg">The current job settings will become the new account-wide default. Every job you create in the future will have these settings set by default. You can view, change and reset the defaults in the account settings at any time.</Tooltip>
+  </div>
+  <div>
+    <Label class="mb-2" for="upload_files">Upload one or more audio files. A transcription job will be created for each of the uploaded files</Label>
+    <Dropzone
+      multiple
+      id="upload_files"
+      bind:files={files}
+      ondrop={dropHandle}
+      ondragover={(event) => {
+        event.preventDefault();
+      }}
+      onchange={handleChange}>
+      <svg aria-hidden="true" class="mb-3 w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+      {#if files === null || files.length === 0}
+        <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Audio files (mp3, m4a, aac, ...)</p>
+      {:else}
+        <p>{showFileNames(files)}</p>
+      {/if}
+    </Dropzone>
+  </div>
+  <WaitingSubmitButton class="w-full" waiting={waitingForPromise} value="submit">Submit</WaitingSubmitButton>
 </Modal>

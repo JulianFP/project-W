@@ -104,6 +104,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	"/api/users/accept_tos": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Accept Tos
+		 * @description By calling this route the user accepts to the terms of service specified by the submitted tos_id and tos_version. Only if a user has accepted the newest version of every term of service of this instance they are allowed to use this service.
+		 */
+		post: operations["accept_tos_api_users_accept_tos_post"];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	"/api/users/delete": {
 		parameters: {
 			query?: never;
@@ -159,6 +179,44 @@ export interface paths {
 		 * @description Invalidate the token of a runner and delete it from the database and redis. If it has any jobs assigned at the time of invalidation these jobs will be reassigned to a different runner. Call this route immediately ones you find out that a runner token was compromised!
 		 */
 		delete: operations["invalidate_runner_api_admins_invalidate_runner_delete"];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	"/api/admins/add_site_banner": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Add Site Banner
+		 * @description Add a new banner to the website that will be broadcasted to all users. Returns the id of the created banner.
+		 *     Banners with higher urgency will be displayed first. Banners with an urgency of 100 and more will additionally be highlighted in red.
+		 */
+		post: operations["add_site_banner_api_admins_add_site_banner_post"];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	"/api/admins/delete_site_banner": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Delete Site Banner */
+		delete: operations["delete_site_banner_api_admins_delete_site_banner_delete"];
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -773,6 +831,14 @@ export interface components {
 			/** Git Hash */
 			git_hash: string;
 			imprint: components["schemas"]["ImprintSettings"] | null;
+			/** Terms Of Services */
+			terms_of_services: {
+				[key: string]: components["schemas"]["TosSettings"];
+			};
+			/** Job Retention In Days */
+			job_retention_in_days: number | null;
+			/** Site Banners */
+			site_banners: components["schemas"]["SiteBannerResponse"][];
 		};
 		/** AlignmentProcessingSettings */
 		AlignmentProcessingSettings: {
@@ -1327,6 +1393,7 @@ export interface components {
 			| "pending_runner"
 			| "runner_assigned"
 			| "runner_in_progress"
+			| "aborting"
 			| "success"
 			| "failed"
 			| "downloaded";
@@ -1398,6 +1465,13 @@ export interface components {
 			 */
 			allow_creation_of_api_tokens: boolean;
 		};
+		/** RegisteredResponse */
+		RegisteredResponse: {
+			/** Id */
+			id: number;
+			/** Session Token */
+			session_token: string;
+		};
 		/** RunnerCreatedInfo */
 		RunnerCreatedInfo: {
 			/** Id */
@@ -1435,6 +1509,22 @@ export interface components {
 			email: components["schemas"]["EmailValidated"];
 			password: components["schemas"]["PasswordValidated"];
 		};
+		/** SiteBanner */
+		SiteBanner: {
+			/** Html */
+			html: string;
+			/** Urgency */
+			urgency: number;
+		};
+		/** SiteBannerResponse */
+		SiteBannerResponse: {
+			/** Html */
+			html: string;
+			/** Urgency */
+			urgency: number;
+			/** Id */
+			id: number;
+		};
 		/**
 		 * TaskEnum
 		 * @enum {string}
@@ -1448,6 +1538,24 @@ export interface components {
 			name: string | null;
 			/** Temp Token Secret */
 			temp_token_secret: boolean;
+		};
+		/** TosSettings */
+		TosSettings: {
+			/**
+			 * Name
+			 * @description The name of this term of service. This will be shown as a title above the tos_html content in the frontend
+			 */
+			name: string;
+			/**
+			 * Version
+			 * @description The version of this term of service. Start by putting this to 1. When incremented then users will have to re-accept these terms.
+			 */
+			version: number;
+			/**
+			 * Tos Html
+			 * @description The terms of services in html format. You may include links to external websites if you want.
+			 */
+			tos_html: string;
 		};
 		/** Transcript */
 		Transcript: {
@@ -1471,6 +1579,10 @@ export interface components {
 		TranscriptTypeEnum: "as_txt" | "as_srt" | "as_tsv" | "as_vtt" | "as_json";
 		/** User */
 		User: {
+			/** Accepted Tos */
+			accepted_tos: {
+				[key: string]: number;
+			};
 			/** Id */
 			id: number;
 			email: components["schemas"]["EmailValidated"];
@@ -1754,6 +1866,67 @@ export interface operations {
 			};
 		};
 	};
+	accept_tos_api_users_accept_tos_post: {
+		parameters: {
+			query: {
+				tos_id: number;
+				tos_version: number;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": string;
+				};
+			};
+			/** @description No term of service with that id or version exists */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
+		};
+	};
 	delete_user_api_users_delete_delete: {
 		parameters: {
 			query?: never;
@@ -1852,6 +2025,110 @@ export interface operations {
 				};
 				content: {
 					"application/json": string;
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
+		};
+	};
+	add_site_banner_api_admins_add_site_banner_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				"application/json": components["schemas"]["SiteBanner"];
+			};
+		};
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": number;
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
+		};
+	};
+	delete_site_banner_api_admins_delete_site_banner_delete: {
+		parameters: {
+			query: {
+				banner_id: number;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": unknown;
 				};
 			};
 			/** @description Validation error of JWT token */
@@ -2451,19 +2728,10 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": number;
+					"application/json": components["schemas"]["RegisteredResponse"];
 				};
 			};
-			/** @description Runner already registered */
-			400: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["ErrorResponse"];
-				};
-			};
-			/** @description Validation error of JWT token */
+			/** @description No runner with that token exists */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2473,10 +2741,9 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Token doesn't grand enough permissions */
+			/** @description This runner is currently already registered as online */
 			403: {
 				headers: {
-					"WWW-Authenticate"?: unknown;
 					[name: string]: unknown;
 				};
 				content: {
@@ -2512,18 +2779,8 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description No runner with that token exists */
 			401: {
-				headers: {
-					"WWW-Authenticate"?: unknown;
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["ErrorResponse"];
-				};
-			};
-			/** @description Token doesn't grand enough permissions */
-			403: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
 					[name: string]: unknown;
@@ -2536,7 +2793,9 @@ export interface operations {
 	};
 	retrieve_job_info_api_runners_retrieve_job_info_get: {
 		parameters: {
-			query?: never;
+			query: {
+				session_token: string;
+			};
 			header?: never;
 			path?: never;
 			cookie?: never;
@@ -2561,7 +2820,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description No runner with that token exists */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2571,21 +2830,40 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Token doesn't grand enough permissions */
+			/** @description This runner is currently not registered as online, or session_token is invalid */
 			403: {
 				headers: {
-					"WWW-Authenticate"?: unknown;
 					[name: string]: unknown;
 				};
 				content: {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
+			/** @description The assigned job was aborted by the user */
+			405: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
 		};
 	};
 	retrieve_job_audio_api_runners_retrieve_job_audio_post: {
 		parameters: {
-			query?: never;
+			query: {
+				session_token: string;
+			};
 			header?: never;
 			path?: never;
 			cookie?: never;
@@ -2610,7 +2888,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description No runner with that token exists */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2620,21 +2898,40 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Token doesn't grand enough permissions */
+			/** @description This runner is currently not registered as online, or session_token is invalid */
 			403: {
 				headers: {
-					"WWW-Authenticate"?: unknown;
 					[name: string]: unknown;
 				};
 				content: {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
+			/** @description The assigned job was aborted by the user */
+			405: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
 		};
 	};
 	submit_job_result_api_runners_submit_job_result_post: {
 		parameters: {
-			query?: never;
+			query: {
+				session_token: string;
+			};
 			header?: never;
 			path?: never;
 			cookie?: never;
@@ -2663,7 +2960,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description No runner with that token exists */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2673,10 +2970,9 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Token doesn't grand enough permissions */
+			/** @description This runner is currently not registered as online, or session_token is invalid */
 			403: {
 				headers: {
-					"WWW-Authenticate"?: unknown;
 					[name: string]: unknown;
 				};
 				content: {
@@ -2696,7 +2992,9 @@ export interface operations {
 	};
 	heartbeat_api_runners_heartbeat_post: {
 		parameters: {
-			query?: never;
+			query: {
+				session_token: string;
+			};
 			header?: never;
 			path?: never;
 			cookie?: never;
@@ -2716,7 +3014,7 @@ export interface operations {
 					"application/json": components["schemas"]["HeartbeatResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description No runner with that token exists */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2726,10 +3024,9 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Token doesn't grand enough permissions */
+			/** @description This runner is currently not registered as online, or session_token is invalid */
 			403: {
 				headers: {
-					"WWW-Authenticate"?: unknown;
 					[name: string]: unknown;
 				};
 				content: {
@@ -3471,6 +3768,7 @@ export const jobStatusValues: ReadonlyArray<
 	"pending_runner",
 	"runner_assigned",
 	"runner_in_progress",
+	"aborting",
 	"success",
 	"failed",
 	"downloaded",

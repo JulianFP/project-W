@@ -1,17 +1,22 @@
 <script lang="ts">
 import "../app.css";
-
-import { routing } from "$lib/utils/global_state.svelte";
-
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+import { routing } from "$lib/utils/global_state.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
+import type { components } from "$lib/utils/schema";
 import {
 	Alert,
 	Avatar,
+	Banner,
 	DarkMode,
 	Dropdown,
 	DropdownDivider,
 	DropdownItem,
+	Footer,
+	FooterBrand,
+	FooterCopyright,
+	FooterLink,
+	FooterLinkGroup,
 	NavBrand,
 	NavHamburger,
 	NavLi,
@@ -20,63 +25,101 @@ import {
 } from "flowbite-svelte";
 import {
 	AdjustmentsHorizontalSolid,
+	BullhornSolid,
 	GithubSolid,
 	InfoCircleSolid,
 	LockSolid,
 	UserEditSolid,
 } from "flowbite-svelte-icons";
+import type { Snippet } from "svelte";
 
 let dropDownOpen = $state(false);
 
-let { children } = $props();
+type Data = {
+	about: components["schemas"]["AboutResponse"];
+	user_info: components["schemas"]["User"];
+};
+interface Props {
+	data: Data;
+	children: Snippet;
+}
+let { data, children }: Props = $props();
 </script>
-<!--fixed: position is relative to browser window, w-full: full width, z-20: 3d pos (closer)-->
-<header class="fixed w-full z-20 top-0 start-0">
-  <!--px/py: padding in x/y direction (one small screens: larger x padding for touch)-->
-  <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-300 dark:bg-slate-900">
-    <NavHamburger />
-    <NavBrand href="#/">
-      <!--TODO add icon like this: <img src="/images/flowbite-svelte-icon-logo.svg" class="me-3 h-6 sm:h-9" alt="Flowbite Logo" />-->
-      <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
-      <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project W</span>
-    </NavBrand>
-    <div class="flex gap-2 sm:gap-4 md:order-2">
-      <DarkMode/>
+<!-- On smaller screens (height <1250px) the login site will be expanded to the size of the screen pushing the footer outside the screen. Looks better that way-->
+<div class={`flex flex-col gap-8 ${routing.location.startsWith("#/auth") ? "min-h-[min(calc(100vh+180px),max(100vh,1250px))]" : "min-h-screen"}`}>
+  <header>
+    <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-300 dark:bg-slate-900">
+      <NavHamburger />
+      <NavBrand href="#/">
+        <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
+        <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project</span>
+        <img src="/favicon.png" class="ml-1.5 h-7 sm:h-9" alt="Logo in the form of a W"/>
+      </NavBrand>
+      <div class="flex gap-2 sm:gap-4 md:order-2">
+        <DarkMode/>
+        {#if auth.loggedIn}
+          <Avatar id="avatar-menu" class="cursor-pointer"/>
+        {/if}
+      </div>
       {#if auth.loggedIn}
-        <Avatar id="avatar-menu" class="cursor-pointer"/>
+        <Dropdown simple placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
+          <DropdownItem href="#/account/info" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
+          <DropdownItem href="#/account/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
+          <DropdownItem href="#/account/default_settings" onclick={() => {dropDownOpen = false}}><AdjustmentsHorizontalSolid class="inline mr-2"/>Default settings</DropdownItem>
+          <DropdownDivider />
+          <DropdownItem class="cursor-pointer" onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
+        </Dropdown>
       {/if}
-    </div>
-    {#if auth.loggedIn}
-      <Dropdown simple placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
-        <DropdownItem href="#/account/info" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
-        <DropdownItem href="#/account/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
-        <DropdownItem href="#/account/default_settings" onclick={() => {dropDownOpen = false}}><AdjustmentsHorizontalSolid class="inline mr-2"/>Default settings</DropdownItem>
-        <DropdownDivider />
-        <DropdownItem class="cursor-pointer" onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
-      </Dropdown>
-    {/if}
-    <NavUl activeUrl={routing.location}>
-      <NavLi href="#/">Home</NavLi>
-      <NavLi href="#/about">About</NavLi>
-      <NavLi href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API-docs</NavLi>
-      <NavLi href="https://project-w.readthedocs.io" target="_blank" rel="noopener noreferrer">Docs</NavLi>
-      <NavLi href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="mx-auto"/></NavLi>
-    </NavUl>
-  </Navbar>
+      <NavUl activeUrl={routing.location}>
+        <NavLi href="#/">Home</NavLi>
+        <NavLi href="#/about">About</NavLi>
+        <NavLi href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="mx-auto"/></NavLi>
+      </NavUl>
+    </Navbar>
 
-  {#each alerts as alert}
-    <Alert color={alert.color} dismissable class="m-2">
-      {#snippet icon()}<InfoCircleSolid class="w-4 h-4" />{/snippet}
-      {alert.msg}
-    </Alert>
-  {/each}
-</header>
+    {#each data.about.site_banners as banner}
+      <Banner color={banner.urgency >= 200 ? "primary" : "gray"} class={`relative z-10 md:p-3 p-1.5 ${banner.urgency >= 200 ? "bg-primary-500" : ""}`} dismissable={false}>
+        <div class={`flowbite-anchors flex items-center gap-3 ${banner.urgency >= 100 && banner.urgency < 200 ? "text-primary-500 dark:text-primary-400" : "text-gray-900 dark:text-white"}`}>
+          <BullhornSolid size="sm"/>
+          {@html banner.html}
+        </div>
+      </Banner>
+    {/each}
 
+    {#each alerts as alert}
+      <Alert color={alert.color} dismissable class="m-2">
+        {#snippet icon()}<InfoCircleSolid class="w-4 h-4" />{/snippet}
+        {alert.msg}
+      </Alert>
+    {/each}
+  </header>
 
-<!--flex: required for h-full of child to work, w-screen: width to screen width min-h-dvh: dynamic viewport height -->
-<main class="flex w-full min-h-dvh">
-  <!--overflow-auto: adds scroll bar only if overflow happens (under navbar), w-full: width to parent width, min-h-full: height to parent width (always), px-4: padding to left/right of screen, mx-auto: center horizontally, mt-16: margin to top (this will be "under" navbar)-->
-  <div class="overflow-auto w-full min-h-full px-4 mt-16">
+  <main class="flex-1 flex flex-col mx-4">
     {@render children()}
-  </div>
-</main>
+  </main>
+
+  <Footer class="mx-4 mb-4" footerType="logo">
+    <div class="sm:flex sm:items-center sm:justify-between sm:gap-6">
+      <FooterBrand href="#/" name="Project">
+        <img src="/favicon.png" class="ml-1.5 mr-9 h-7 sm:h-9" alt="Logo in the form of a W"/>
+      </FooterBrand>
+      <FooterLinkGroup class="flex flex-wrap items-center gap-y-2">
+        <FooterLink href="#/about">About</FooterLink>
+        {#if data.about.imprint}
+          <FooterLink href="#/imprint">Imprint</FooterLink>
+        {/if}
+        {#if Object.keys(data.about.terms_of_services).length !== 0}
+          <FooterLink href="#/tos">Terms of Services</FooterLink>
+        {/if}
+        <FooterLink href="https://project-w.readthedocs.io" target="_blank" rel="noopener noreferrer">Docs</FooterLink>
+        <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API docs (Swagger)</FooterLink>
+        <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/redoc`} target="_blank" rel="noopener noreferrer">API docs (Redoc)</FooterLink>
+        <FooterLink href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Backend</FooterLink>
+        <FooterLink href="https://github.com/JulianFP/project-W-frontend" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Frontend</FooterLink>
+        <FooterLink href="https://github.com/JulianFP/project-W-runner" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Runner</FooterLink>
+      </FooterLinkGroup>
+    </div>
+    <hr class="my-6 lg:my-8 border-gray-200 dark:border-gray-700"/>
+    <FooterCopyright href="https://github.com/JulianFP/project-W/blob/main/COPYING.md" target="_blank" rel="noopener noreferrer" by="Julian Partanen and contributors (click to see all contributors)." year={2025}/>
+  </Footer>
+</div>

@@ -1,11 +1,11 @@
 import { BackendCommError, get } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 import { error } from "@sveltejs/kit";
-import type { PageLoad } from "./$types";
+import type { LayoutLoad } from "./$types";
 
 type AboutResponse = components["schemas"]["AboutResponse"];
 
-export const load: PageLoad = async ({ fetch }) => {
+export const load: LayoutLoad = async ({ fetch }) => {
 	try {
 		const about = await get<AboutResponse>("about", {}, {}, fetch);
 		return { about: about };
