@@ -68,5 +68,5 @@ async function changeUserEmail(): Promise<void> {
 </form>
 
 <ConfirmPasswordModal bind:open={modalOpen} bind:value={password} action={changeUserEmail} onerror={(err: BackendCommError) => {errorMsg = err.message; error = true;}}>
-  You are about to change this accounts email address to <Span highlight="blue" class="font-bold">{email}</Span>. We will send you an email to this address. The actual change of the address will only occur ones you clicked on the link in the email.
+  You are about to change this accounts email address to <Span highlight="blue" class="font-bold">{email}</Span>. We will send you an email to this address. The actual change of the address will only occur once you clicked on the link in the email.
 </ConfirmPasswordModal>
