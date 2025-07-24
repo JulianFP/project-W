@@ -1,6 +1,6 @@
 import secrets
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncGenerator, LiteralString
 
 from argon2 import PasswordHasher
@@ -11,23 +11,31 @@ from psycopg.connection_async import AsyncConnection
 from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
+
+import project_W.dependencies as dp
 
 from ._version import version, version_tuple
 from .logger import get_logger
-from .models.base import EmailValidated, JobBase, PasswordValidated, UserInDb
+from .models.base import EmailValidated, PasswordValidated
 from .models.internal import (
+    JobAndSettingsInDb,
+    JobInDb,
     JobSettingsInDb,
     JobSortKey,
     LdapUserInDb,
+    LdapUserInDbAll,
     LocalUserInDb,
+    LocalUserInDbAll,
     OidcUserInDb,
+    OidcUserInDbAll,
     OnlineRunner,
     RunnerInDb,
     TokenSecret,
+    UserInDbAll,
 )
 from .models.request_data import JobSettings, Transcript, TranscriptTypeEnum
-from .models.response_data import JobAndSettings, RunnerCreatedInfo, TokenSecretInfo
+from .models.response_data import RunnerCreatedInfo, SiteBannerResponse, TokenSecretInfo
 from .utils import hash_runner_token, parse_version_tuple
 
 
@@ -131,7 +139,7 @@ class DatabaseAdapter(ABC):
 
     @abstractmethod
     async def ensure_ldap_user_exists(
-        self, provider_name: str, dn: str, email: EmailValidated
+        self, provider_name: str, uid: str, email: EmailValidated
     ) -> int:
         """
         Add a database entry for an ldap user if it doesn't exist yet. Will be called at first login of this user.
@@ -183,7 +191,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_user_by_id(self, user_id: int) -> UserInDb | None:
+    async def get_user_by_id(self, user_id: int) -> UserInDbAll | None:
         """
         Return the user with the specified id, regardless of whether this user is a local, oidc or ldap user.
         Return None if no such user exists
@@ -191,28 +199,35 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
+    async def accept_tos_of_user(self, user_id: int, tos_id: int, tos_version: int):
+        """
+        Marks the term of service with the specified id and version as accepted for the user with the specified id
+        """
+        pass
+
+    @abstractmethod
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDbAll | None:
         """
         Return a local user with the matching email, or None if the email doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDbAll | None:
         """
         Return an oidc user with the matching iss/sub pair, or None if iss/sub doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDb | None:
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDbAll | None:
         """
         Return an oidc user with the matching user id, or None if user_id doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDbAll | None:
         """
         Return an ldap user with the matching user id, or None if user_id doesn't match any user
         """
@@ -236,6 +251,13 @@ class DatabaseAdapter(ABC):
     async def get_info_of_all_tokens_of_user(self, user_id: int) -> list[TokenSecretInfo]:
         """
         Return a list of all stripped token secret objects a user has
+        """
+        pass
+
+    @abstractmethod
+    async def get_all_user_emails(self) -> list[EmailValidated]:
+        """
+        Returns a list of all email addresses of all Project-W users, regardless of whether they are local, oidc or ldap users
         """
         pass
 
@@ -373,7 +395,15 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobBase]:
+    async def get_job_by_id(self, job_id) -> JobInDb | None:
+        """
+        Returns the job matching the provided job_id.
+        Returns None if no job with that id exists
+        """
+        pass
+
+    @abstractmethod
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobInDb]:
         """
         Returns all job metadata (excluding job settings, audio/audio oid, user_id, job_settings_id and transcript) for all provided job ids that belong to the provided user_id
         """
@@ -382,7 +412,7 @@ class DatabaseAdapter(ABC):
     @abstractmethod
     async def get_job_infos_with_settings_of_user(
         self, user_id: int, job_ids: list[int]
-    ) -> list[JobAndSettings]:
+    ) -> list[JobAndSettingsInDb]:
         """
         Returns all job metadata (including job settings but excluding audio/audio oid, user_id, job_settings_id and transcript) for all provided job ids that belong to the provided user_id
         """
@@ -408,9 +438,9 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
+    async def get_all_unfinished_jobs(self) -> list[tuple[int, int, bool]]:
         """
-        Returns the job id and user id of all jobs in the database that haven't finished yet (not downloaded, finished, failed).
+        Returns the job id, user id and whether the job was marked for aborting of all jobs in the database that haven't finished yet (not downloaded, finished, failed).
         Will be called at startup to enqueue existing jobs
         """
         pass
@@ -420,6 +450,14 @@ class DatabaseAdapter(ABC):
         """
         Returns the user_id of the user that owns a specific job.
         Returns None if no job with job_id exists
+        """
+        pass
+
+    @abstractmethod
+    async def mark_job_as_aborting(self, job_id: int):
+        """
+        Marks a job as being aborted. This will be signaled to the runner. A aborted job will then be finished as failed
+        Does nothing if no job with that id exists
         """
         pass
 
@@ -468,6 +506,48 @@ class DatabaseAdapter(ABC):
         token_hash = hash_runner_token(token)
         return await self._get_runner_by_token_hashed(token_hash)
 
+    @abstractmethod
+    async def general_cleanup(self):
+        """
+        Generic cleanup of database entries like orphaned rows and the like
+        """
+        pass
+
+    @abstractmethod
+    async def user_cleanup(self, retention_time_in_days: int):
+        """
+        Cleanup of users and their data who haven't logged in the specified retention time.
+        """
+        pass
+
+    @abstractmethod
+    async def job_cleanup(self, retention_time_in_days: int):
+        """
+        Cleanup of jobs and their data (most notably transcripts!) which are older than the specified retention time (after finishing time, not creation time)
+        """
+        pass
+
+    @abstractmethod
+    async def add_site_banner(self, urgency: int, html: str) -> int | None:
+        """
+        Creates a new site banner. Returns it's id if Successful, returns None if not
+        """
+        pass
+
+    @abstractmethod
+    async def list_site_banners(self) -> list[SiteBannerResponse]:
+        """
+        List all site banners
+        """
+        pass
+
+    @abstractmethod
+    async def delete_site_banner(self, id: int):
+        """
+        List site banner with provided id
+        """
+        pass
+
 
 class PostgresAdapter(DatabaseAdapter):
     apool: AsyncConnectionPool
@@ -500,6 +580,7 @@ class PostgresAdapter(DatabaseAdapter):
             await self.__ensure_postgresql_version(conn)
 
             table_names: list[LiteralString] = [
+                "site_data",
                 "users",
                 "local_accounts",
                 "oidc_accounts",
@@ -537,6 +618,9 @@ class PostgresAdapter(DatabaseAdapter):
                         raise Exception(
                             f"Critical: The metadata table exists but the {table_name} table is missing. Either restore the {table_name} table with its previous contents or drop the metadata table as well!"
                         )
+
+                # check when the last cleanups were performed and warn the user if it was too long ago
+                await self.__warn_about_missing_cleanups()
 
         self.logger.info("Database is ready to use")
 
@@ -656,10 +740,9 @@ class PostgresAdapter(DatabaseAdapter):
                 [Jsonb(application_metadata)],
             )
             cleanup_metadata = {
+                "general_last_cleanup": datetime.min.isoformat(),
                 "jobs_last_cleanup": datetime.min.isoformat(),
                 "users_last_cleanup": datetime.min.isoformat(),
-                "runners_last_cleanup": datetime.min.isoformat(),
-                "runners_last_cleanup": datetime.min.isoformat(),
             }
             await cur.execute(
                 f"""
@@ -674,7 +757,21 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.users (
                     id int GENERATED ALWAYS AS IDENTITY,
+                    last_login timestamptz NOT NULL DEFAULT NOW(),
+                    accepted_tos jsonb NOT NULL DEFAULT '{{}}'::jsonb,
                     primary key (id)
+                )
+            """
+            )
+
+            self.logger.info("Creating site_data table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.site_data (
+                    id int GENERATED ALWAYS AS IDENTITY,
+                    type text NOT NULL,
+                    urgency int NOT NULL,
+                    html text NOT NULL
                 )
             """
             )
@@ -759,10 +856,10 @@ class PostgresAdapter(DatabaseAdapter):
                 f"""
                 CREATE TABLE {self.schema}.ldap_accounts (
                     provider_name text NOT NULL,
-                    dn text NOT NULL,
+                    uid text NOT NULL,
                     id int NOT NULL UNIQUE,
                     email varchar(254) NOT NULL,
-                    PRIMARY KEY (provider_name, dn),
+                    PRIMARY KEY (provider_name, uid),
                     FOREIGN KEY (id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
                 )
             """
@@ -809,8 +906,9 @@ class PostgresAdapter(DatabaseAdapter):
                     id int GENERATED ALWAYS AS IDENTITY,
                     user_id int NOT NULL,
                     job_settings_id int,
-                    creation_timestamp timestamptz NOT NULL DEFAULT now(),
+                    creation_timestamp timestamptz NOT NULL DEFAULT NOW(),
                     file_name text NOT NULL,
+                    aborting boolean NOT NULL DEFAULT false,
                     audio_oid oid,
                     finish_timestamp timestamptz,
                     runner_name varchar(40),
@@ -837,9 +935,13 @@ class PostgresAdapter(DatabaseAdapter):
                         OR (finish_timestamp IS NOT NULL AND downloaded IS NULL AND error_msg IS NOT NULL)
                         OR (finish_timestamp IS NULL AND downloaded IS NULL AND error_msg IS NULL)
                     ),
-                    CONSTRAINT only_running_job_has_audio_oidc CHECK (
-                        (finish_timestamp IS NULL AND audio_oid IS NOT NULL)
-                        OR (finish_timestamp IS NOT NULL AND audio_oid IS NULL)
+                    CONSTRAINT finished_job_has_no_audio_oid CHECK (
+                        (finish_timestamp IS NOT NULL AND audio_oid IS NULL)
+                        OR (finish_timestamp IS NULL)
+                    ),
+                    CONSTRAINT aborting_job_has_no_audio_oid_and_is_not_finished CHECK (
+                        (NOT aborting)
+                        OR (aborting AND audio_oid IS NULL AND finish_timestamp IS NULL)
                     )
                 )
             """
@@ -944,6 +1046,49 @@ class PostgresAdapter(DatabaseAdapter):
 
                 else:
                     self.logger.info("No database schema migration required")
+
+    async def __warn_about_missing_cleanups(self):
+        async with self.apool.connection() as conn:
+            async with conn.cursor() as cur:
+                self.logger.info("Checking cleanup metadata...")
+                await cur.execute(
+                    f"""
+                        SELECT data['general_last_cleanup'], data['users_last_cleanup'], data['jobs_last_cleanup']
+                        FROM {self.schema}.metadata
+                        WHERE topic = 'cleanup'
+                    """
+                )
+                cleanup_info = await cur.fetchone()
+                if cleanup_info is None:
+                    raise Exception(
+                        "Database doesn't contain cleanup timestamps in the metadata table!"
+                    )
+                (
+                    general_last_cleanup_isoformat,
+                    users_last_cleanup_isoformat,
+                    jobs_last_cleanup_isoformat,
+                ) = cleanup_info
+                general_last_cleanup = datetime.fromisoformat(general_last_cleanup_isoformat)
+                time_since_general_last_cleanup = datetime.now() - general_last_cleanup
+                if time_since_general_last_cleanup.total_seconds() > 86400:
+                    self.logger.warning(
+                        "It's more than 24 hours ago since the general database cleanup was last executed. This may indicate a mistake in your server setup, the general cleanup should always run at least once a day!"
+                    )
+
+                if dp.config.cleanup.user_retention_in_days is not None:
+                    users_last_cleanup = datetime.fromisoformat(users_last_cleanup_isoformat)
+                    time_since_users_last_cleanup = datetime.now() - users_last_cleanup
+                    if time_since_users_last_cleanup.total_seconds() > 86400:
+                        self.logger.warning(
+                            "It's more than 24 hours ago since the users database cleanup was last executed, even though you enabled user database cleanups in the config. This may indicate a mistake in your server setup, the user cleanup should run at least once a day if enabled!"
+                        )
+                if dp.config.cleanup.finished_job_retention_in_days is not None:
+                    jobs_last_cleanup = datetime.fromisoformat(jobs_last_cleanup_isoformat)
+                    time_since_jobs_last_cleanup = datetime.now() - jobs_last_cleanup
+                    if time_since_jobs_last_cleanup.total_seconds() > 86400:
+                        self.logger.warning(
+                            "It's more than 24 hours ago since the jobs database cleanup was last executed, even though you enabled finished jobs database cleanups in the config. This may indicate a mistake in your server setup, the finished job cleanup should run at least once a day if enabled!"
+                        )
 
     async def _add_local_user_hashed(
         self,
@@ -1082,6 +1227,14 @@ class PostgresAdapter(DatabaseAdapter):
                             """,
                             (email.root, iss, sub),
                         )
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.users
+                        SET last_login = NOW()
+                        WHERE id = %s
+                        """,
+                        (user.id,),
+                    )
                     return user.id
 
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -1107,7 +1260,7 @@ class PostgresAdapter(DatabaseAdapter):
                     )
 
     async def ensure_ldap_user_exists(
-        self, provider_name: str, dn: str, email: EmailValidated
+        self, provider_name: str, uid: str, email: EmailValidated
     ) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
@@ -1115,9 +1268,9 @@ class PostgresAdapter(DatabaseAdapter):
                     f"""
                     SELECT *
                     FROM {self.schema}.ldap_accounts
-                    WHERE provider_name = %s AND dn = %s
+                    WHERE provider_name = %s AND uid = %s
                 """,
-                    (provider_name, dn),
+                    (provider_name, uid),
                 )
                 if user := await cur.fetchone():
                     if user.email.root != email:
@@ -1125,10 +1278,18 @@ class PostgresAdapter(DatabaseAdapter):
                             f"""
                             UPDATE {self.schema}.ldap_accounts
                             SET email = %s
-                            WHERE provider_name = %s AND dn = %s
+                            WHERE provider_name = %s AND uid = %s
                             """,
-                            (email.root, provider_name, dn),
+                            (email.root, provider_name, uid),
                         )
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.users
+                        SET last_login = NOW()
+                        WHERE id = %s
+                        """,
+                        (user.id,),
+                    )
                     return user.id
 
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -1142,10 +1303,10 @@ class PostgresAdapter(DatabaseAdapter):
                 if user_id := await cur.fetchone():
                     await cur.execute(
                         f"""
-                        INSERT INTO {self.schema}.ldap_accounts (provider_name, dn, id, email)
+                        INSERT INTO {self.schema}.ldap_accounts (provider_name, uid, id, email)
                         VALUES (%s, %s, %s, %s)
                     """,
-                        (provider_name, dn, user_id, email.root),
+                        (provider_name, uid, user_id, email.root),
                     )
                     await cur.execute(
                         f"""
@@ -1250,9 +1411,9 @@ class PostgresAdapter(DatabaseAdapter):
                     (runner_id,),
                 )
 
-    async def get_user_by_id(self, user_id: int) -> UserInDb | None:
+    async def get_user_by_id(self, user_id: int) -> UserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(UserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(UserInDbAll)) as cur:
                 # check local_accounts
                 await cur.execute(
                     f"""
@@ -1293,53 +1454,79 @@ class PostgresAdapter(DatabaseAdapter):
                 # not found
                 return None
 
-    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDb | None:
+    async def accept_tos_of_user(self, user_id: int, tos_id: int, tos_version: int):
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.users
+                    SET accepted_tos[%s] = to_jsonb(%s)
+                    WHERE id = %s
+                    """,
+                    (tos_id, tos_version, user_id),
+                )
+
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDbAll | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(LocalUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
-                    FROM {self.schema}.local_accounts
-                    WHERE email = %s
+                    FROM {self.schema}.local_accounts la, {self.schema}.users users
+                    WHERE la.id = users.id
+                    AND la.email = %s
                 """,
                     (email.root,),
                 )
-                return await cur.fetchone()
+                user = await cur.fetchone()
+                if user is not None:
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.users
+                        SET last_login = NOW()
+                        WHERE id = %s
+                        """,
+                        (user.id,),
+                    )
+                return user
 
-    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDb | None:
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(OidcUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
-                        FROM {self.schema}.oidc_accounts
-                        WHERE iss = %s AND sub = %s
+                        FROM {self.schema}.oidc_accounts oa, {self.schema}.users users
+                        WHERE oa.id = users.id
+                        AND oa.iss = %s AND oa.sub = %s
                     """,
                     (iss, sub),
                 )
                 return await cur.fetchone()
 
-    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDb | None:
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(OidcUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
-                        FROM {self.schema}.oidc_accounts
-                        WHERE id = %s
+                        FROM {self.schema}.oidc_accounts oa, {self.schema}.users users
+                        WHERE oa.id = users.id
+                        AND oa.id = %s
                     """,
                     (user_id,),
                 )
                 return await cur.fetchone()
 
-    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDb | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDbAll | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(LdapUserInDbAll)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
-                        FROM {self.schema}.ldap_accounts
-                        WHERE id = %s
+                        FROM {self.schema}.ldap_accounts lda, {self.schema}.users users
+                        WHERE lda.id = users.id
+                        AND lda.id = %s
                     """,
                     (str(user_id),),
                 )
@@ -1387,6 +1574,32 @@ class PostgresAdapter(DatabaseAdapter):
                     row = row_tup[0]
                     rows.append(TokenSecretInfo(id=row[0], name=row[1], temp_token_secret=row[2]))
                 return rows
+
+    async def get_all_user_emails(self) -> list[EmailValidated]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT email
+                        FROM {self.schema}.local_accounts
+                        UNION
+                        SELECT email
+                        FROM {self.schema}.oidc_accounts
+                        UNION
+                        SELECT email
+                        FROM {self.schema}.ldap_accounts
+                    """
+                )
+                email_list = await cur.fetchall()
+                validated_email_list = []
+                for email in email_list:
+                    try:
+                        validated_email_list.append(EmailValidated.model_validate(email))
+                    except ValidationError:
+                        self.logger.error(
+                            f"Database contained invalid email address {email}, ignoring..."
+                        )
+                return validated_email_list
 
     async def _update_password_hash(self, user_id: int, new_password_hash: str):
         async with self.apool.connection() as conn:
@@ -1663,9 +1876,22 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchall()
 
-    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobBase]:
+    async def get_job_by_id(self, job_id) -> JobInDb | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(JobBase)) as cur:
+            async with conn.cursor(row_factory=class_row(JobInDb)) as cur:
+                await cur.execute(
+                    f"""
+                        SELECT *
+                        FROM {self.schema}.jobs
+                        WHERE id = %s
+                    """,
+                    (job_id,),
+                )
+                return await cur.fetchone()
+
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobInDb]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(JobInDb)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -1679,10 +1905,10 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def get_job_infos_with_settings_of_user(
         self, user_id: int, job_ids: list[int]
-    ) -> list[JobAndSettings]:
+    ) -> list[JobAndSettingsInDb]:
         jobs = []
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(JobAndSettings)) as cur:
+            async with conn.cursor(row_factory=class_row(JobAndSettingsInDb)) as cur:
                 # first query jobs that use application wide default settings
                 await cur.execute(
                     f"""
@@ -1768,12 +1994,12 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     return None
 
-    async def get_all_unfinished_jobs(self) -> list[tuple[int, int]]:
+    async def get_all_unfinished_jobs(self) -> list[tuple[int, int, bool]]:
         async with self.apool.connection() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                        SELECT id, user_id
+                        SELECT id, user_id, aborting
                         FROM {self.schema}.jobs
                         WHERE finish_timestamp IS NULL
                     """
@@ -1793,7 +2019,7 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
-    async def finish_successful_job(self, runner: OnlineRunner, transcript: Transcript):
+    async def mark_job_as_aborting(self, job_id: int):
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
@@ -1802,16 +2028,52 @@ class PostgresAdapter(DatabaseAdapter):
                         FROM {self.schema}.jobs
                         WHERE id = %s
                     """,
-                    (runner.assigned_job_id,),
+                    (job_id,),
                 )
                 if (audio_oid := await cur.fetchone()) is None:
                     raise Exception(
-                        f"Couldn't get audio_oid for the unfinished job with id {runner.assigned_job_id}"
+                        f"Couldn't get audio_oid for the unfinished job with id {job_id}"
                     )
                 await cur.execute(
                     f"""
                         UPDATE {self.schema}.jobs
-                        SET (audio_oid, finish_timestamp, downloaded, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url) = (NULL, now(), false, %s, %s, %s, %s, %s)
+                        SET (audio_oid, aborting) = (NULL, true)
+                        WHERE id = %s
+                    """,
+                    (job_id,),
+                )
+                await cur.execute(
+                    f"""
+                        SELECT lo_unlink(%s)
+                    """,
+                    (audio_oid,),
+                )
+
+    async def finish_successful_job(self, runner: OnlineRunner, transcript: Transcript):
+        async with self.apool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                        SELECT audio_oid,aborting
+                        FROM {self.schema}.jobs
+                        WHERE id = %s
+                    """,
+                    (runner.assigned_job_id,),
+                )
+                if (result := await cur.fetchone()) is None:
+                    raise Exception(
+                        f"Couldn't find unfinished job with id {runner.assigned_job_id} in the database!"
+                    )
+                (audio_oid, aborting) = result
+                if not aborting and audio_oid is None:
+                    raise Exception(
+                        f"Couldn't get audio_oid for unfinished job with id {runner.assigned_job_id} from the database!"
+                    )
+
+                await cur.execute(
+                    f"""
+                        UPDATE {self.schema}.jobs
+                        SET (audio_oid, finish_timestamp, aborting, downloaded, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url) = (NULL, NOW(), false, false, %s, %s, %s, %s, %s)
                         WHERE id = %s
                     """,
                     (
@@ -1837,12 +2099,13 @@ class PostgresAdapter(DatabaseAdapter):
                         Jsonb(transcript.as_json),
                     ),
                 )
-                await cur.execute(
-                    f"""
-                        SELECT lo_unlink(%s)
-                    """,
-                    (audio_oid,),
-                )
+                if audio_oid is not None:
+                    await cur.execute(
+                        f"""
+                            SELECT lo_unlink(%s)
+                        """,
+                        (audio_oid,),
+                    )
 
     async def finish_failed_job(
         self, job_id: int, error_msg: str, runner: OnlineRunner | None = None
@@ -1862,23 +2125,29 @@ class PostgresAdapter(DatabaseAdapter):
             runner_git_hash = None
             runner_source_code_url = None
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=scalar_row) as cur:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                        SELECT audio_oid
+                        SELECT audio_oid,aborting
                         FROM {self.schema}.jobs
                         WHERE id = %s
                     """,
                     (job_id,),
                 )
-                if (audio_oid := await cur.fetchone()) is None:
+                if (result := await cur.fetchone()) is None:
                     raise Exception(
-                        f"Couldn't get audio_oid for the unfinished job with id {job_id}"
+                        f"Couldn't find unfinished job with id {job_id} in the database!"
                     )
+                (audio_oid, aborting) = result
+                if not aborting and audio_oid is None:
+                    raise Exception(
+                        f"Couldn't get audio_oid for unfinished job with id {job_id} from the database!"
+                    )
+
                 await cur.execute(
                     f"""
                         UPDATE {self.schema}.jobs
-                        SET (audio_oid, finish_timestamp, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, error_msg) = (NULL, now(), %s, %s, %s, %s, %s, %s)
+                        SET (audio_oid, finish_timestamp, aborting, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, error_msg) = (NULL, NOW(), false, %s, %s, %s, %s, %s, %s)
                         WHERE id = %s
                     """,
                     (
@@ -1891,9 +2160,291 @@ class PostgresAdapter(DatabaseAdapter):
                         job_id,
                     ),
                 )
+                if audio_oid is not None:
+                    await cur.execute(
+                        f"""
+                            SELECT lo_unlink(%s)
+                        """,
+                        (audio_oid,),
+                    )
+
+    async def general_cleanup(self):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                self.logger.info("Starting general database cleanup...")
                 await cur.execute(
                     f"""
-                        SELECT lo_unlink(%s)
+                    SELECT data['general_last_cleanup']
+                    FROM {self.schema}.metadata
+                    WHERE topic = 'cleanup'
+                    """
+                )
+                last_cleanup_isoformat = await cur.fetchone()
+                if last_cleanup_isoformat is None:
+                    raise Exception(
+                        "Couldn't find general_last_cleanup timestamp in cleanup topic of the metadata table!"
+                    )
+                last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
+                time_since_last_cleanup = datetime.now() - last_cleanup
+                if time_since_last_cleanup.total_seconds() < 86400:
+                    self.logger.info(
+                        "General cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
+                    )
+                    return
+
+                self.logger.info("Cleaning up orphaned large objects...")
+                await cur.execute(
+                    f"""
+                    SELECT lo_unlink(lo.oid)
+                    FROM pg_largeobject_metadata lo, pg_roles roles
+                    WHERE roles.rolname = current_user
+                    AND lo.lomowner = roles.oid
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM {self.schema}.jobs
+                        WHERE audio_oid = lo.oid
+                    )
+                    """
+                )
+                self.logger.info("Cleaning up orphaned job settings rows...")
+                await cur.execute(
+                    f"""
+                    DELETE FROM {self.schema}.job_settings job_settings
+                    WHERE NOT is_default
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM {self.schema}.jobs
+                        WHERE job_settings_id = job_settings.id
+                    )
+                    """
+                )
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.metadata
+                    SET data['general_last_cleanup'] = %s
+                    WHERE topic = 'cleanup'
+                """,
+                    (Jsonb(datetime.now().isoformat()),),
+                )
+        self.logger.info("General database cleanup complete")
+
+    async def user_cleanup(self, retention_time_in_days: int):
+        assert dp.config.cleanup.user_retention_in_days is not None
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                self.logger.info("Starting user database cleanup...")
+                await cur.execute(
+                    f"""
+                    SELECT data['users_last_cleanup']
+                    FROM {self.schema}.metadata
+                    WHERE topic = 'cleanup'
+                    """
+                )
+                last_cleanup_isoformat = await cur.fetchone()
+                if last_cleanup_isoformat is None:
+                    raise Exception(
+                        "Couldn't find users_last_cleanup timestamp in cleanup topic of the metadata table!"
+                    )
+                last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
+                time_since_last_cleanup = datetime.now() - last_cleanup
+                if time_since_last_cleanup.total_seconds() < 86400:
+                    self.logger.info(
+                        "User cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
+                    )
+                    return
+
+                self.logger.info(
+                    f"Cleaning up users that haven't logged in {retention_time_in_days} days..."
+                )
+                # first send emails out to users who's accounts will be deleted in 30 days/7 days
+                await cur.execute(
+                    f"""
+                    SELECT la.email
+                    FROM {self.schema}.users users, {self.schema}.local_accounts la
+                    WHERE users.id = la.id
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
+                    AND la.provision_number IS NULL
+                    UNION
+                    SELECT oa.email
+                    FROM {self.schema}.users users, {self.schema}.oidc_accounts oa
+                    WHERE users.id = oa.id
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
+                    UNION
+                    SELECT lda.email
+                    FROM {self.schema}.users users, {self.schema}.ldap_accounts lda
+                    WHERE users.id = lda.id
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
                     """,
-                    (audio_oid,),
+                    {
+                        "interval_begin": timedelta(days=retention_time_in_days - 31),
+                        "interval_end": timedelta(days=retention_time_in_days - 30),
+                    },
+                )
+                users_30_days_notif = await cur.fetchall()
+                await cur.execute(
+                    f"""
+                    SELECT la.email
+                    FROM {self.schema}.users users, {self.schema}.local_accounts la
+                    WHERE users.id = la.id
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
+                    AND la.provision_number IS NULL
+                    UNION
+                    SELECT oa.email
+                    FROM {self.schema}.users users, {self.schema}.oidc_accounts oa
+                    WHERE users.id = oa.id
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
+                    UNION
+                    SELECT lda.email
+                    FROM {self.schema}.users users, {self.schema}.ldap_accounts lda
+                    WHERE users.id = lda.id
+                    AND NOW() - users.last_login BETWEEN %(interval_begin)s AND %(interval_end)s
+                    """,
+                    {
+                        "interval_begin": timedelta(days=retention_time_in_days - 8),
+                        "interval_end": timedelta(days=retention_time_in_days - 7),
+                    },
+                )
+                users_7_days_notif = await cur.fetchall()
+                users_30_days_notif_validated = []
+                for email in users_30_days_notif:
+                    try:
+                        users_30_days_notif_validated.append(EmailValidated.model_validate(email))
+                    except ValidationError:
+                        self.logger.error(
+                            f"Database contained invalid email address {email}, ignoring..."
+                        )
+                if len(users_30_days_notif_validated) > 0:
+                    await dp.smtp.send_account_deletion_reminder(
+                        users_30_days_notif_validated, dp.config.client_url, 30
+                    )
+                    self.logger.info(
+                        f"Sent 30 day account deletion reminder to {len(users_30_days_notif_validated)} users"
+                    )
+                else:
+                    self.logger.info("Didn't have to send any 30 day account deletion reminders")
+                users_7_days_notif_validated = []
+                for email in users_7_days_notif:
+                    try:
+                        users_7_days_notif_validated.append(EmailValidated.model_validate(email))
+                    except ValidationError:
+                        self.logger.error(
+                            f"Database contained invalid email address {email}, ignoring..."
+                        )
+                if len(users_7_days_notif_validated) > 0:
+                    await dp.smtp.send_account_deletion_reminder(
+                        users_7_days_notif_validated, dp.config.client_url, 7
+                    )
+                    self.logger.info(
+                        f"Sent 7 day account deletion reminder to {len(users_7_days_notif_validated)} users"
+                    )
+                else:
+                    self.logger.info("Didn't have to send any 7 day account deletion reminders")
+
+                await cur.execute(
+                    f"""
+                    DELETE
+                    FROM {self.schema}.users users
+                    WHERE users.last_login < NOW() - %s
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM {self.schema}.local_accounts la
+                        WHERE la.id = users.id
+                        AND la.provision_number IS NOT NULL
+                    )
+                    """,
+                    (timedelta(days=retention_time_in_days),),
+                )
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.metadata
+                    SET data['users_last_cleanup'] = %s
+                    WHERE topic = 'cleanup'
+                """,
+                    (Jsonb(datetime.now().isoformat()),),
+                )
+        self.logger.info("User database cleanup complete")
+
+    async def job_cleanup(self, retention_time_in_days: int):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                self.logger.info("Starting job database cleanup...")
+                await cur.execute(
+                    f"""
+                    SELECT data['jobs_last_cleanup']
+                    FROM {self.schema}.metadata
+                    WHERE topic = 'cleanup'
+                    """
+                )
+                last_cleanup_isoformat = await cur.fetchone()
+                if last_cleanup_isoformat is None:
+                    raise Exception(
+                        "Couldn't find jobs_last_cleanup timestamp in cleanup topic of the metadata table!"
+                    )
+                last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
+                time_since_last_cleanup = datetime.now() - last_cleanup
+                if time_since_last_cleanup.total_seconds() < 86400:
+                    self.logger.info(
+                        "Job cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
+                    )
+                    return
+
+                self.logger.info(
+                    f"Cleaning up jobs that have finished more than {retention_time_in_days} days ago..."
+                )
+                await cur.execute(
+                    f"""
+                    DELETE
+                    FROM {self.schema}.jobs
+                    WHERE finish_timestamp IS NOT NULL
+                    AND finish_timestamp < NOW() - %s
+                    """,
+                    (timedelta(days=retention_time_in_days),),
+                )
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.metadata
+                    SET data['jobs_last_cleanup'] = %s
+                    WHERE topic = 'cleanup'
+                """,
+                    (Jsonb(datetime.now().isoformat()),),
+                )
+        self.logger.info("Job database cleanup complete")
+
+    async def add_site_banner(self, urgency: int, html: str) -> int | None:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                    INSERT INTO {self.schema}.site_data (type, urgency, html)
+                    VALUES ('banner', %s, %s)
+                    RETURNING id
+                """,
+                    (urgency, html),
+                )
+                return await cur.fetchone()
+
+    async def list_site_banners(self) -> list[SiteBannerResponse]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(SiteBannerResponse)) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT id,urgency,html
+                    FROM {self.schema}.site_data
+                    WHERE type = 'banner'
+                    ORDER BY urgency DESC
+                    """
+                )
+                return await cur.fetchall()
+
+    async def delete_site_banner(self, id: int):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(SiteBannerResponse)) as cur:
+                await cur.execute(
+                    f"""
+                    DELETE
+                    FROM {self.schema}.site_data
+                    WHERE type = 'banner'
+                    AND id = %s
+                    """,
+                    (id,),
                 )

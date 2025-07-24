@@ -46,7 +46,7 @@ async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, D
     user = await ldap.ldap_adapter.query_user(idp_name, form_data.username)
 
     if await ldap.ldap_adapter.authenticate_user(idp_name, user.dn, form_data.password):
-        user_id = await dp.db.ensure_ldap_user_exists(idp_name, user.dn, user.email)
+        user_id = await dp.db.ensure_ldap_user_exists(idp_name, user.uid, user.email)
         data = AuthTokenData(
             user_type=UserTypeEnum.LDAP, sub=str(user_id), email=user.email, is_verified=True
         )

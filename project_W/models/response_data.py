@@ -4,6 +4,7 @@ from typing import Mapping
 from pydantic import BaseModel, Field
 
 from .base import (
+    AdditionalUserInfo,
     InProcessJobBase,
     JobBase,
     JobSettingsBase,
@@ -11,8 +12,8 @@ from .base import (
     ProviderSettingsBase,
     UserInDb,
 )
-from .request_data import JobSettings
-from .settings import ImprintSettings
+from .request_data import JobSettings, SiteBanner
+from .settings import ImprintSettings, TosSettings
 
 
 class UserTypeEnum(str, Enum):
@@ -22,7 +23,7 @@ class UserTypeEnum(str, Enum):
 
 
 # user model for the api
-class User(UserInDb):
+class User(UserInDb, AdditionalUserInfo):
     provider_name: str
     user_type: UserTypeEnum
     is_admin: bool
@@ -39,12 +40,19 @@ class ErrorResponse(BaseModel):
         }
 
 
+class SiteBannerResponse(SiteBanner):
+    id: int
+
+
 class AboutResponse(BaseModel):
     description: str
     source_code: str
     version: str
     git_hash: str
     imprint: ImprintSettings | None
+    terms_of_services: dict[int, TosSettings]
+    job_retention_in_days: int | None
+    site_banners: list[SiteBannerResponse]
 
 
 class TokenSecretInfo(BaseModel):
@@ -92,6 +100,9 @@ class JobStatus(str, Enum):
     # A runner has been assigned, and is currently processing
     # the request
     RUNNER_IN_PROGRESS = "runner_in_progress"
+    # The job is currently being aborted, i.e. the backend waits
+    # for the runner to stop processing this job
+    ABORTING = "aborting"
     # The runner successfully completed the job and
     # the transcript is ready for retrieval
     SUCCESS = "success"

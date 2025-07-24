@@ -72,8 +72,6 @@ async def unregister_runner(
     """
     await dp.ch.unregister_online_runner(runner_id)
 
-    await dp.ch.unregister_online_runner(runner_id)
-
     return "Success"
 
 
@@ -83,6 +81,10 @@ async def unregister_runner(
         400: {
             "model": ErrorResponse,
             "description": "No job assigned or job not in database",
+        },
+        405: {
+            "model": ErrorResponse,
+            "description": "The assigned job was aborted by the user",
         },
         **online_runner_dependency_responses,
     },
@@ -98,14 +100,22 @@ async def retrieve_job_info(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This runner has currently no job assigned",
         )
-    if (
-        job_settings := await dp.db.get_job_settings_by_job_id(online_runner.assigned_job_id)
-    ) is None:
+    if (job := await dp.db.get_job_by_id(online_runner.assigned_job_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The job id assigned to this runner doesn't appear in the database!",
+        )
+    if job.aborting:
+        raise HTTPException(
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+            detail="This job was aborted by a user. Can't get job info of an aborted job!",
+        )
+    if (job_settings := await dp.db.get_job_settings_by_job_id(job.id)) is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="The job id of this runner doesn't appear in the database!",
         )
-    return RunnerJobInfoResponse(id=online_runner.assigned_job_id, settings=job_settings)
+    return RunnerJobInfoResponse(id=job.id, settings=job_settings)
 
 
 @router.post(
@@ -114,6 +124,10 @@ async def retrieve_job_info(
         400: {
             "model": ErrorResponse,
             "description": "No job assigned",
+        },
+        405: {
+            "model": ErrorResponse,
+            "description": "The assigned job was aborted by the user",
         },
         **online_runner_dependency_responses,
     },
@@ -131,13 +145,21 @@ async def retrieve_job_audio(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This runner has currently no job assigned",
         )
+    if (job := await dp.db.get_job_by_id(online_runner.assigned_job_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The job id assigned to this runner doesn't appear in the database!",
+        )
+    if job.aborting:
+        raise HTTPException(
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+            detail="This job was aborted by a user. Can't get job audio of an aborted job!",
+        )
 
     if not online_runner.in_process:
         await dp.ch.mark_job_of_runner_in_progress(online_runner.id)
 
-    return StreamingResponse(
-        dp.db.get_job_audio(online_runner.assigned_job_id), media_type="audio/"
-    )
+    return StreamingResponse(dp.db.get_job_audio(job.id), media_type="audio/")
 
 
 @router.post(
@@ -172,30 +194,43 @@ async def submit_job_result(
         raise Exception("Trying to submit a job that belongs to a non-existing user!")
 
     if submitted_data.error_msg is not None:
-        await dp.db.finish_failed_job(
-            online_runner.assigned_job_id, submitted_data.error_msg, online_runner
-        )
-        if settings.email_notification:
-            background_tasks.add_task(
-                dp.smtp.send_job_failed_email,
-                user.email,
-                in_process_job.id,
-                submitted_data.error_msg,
-                dp.config.client_url,
-            )
+        job_failed = True
     elif submitted_data.transcript is not None:
-        await dp.db.finish_successful_job(online_runner, submitted_data.transcript)
-        if settings.email_notification:
-            background_tasks.add_task(
-                dp.smtp.send_job_success_email, user.email, in_process_job.id, dp.config.client_url
-            )
+        job_failed = False
     else:
         raise Exception(
             "Pydantic model validation failed, job submission has neither error_msg nor a transcript attached to it"
         )
 
-    await dp.ch.finish_job_of_online_runner(online_runner)
+    # processing the result can take some time for larger jobs, especially the database operations
+    # so do this as a background task
+    async def process_job_result():
+        assert online_runner.assigned_job_id is not None
+        if job_failed:
+            assert submitted_data.error_msg is not None
+            await dp.db.finish_failed_job(
+                online_runner.assigned_job_id, submitted_data.error_msg, online_runner
+            )
+        else:
+            assert submitted_data.transcript is not None
+            await dp.db.finish_successful_job(online_runner, submitted_data.transcript)
 
+        await dp.ch.finish_job_of_online_runner(online_runner.assigned_job_id)
+
+        if settings.email_notification:
+            if job_failed:
+                assert submitted_data.error_msg is not None
+                await dp.smtp.send_job_failed_email(
+                    user.email, in_process_job.id, submitted_data.error_msg, dp.config.client_url
+                )
+            else:
+                await dp.smtp.send_job_success_email(
+                    user.email, in_process_job.id, dp.config.client_url
+                )
+
+    background_tasks.add_task(process_job_result)
+
+    await dp.ch.unassign_current_job_from_online_runner(online_runner)
     await dp.ch.assign_queue_job_to_runner_if_possible()
 
     return "Success"

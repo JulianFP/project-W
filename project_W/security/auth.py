@@ -107,7 +107,7 @@ def validate_user(require_verified: bool, require_admin: bool):
         if require_verified and not token_data.is_verified:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Your email address needs to be verified to access this route. Please click on the link sent to {token_data.email} or request a new confirmation email.",
+                detail=f"Your email address needs to be verified to access this route. Please click on the link sent to '{token_data.email.root}' or request a new confirmation email.",
             )
 
         if require_admin and not token_data.is_admin:
@@ -122,23 +122,34 @@ def validate_user(require_verified: bool, require_admin: bool):
     return user_validation_dep
 
 
-def validate_user_and_get_from_db(require_verified: bool, require_admin: bool):
+def validate_user_and_get_from_db(require_verified: bool, require_admin: bool, require_tos: bool):
     async def user_lookup_dep(
         user_token_data: Annotated[
             DecodedAuthTokenData, Depends(validate_user(require_verified, require_admin))
         ],
     ) -> User:
         if user_token_data.user_type == UserTypeEnum.LOCAL:
-            return await lookup_local_user_in_db_from_token(user_token_data)
+            user = await lookup_local_user_in_db_from_token(user_token_data)
         elif user_token_data.user_type == UserTypeEnum.LDAP:
-            return await lookup_ldap_user_in_db_from_token(user_token_data)
+            user = await lookup_ldap_user_in_db_from_token(user_token_data)
         elif user_token_data.user_type == UserTypeEnum.OIDC:
             if user_token_data.iss == jwt_issuer:
-                return await lookup_oidc_user_in_db_from_api_token(user_token_data)
+                user = await lookup_oidc_user_in_db_from_api_token(user_token_data)
             else:
-                return await lookup_oidc_user_in_db_from_token(user_token_data)
+                user = await lookup_oidc_user_in_db_from_token(user_token_data)
         else:
             raise Exception("Invalid token type encountered!")
+
+        if require_tos:
+            for tos_id, tos in dp.config.terms_of_services.items():
+                accepted_tos_version = user.accepted_tos.get(tos_id)
+                if accepted_tos_version is None or accepted_tos_version < tos.version:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="You need to agree to the newest version of the terms of services of this instance to access this route",
+                    )
+
+        return user
 
     return user_lookup_dep
 

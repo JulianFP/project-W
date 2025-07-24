@@ -22,7 +22,12 @@ router = APIRouter(
 @router.delete("/invalidate_token")
 async def invalidate_token(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
     ],
     token_id: int,
 ) -> str:
@@ -36,7 +41,12 @@ async def invalidate_token(
 @router.delete("/invalidate_all_tokens")
 async def invalidate_all_tokens(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
     ],
 ) -> str:
     """
@@ -57,7 +67,12 @@ async def invalidate_all_tokens(
 )
 async def get_new_api_token(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=False
+            )
+        ),
     ],
     name: Annotated[str, Query(max_length=64)],
 ) -> str:
@@ -103,7 +118,12 @@ async def get_new_api_token(
 @router.get("/get_all_token_info")
 async def get_all_token_info(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
     ],
 ) -> list[TokenSecretInfo]:
     """
@@ -115,7 +135,12 @@ async def get_all_token_info(
 @router.get("/info")
 async def user_info(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
     ],
 ) -> User:
     """
@@ -124,10 +149,49 @@ async def user_info(
     return current_user
 
 
+@router.post(
+    "/accept_tos",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "No term of service with that id or version exists",
+        }
+    },
+)
+async def accept_tos(
+    current_user: Annotated[
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
+    ],
+    tos_id: int,
+    tos_version: int,
+) -> str:
+    """
+    By calling this route the user accepts to the terms of service specified by the submitted tos_id and tos_version. Only if a user has accepted the newest version of every term of service of this instance they are allowed to use this service.
+    """
+    for server_tos_id, server_tos in dp.config.terms_of_services.items():
+        if tos_id == server_tos_id and tos_version <= server_tos.version:
+            await dp.db.accept_tos_of_user(current_user.id, tos_id, tos_version)
+            return "Success"
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"No term of service found with id {tos_id} and version {tos_version}",
+    )
+
+
 @router.delete("/delete")
 async def delete_user(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
     ],
 ) -> str:
     """

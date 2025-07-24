@@ -5,13 +5,11 @@ from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_400_BAD_REQUEST
 
 import project_W.dependencies as dp
-from project_W.models.base import JobBase
-from project_W.models.internal import JobSortKey
+from project_W.models.internal import JobAndSettingsInDb, JobInDb, JobSortKey
 
 from ..models.request_data import JobSettings, TranscriptTypeEnum
 from ..models.response_data import (
     ErrorResponse,
-    JobAndSettings,
     JobInfo,
     JobStatus,
     User,
@@ -19,13 +17,15 @@ from ..models.response_data import (
 from ..security.auth import auth_dependency_responses, validate_user_and_get_from_db
 
 
-async def job_status(job: JobBase) -> JobStatus:
+async def job_status(job: JobInDb) -> JobStatus:
     if job.downloaded:
         return JobStatus.DOWNLOADED
     if job.downloaded is not None:
         return JobStatus.SUCCESS
     if job.error_msg is not None:
         return JobStatus.FAILED
+    if job.aborting:
+        return JobStatus.ABORTING
     if (runner_id := (await dp.ch.get_online_runner_id_by_assigned_job(job.id))) is not None and (
         runner := await dp.ch.get_online_runner_by_id(runner_id)
     ) is not None:
@@ -48,7 +48,12 @@ router = APIRouter(
 @router.post("/submit_settings")
 async def submit_settings(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_settings: JobSettings,
     is_new_default: bool = False,
@@ -62,7 +67,12 @@ async def submit_settings(
 @router.get("/default_settings")
 async def get_default_settings(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=False, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=False, require_admin=False, require_tos=False
+            )
+        ),
     ],
 ) -> JobSettings:
     """
@@ -85,7 +95,12 @@ async def get_default_settings(
 )
 async def submit_job(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     audio_file: UploadFile,
     job_settings_id: int | None = None,
@@ -118,7 +133,12 @@ async def submit_job(
 @router.get("/count")
 async def job_count(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     exclude_finished: bool,
     exclude_downloaded: bool,
@@ -135,7 +155,12 @@ async def job_count(
 @router.get("/get")
 async def get(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     start_index: int,
     end_index: int,
@@ -162,7 +187,12 @@ async def get(
 @router.get("/info")
 async def job_info(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_ids: Annotated[list[int], Query()],
 ) -> list[JobInfo]:
@@ -170,8 +200,8 @@ async def job_info(
     Returns a list of job objects containing all information related to each of the specified jobs.
     Note that job infos will be returned in no specific order, please use the get route to get an ordering of jobs by id and only use this route to get additional information about these jobs.
     """
-    job_and_setting_infos: list[JobAndSettings] = await dp.db.get_job_infos_with_settings_of_user(
-        current_user.id, job_ids
+    job_and_setting_infos: list[JobAndSettingsInDb] = (
+        await dp.db.get_job_infos_with_settings_of_user(current_user.id, job_ids)
     )
     job_infos = []
     for job in job_and_setting_infos:
@@ -187,7 +217,7 @@ async def job_info(
                 runner_dict = runner.model_dump()
                 for key, val in runner_dict.items():
                     data[f"runner_{key}"] = val  # JobBase optional data
-        elif data["step"] == JobStatus.SUCCESS or data["step"] == JobStatus.DOWNLOADED:
+        elif data["step"] in [JobStatus.SUCCESS, JobStatus.DOWNLOADED, JobStatus.ABORTING]:
             data["progress"] = 100
         job_infos.append(JobInfo.model_validate(data))
     return job_infos
@@ -204,17 +234,27 @@ async def job_info(
 )
 async def abort_jobs(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_ids: list[int],
 ) -> str:
     """
     Aborts a currently running job. This will put the job into a failed state with an error message saying that the job was aborted. Any processing of this job will be canceled.
     """
-    jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
+    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
-        if jobStatus in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
+        if jobStatus in [
+            JobStatus.SUCCESS,
+            JobStatus.FAILED,
+            JobStatus.DOWNLOADED,
+            JobStatus.ABORTING,
+        ]:
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
                 detail="At least one of the provided jobs is currently not running",
@@ -224,6 +264,7 @@ async def abort_jobs(
     for job in jobs:
         jobStatus = await job_status(job)
         if jobStatus in [JobStatus.RUNNER_ASSIGNED, JobStatus.RUNNER_IN_PROGRESS]:
+            await dp.db.mark_job_as_aborting(job.id)
             await dp.ch.abort_in_process_job(job.id)
         else:
             if jobStatus is JobStatus.PENDING_RUNNER:
@@ -244,14 +285,19 @@ async def abort_jobs(
 )
 async def delete_jobs(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_ids: list[int],
 ) -> str:
     """
     Deletes a completed (aborted/successfully finished) job. To delete a currently running job please use the abort route first and then delete it using this route.
     """
-    jobs: list[JobBase] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
+    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
         if jobStatus not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
@@ -276,7 +322,12 @@ async def delete_jobs(
 )
 async def download_transcript(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
     job_id: int,
     transcript_type: TranscriptTypeEnum,
@@ -301,7 +352,12 @@ async def download_transcript(
 @router.get("/events")
 async def events(
     current_user: Annotated[
-        User, Depends(validate_user_and_get_from_db(require_verified=True, require_admin=False))
+        User,
+        Depends(
+            validate_user_and_get_from_db(
+                require_verified=True, require_admin=False, require_tos=True
+            )
+        ),
     ],
 ) -> StreamingResponse:
     """

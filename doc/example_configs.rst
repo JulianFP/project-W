@@ -27,8 +27,35 @@ An imprint is often required for legal reasons and contains information about wh
        </div>
        <div>
          <dt><strong>Website:</strong></dt>
-         <dd><a href="alice.example.org" target="_blank" rel="noopener noreferrer">alice.example.org</a></dd>
+         <dd><a href="https://alice.example.org" target="_blank" rel="noopener noreferrer">alice.example.org</a></dd>
        </div>
+
+Add Terms of Services
+---------------------
+
+A User Agreement or a Data Privacy Agreement can often be a legal requirement for hosting an instance like this. While Project-W doesn't offer any legal insurances it does offer features to the administrator so that they can figure out the legal requirements themselves and hopefully implement them.
+
+The following config is for demonstration purposes only:
+
+.. code-block:: yaml
+
+   terms_of_services:
+     0:
+       name: User Agreement
+       version: 1
+       tos_html: |
+         <p>The user agrees to donate their kidney to the developer of Project-W</p>
+     1:
+       name: Data Privacy Agreement
+       version: 1
+       tos_html: |
+         <p>You can find the full data privacy agreement <a href="https://tos.example.org" target="_blank" rel="noopener noreferrer">here</a></p>
+
+This config adds two separate terms of services. The user has to explicitly accept both of them before being able to use Project-W (i.e. upload any jobs etc.). While the official frontend leaves plenty of space for longer terms of services than shown here, for many pages worth of legal text consider using a link instead as shown in the Data Privacy Agreement above.
+
+The version field can't be omitted and is important when updating the terms of services: If you increase the version integer all users will have to re-read and re-accept this term of service. Always increase the version if you make significant changes to the terms of services.
+
+Never change the keys of these attributes sets (here 0 and 1) since they are being used to identify each term of service. If you want to remove a term of service then never re-use that same key for a different term of service in the future as the users will still have accepted the term of service with that key even if it has been removed from the config. The name and tos_html of the term of service however can be changed as much as you want (just consider to increase the version field alongside it).
 
 Basic OIDC login with Google
 ----------------------------
@@ -61,7 +88,7 @@ OIDC login restricted to a user group
 
 If you/your organization are hosting your own identity provider that you want to use for Project-W, but you don't want to give all registered users at that provider access to the service, then this example config might be for you. Project-W allows you to restrict access to certain user roles which are read from the claims of the id_token.
 
-1. Configure your IdP with a custom claim map. The name and value of that claim are up to you, just make sure that only the users who are supposed to have access to Project-W have that claim with that specific value. I use `Kanidm <https://kanidm.com>`_ as my IdP, if you do too then you can find the documentation for how to do this `here <https://kanidm.github.io/kanidm/master/integrations/oauth2/custom_claims.html>`_.
+1. Configure your IdP with a custom claim map. The name and value of that claim are up to you, just make sure that only the users who are supposed to have access to Project-W have that claim with that specific value. I use `Kanidm <https://kanidm.com>`_ as my IdP, if you do too then `here is the documentation for how to do this <https://kanidm.github.io/kanidm/master/integrations/oauth2/custom_claims.html>`_.
 
 2. If you want then you can do the same for a different group of users that should have admin privileges as well. Please be careful though as having admin privileges gives a user full access over the data of all users on the instance! Refer to :ref:`login_with_admin_privileges` for more information on that.
 
@@ -96,7 +123,7 @@ If you want to use LDAP instead of OIDC for logging in your users this guide is 
 
 4. If you want you can craft a different filter expression, base dn and mail attribute name for a different user group that should have admin privileges as well. Please be careful though as having admin privileges gives a user full access over the data of all users on the instance! Refer to :ref:`login_with_admin_privileges` for more information on that.
 
-5. I use `Kanidm <https://kanidm.com>`_ as my IdP, if you do too then you can find the documentation for how to set up it's LDAP interface `here <https://kanidm.github.io/kanidm/master/integrations/ldap.html>`_. If your IdP is ready to go then you just need to add a config similar to the following to the backend. The admin_query section can be omitted if no user should have admin privileges, and the ca_pem_file_path option can of course also be omitted if you didn't self-sign your certificate:
+5. I use `Kanidm <https://kanidm.com>`_ as my IdP, if you do too then `here is it's documentation for setting up the LDAP interface <https://kanidm.github.io/kanidm/master/integrations/ldap.html>`_. If your IdP is ready to go then you just need to add a config similar to the following to the backend. The admin_query section can be omitted if no user should have admin privileges, and the ca_pem_file_path option can of course also be omitted if you didn't self-sign your certificate:
 
    .. code-block:: yaml
 
@@ -108,11 +135,38 @@ If you want to use LDAP instead of OIDC for logging in your users this guide is 
           service_account_auth:
             user: "dn=token"
             password: <redacted>
+          username_attributes:
+            - "name"
+            - "mail"
+          uid_attribute: "uuid"
+          mail_attribute: "mail"
           user_query:
             base_dn: "dc=localhost"
-            filter: "(&(class=account)(memberof=spn=project-W-users@localhost)(name=%s))"
-            mail_attribute_name: "mail"
+            filter: "&(class=account)(memberof=spn=project-W-users@localhost)"
           admin_query:
             base_dn: "dc=localhost"
-            filter: "(&(class=account)(memberof=spn=project-W-admins@localhost)(name=%s))"
-            mail_attribute_name: "mail"
+            filter: "&(class=account)(memberof=spn=project-W-admins@localhost)"
+
+Automatic user and job cleanups
+-------------------------------
+
+The backend always deletes the submitted audio files (which is both the most sensitive and storage consuming data) as soon as possible, i.e. immediately after the job has finished, failed or was aborted. However by default, all other data (like transcripts, job information and settings, user emails and account information, ...) will be kept indefinitely.
+
+For various reasons it might be desirable to change this behavior. For this Project-W provides automatic cleanup functionality for both jobs and users. This feature might proof especially useful to comply with possible regulatory requirements which dictate that user data can only be kept for a certain amount of time.
+
+   .. note::
+      This feature relies on the periodic tasks being executed at least daily. Please use the provided project-w_cron docker container or setup a cronjob or systemd timer for this if you haven't already. If the periodic tasks are misconfigured this feature will not work correctly or at all!
+
+Here is an example config that deletes jobs 7 days after they have finished and users 1 year after their last login:
+
+   .. code-block:: yaml
+
+      cleanup:
+        finished_job_retention_in_days: 7
+        user_retention_in_days: 365
+
+Of course you can also decide to activate only one of user or job deletion without the other. By default, both are deactivated.
+
+If a job gets deleted this means that all data attached to that job, most notably the transcript, will also be deleted. Since the transcript is almost as sensitive as the audio files themselves you might want to setup your Project-W instance to store jobs only very briefly to minimize the amount of sensitive data stored on the backend at every given time (e.g. to 7 days like in this example). If job deletion is active the users will be informed about that on the job submission page so that they can make sure to download the transcript of a finished job before it gets deleted.
+
+If a user gets deleted this means that all data attached to that user, most notably all of their jobs, transcripts and their account information and email address, will also be deleted. An email will be sent to affected users both 30 days and 7 days before their account will be deleted which gives them a chance to login to Project-W again and thus save their account from deletion.

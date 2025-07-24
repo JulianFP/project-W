@@ -125,6 +125,10 @@ class OidcProviderSettings(ProviderSettings):
     client_secret: SecretStr = Field(
         description="The client_secret string as returned by the identity provider after setting up this application"
     )
+    enable_pkce_s256_challenge: bool = Field(
+        default=True,
+        description="Whether the PKCE flow using the S256 challenge method should be enabled. The OIDC provider has to support this.",
+    )
     user_role: OidcRoleSettings | None = Field(
         default=None,
         description="Configure the role that users should have to be able to access this Project-W instance. Every user who doesn't have this role in their id token won't be able to use this service. Set to None if all users of this IdP should be able to access it",
@@ -142,19 +146,11 @@ class LdapQuerySettings(BaseModel):
         examples=["dc=example,dc=org"],
     )
     filter: str = Field(
-        description="Ldap filter expression that should return only one user with a specific username that has the required permissions. Use %s as a placeholder for the username as the user enters it into on the login form.",
+        description="Ldap filter expression that that will be merged with the user attribute filters.",
         examples=[
-            "(&(class=person)(person=%s))"
-            "(&(class=person)(memberof=spn=project-W-users@localhost)(name=%s))"
-            "(&(class=person)(memberof=spn=project-W-admins@localhost)(mail=%s))"
-        ],
-    )
-    mail_attribute_name: str = Field(
-        description="The attribute/field name that contains the email address of a user. Every user that should be able to authenticate with Project-W should have this attribute.",
-        examples=[
-            "mail",
-            "email",
-            "mail1",
+            "(class=person)"
+            "(&(class=person)(memberof=spn=project-W-users@localhost)"
+            "(&(class=account)(memberof=spn=project-W-admins@localhost))"
         ],
     )
 
@@ -192,6 +188,29 @@ class LdapProviderSettings(ProviderSettings):
             "ldap://example.org",
             "ldaps://example.org",
             "ldapi://%2Frun%2Fslapd%2Fldapi",
+        ],
+    )
+    username_attributes: list[str] = Field(
+        description="A list of attribute/field names which contain strings that can be used by the user as a username during login. Project-W will use them to generate an LDAP filter expression and merge it with your provided filter expression like this: (&(<your filter expression>)(|(<username_attribute1>=<username>)(<username_attribute2>=<username>)...))",
+        examples=[
+            ["name"],
+            ["name", "mail"],
+            ["displayname", "email"],
+        ],
+    )
+    uid_attribute: str = Field(
+        description="The attribute/field name that contains a unique user identifier. Doesn't have to be the same as one of the username_attributes, but can be. Make sure that this identifier is unique to a user across the LDAP directory and will never change/be reassigned to a different user! Every LDAP user that the filter expression can return should have this attribute exactly ones. This attribute in combination with the filter expression will be used to query users outside of the regular login flow.",
+        examples=[
+            "uid",
+            "uuid",
+        ],
+    )
+    mail_attribute: str = Field(
+        description="The attribute/field name that contains the email address of a user.  Every LDAP user that the filter expression can return should have this attribute exactly ones.",
+        examples=[
+            "mail",
+            "email",
+            "mail1",
         ],
     )
     user_query: LdapQuerySettings | None = Field(
@@ -303,6 +322,20 @@ class ImprintSettings(BaseModel):
     )
 
 
+class TosSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(
+        description="The name of this term of service. This will be shown as a title above the tos_html content in the frontend",
+    )
+    version: int = Field(
+        ge=1,
+        description="The version of this term of service. Start by putting this to 1. When incremented then users will have to re-accept these terms.",
+    )
+    tos_html: str = Field(
+        description="The terms of services in html format. You may include links to external websites if you want.",
+    )
+
+
 class SslSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cert_file: FilePath = Field(
@@ -366,6 +399,20 @@ class WebServerSettings(BaseModel):
     )
 
 
+class CleanupSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    finished_job_retention_in_days: int | None = Field(
+        description="For how long to keep finished jobs. If a job is older than this it can be cleaned up by the database cleanup task (please note that you have to setup this task as a cronjob or use the cronjob docker container!). If set to None then job cleanup is disabled",
+        default=None,
+        ge=1,
+    )
+    user_retention_in_days: int | None = Field(
+        description="For how long to keep users and their data. If a user hasn't logged in to Project-W in the specified time frame then the user may be deleted (please note that you have to setup this task as a cronjob or use the cronjob docker container!). If set to None then job cleanup is disabled",
+        default=None,
+        ge=90,
+    )
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_url: str = Field(
@@ -394,4 +441,15 @@ class Settings(BaseModel):
         description="Set the imprint/impressum of this instance",
         default=None,
         validate_default=None,
+    )
+    terms_of_services: Annotated[
+        dict[int, TosSettings],
+        Field(
+            description="Attribute set of terms of services. The user will have to accept to every one of these separately before they can use the service. The name of the set will be id of the term of service, don't change it once set!",
+        ),
+    ] = {}
+    cleanup: CleanupSettings = Field(
+        description="Settings regarding cleanups of this server's database. This requires the cronjob to be set up correctly!",
+        default=CleanupSettings(),
+        validate_default=True,
     )

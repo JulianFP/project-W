@@ -21,15 +21,6 @@ from .smtp import SmtpClient
 # startup database connections before spinning up application
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
-    # add imprint info to app attributes (so that it is displayed in OpenAPI docs as well)
-    if dp.config.imprint:
-        app.contact = {
-            "name": dp.config.imprint.name,
-            "email": dp.config.imprint.email.root,
-            "url": f"{dp.config.client_url}/about",
-        }
-
     # connect to database
     dp.db = PostgresAdapter(str(dp.config.postgres_connection_string))
     await dp.db.open()
@@ -74,7 +65,9 @@ async def lifespan(app: FastAPI):
         )
 
     # enqueue all jobs from the database that are not finished yet
-    for job_id, user_id in await dp.db.get_all_unfinished_jobs():
+    for job_id, user_id, aborting in await dp.db.get_all_unfinished_jobs():
+        if aborting:
+            await dp.db.finish_failed_job(job_id, "Job was aborted")
         await dp.ch.enqueue_new_job(job_id, job_id * -1)
         await dp.ch.assign_job_to_runner_if_possible(job_id, user_id)
 
@@ -151,6 +144,17 @@ app = FastAPI(
         else ""
     ),
     root_path_in_servers=False,
+    # add imprint info to app attributes (so that it is displayed in OpenAPI docs as well)
+    contact=(
+        {
+            "name": dp.config.imprint.name,
+            "email": dp.config.imprint.email.root,
+            "url": f"{dp.config.client_url}/imprint",
+        }
+        if dp.config.imprint
+        else None
+    ),
+    terms_of_service=f"{dp.config.client_url}/tos" if dp.config.terms_of_services else None,
 )
 # middleware required by authlib for oidc
 app.add_middleware(
@@ -182,6 +186,9 @@ async def about() -> AboutResponse:
         version=__version__,
         git_hash=str(__version_tuple__[-1]).split(".")[0].removeprefix("g"),
         imprint=dp.config.imprint,
+        terms_of_services=dp.config.terms_of_services,
+        job_retention_in_days=dp.config.cleanup.finished_job_retention_in_days,
+        site_banners=await dp.db.list_site_banners(),
     )
 
 

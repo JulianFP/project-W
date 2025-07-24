@@ -2,9 +2,19 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .base import EmailValidated, InProcessJobBase, UserInDb
+from .base import (
+    AdditionalUserInfo,
+    EmailValidated,
+    InProcessJobBase,
+    JobBase,
+    UserInDb,
+)
 from .request_data import JobSettings, RunnerRegisterRequest
 from .response_data import TokenSecretInfo, UserTypeEnum
+
+
+class UserInDbAll(UserInDb, AdditionalUserInfo):
+    pass
 
 
 # user models for the database
@@ -15,19 +25,42 @@ class LocalUserInDb(UserInDb):
     provision_number: int | None
 
 
+class LocalUserInDbAll(LocalUserInDb, AdditionalUserInfo):
+    pass
+
+
 class OidcUserInDb(UserInDb):
     iss: str
     sub: str
 
 
+class OidcUserInDbAll(OidcUserInDb, AdditionalUserInfo):
+    pass
+
+
 class LdapUserInDb(UserInDb):
     provider_name: str
-    dn: str
+    uid: str
+
+
+class LdapUserInDbAll(LdapUserInDb, AdditionalUserInfo):
+    pass
 
 
 class RunnerInDb(BaseModel):
     id: int
     token_hash: str
+
+
+class JobInDb(JobBase):
+    aborting: bool
+    user_id: int
+    job_settings_id: int | None = None
+    audio_oid: int | None = None
+
+
+class JobAndSettingsInDb(JobInDb):
+    settings: JobSettings = JobSettings()
 
 
 class JobSettingsInDb(BaseModel):
@@ -63,6 +96,7 @@ class TokenSecret(TokenSecretInfo):
 
 class LdapUserInfo(BaseModel):
     dn: str
+    uid: str
     is_admin: bool
     email: EmailValidated
 

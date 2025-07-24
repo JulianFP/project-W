@@ -39,7 +39,7 @@ If a route is not successful (http status code not in the 200 range) and the err
 OpenAPI docs
 ------------
 
-   We would recommend to visit the OpenAPI docs UI (formerly known as Swagger UI) under `/docs` of a hosted Project-W instance. Alternatively if you prefer every Project-W instance also comes with a Redoc UI under `/redoc`. The API reference below should only be considered as a quick overview, the OpenAPI and Redoc UIs are far superior to this documentation.
+We would recommend to visit the OpenAPI docs UI (formerly known as Swagger UI) under `/docs` of a hosted Project-W instance. Alternatively if you prefer every Project-W instance also comes with a Redoc UI under `/redoc`. The API reference below should only be considered as a quick overview, the OpenAPI and Redoc UIs are far superior to this documentation.
 
 Quick overview
 --------------
