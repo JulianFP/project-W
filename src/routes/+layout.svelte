@@ -51,9 +51,9 @@ let { data, children }: Props = $props();
     <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-300 dark:bg-slate-900">
       <NavHamburger />
       <NavBrand href="#/">
-        <!--TODO add icon like this: <img src="/images/flowbite-svelte-icon-logo.svg" class="me-3 h-6 sm:h-9" alt="Flowbite Logo" />-->
         <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
-        <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project W</span>
+        <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project</span>
+        <img src="/favicon.png" class="ml-1.5 h-7 sm:h-9" alt="Logo in the form of a W"/>
       </NavBrand>
       <div class="flex gap-2 sm:gap-4 md:order-2">
         <DarkMode/>
@@ -100,7 +100,9 @@ let { data, children }: Props = $props();
 
   <Footer class="mx-4 mb-4" footerType="logo">
     <div class="sm:flex sm:items-center sm:justify-between sm:gap-6">
-      <FooterBrand href="#/" name="Project W"/>
+      <FooterBrand href="#/" name="Project">
+        <img src="/favicon.png" class="ml-1.5 mr-9 h-7 sm:h-9" alt="Logo in the form of a W"/>
+      </FooterBrand>
       <FooterLinkGroup class="flex flex-wrap items-center gap-y-2">
         <FooterLink href="#/about">About</FooterLink>
         {#if data.about.imprint}
