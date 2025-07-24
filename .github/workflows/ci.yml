@@ -129,7 +129,7 @@ jobs:
       - name: Build Project-W Runner docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./runner
+          context: .
           file: ./runner/Dockerfile.dummy
           tags: project-w_runner_dummy:latest
           push: false
