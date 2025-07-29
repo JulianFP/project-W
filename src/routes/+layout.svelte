@@ -106,7 +106,7 @@ let { data, children }: Props = $props();
       <FooterLinkGroup class="flex flex-wrap items-center gap-y-2">
         <FooterLink href="#/about">About</FooterLink>
         {#if data.about.imprint}
-          <FooterLink href="#/imprint">Imprint</FooterLink>
+          <FooterLink href={data.about.imprint.url != null ? data.about.imprint.url : "#/imprint"}>Imprint</FooterLink>
         {/if}
         {#if Object.keys(data.about.terms_of_services).length !== 0}
           <FooterLink href="#/tos">Terms of Services</FooterLink>

@@ -196,7 +196,7 @@ export interface paths {
 		/**
 		 * Add Site Banner
 		 * @description Add a new banner to the website that will be broadcasted to all users. Returns the id of the created banner.
-		 *     Banners with higher urgency will be displayed first. Banners with an urgency of 100 and more will additionally be highlighted in red.
+		 *     Banners with higher urgency will be displayed first. The text of a banner with an urgency between 100 and 200 (excluding) will be highlighted in red. Banners with an urgency of 200 and more will have a red background.
 		 */
 		post: operations["add_site_banner_api_admins_add_site_banner_post"];
 		delete?: never;
@@ -217,6 +217,26 @@ export interface paths {
 		post?: never;
 		/** Delete Site Banner */
 		delete: operations["delete_site_banner_api_admins_delete_site_banner_delete"];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	"/api/admins/send_email_to_all_users": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/**
+		 * Send Email To All Users
+		 * @description Sends out an email with the provided content to all users of this Project-W instance, regardless whether they are local accounts, oidc accounts or ldap accounts. The body is in plaintext format, don't forget to include line breaks for longer emails.
+		 */
+		post: operations["send_email_to_all_users_api_admins_send_email_to_all_users_post"];
+		delete?: never;
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -1004,6 +1024,13 @@ export interface components {
 			/** Max Speakers */
 			max_speakers?: number | null;
 		};
+		/** EmailToUsers */
+		EmailToUsers: {
+			/** Subject */
+			subject: string;
+			/** Body */
+			body: string;
+		};
 		/** EmailValidated */
 		EmailValidated: string;
 		/**
@@ -1049,11 +1076,16 @@ export interface components {
 			 * @description The name of the person/institution hosting this instance
 			 */
 			name: string;
-			/** @description The contact email address of the person/institution hosting this instance */
-			email: components["schemas"]["EmailValidated"];
+			/** @description A contact email address of the person/institution hosting this instance */
+			email: components["schemas"]["EmailValidated"] | null;
+			/**
+			 * Url
+			 * @description The URL to forward users to if they click on the imprint button on the frontend. Useful if you want to link to an imprint on a different website instead of having a dedicated imprint for Project-W. Mutually exclusive with the 'additional_imprint_html' option.
+			 */
+			url?: string | null;
 			/**
 			 * Additional Imprint Html
-			 * @description Content of the imprint in addition to the other fields
+			 * @description Content of the imprint in addition to the name and email fields. Mutually exclusive with the 'url' option.
 			 */
 			additional_imprint_html?: string | null;
 		};
@@ -2121,6 +2153,59 @@ export interface operations {
 			cookie?: never;
 		};
 		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": unknown;
+				};
+			};
+			/** @description Validation error of JWT token */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Validation Error */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["HTTPValidationError"];
+				};
+			};
+		};
+	};
+	send_email_to_all_users_api_admins_send_email_to_all_users_post: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				"application/json": components["schemas"]["EmailToUsers"];
+			};
+		};
 		responses: {
 			/** @description Successful Response */
 			200: {

@@ -11,6 +11,11 @@ interface Props {
 	data: Data;
 }
 let { data }: Props = $props();
+
+if (data.about.imprint != null && data.about.imprint.url != null) {
+	const win: Window = window;
+	win.location = data.about.imprint.url;
+}
 </script>
 
 <CenterPage title="Imprint of this instance">
@@ -21,10 +26,12 @@ let { data }: Props = $props();
           <dt><strong>Name:</strong></dt>
           <dd><Span highlight="blue">{data.about.imprint.name}</Span></dd>
         </div>
-        <div>
-          <dt><strong>Email:</strong></dt>
-          <dt><A href="mailto:{data.about.imprint.email}">{data.about.imprint.email}</A></dt>
-        </div>
+        {#if data.about.imprint.email != null}
+          <div>
+            <dt><strong>Email:</strong></dt>
+            <dt><A href="mailto:{data.about.imprint.email}">{data.about.imprint.email}</A></dt>
+          </div>
+        {/if}
 
         {#if data.about.imprint.additional_imprint_html}
           {@html data.about.imprint.additional_imprint_html}
