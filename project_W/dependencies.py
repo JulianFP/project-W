@@ -8,5 +8,6 @@ from .smtp import SmtpClient
 db: DatabaseAdapter
 ch: CachingAdapter
 config: Settings
+git_hash: str
 smtp: SmtpClient
 client_path: Path
