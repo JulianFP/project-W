@@ -8,7 +8,7 @@ from granian.server import Server
 
 import project_W.dependencies as dp
 
-from ._version import __version__
+from ._version import __commit_id__, __version__
 from .config import load_config
 from .logger import get_logger
 from .periodic_background_tasks import execute_background_tasks
@@ -62,6 +62,12 @@ def main(
 
     # post application version for debug purposes and bug reports
     logger.info(f"Running application version {__version__}")
+    if __commit_id__ is None:
+        raise Exception(
+            "Couldn't read git hash from _version.py file. Make sure to install this package from a working git repository!"
+        )
+    dp.git_hash = __commit_id__.removeprefix("g")
+    logger.info(f"Application was built from git hash {dp.git_hash}")
     logger.info(f"Python version: {platform.python_version()}")
 
     dp.client_path = root_static_files
