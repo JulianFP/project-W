@@ -148,8 +148,12 @@ app = FastAPI(
     contact=(
         {
             "name": dp.config.imprint.name,
-            "email": dp.config.imprint.email.root,
-            "url": f"{dp.config.client_url}/imprint",
+            "email": dp.config.imprint.email.root if dp.config.imprint.email is not None else None,
+            "url": (
+                dp.config.imprint.url
+                if dp.config.imprint.url is not None
+                else f"{dp.config.client_url}/imprint"
+            ),
         }
         if dp.config.imprint
         else None

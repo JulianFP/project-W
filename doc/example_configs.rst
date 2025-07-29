@@ -9,7 +9,12 @@ This page contains a collection of example snippets from config files for more a
 Add an imprint
 --------------
 
-An imprint is often required for legal reasons and contains information about who is hosting this instance. The name and email fields are required, but then you can add arbitrary html to the imprint a add any information you want.
+An imprint is often required for legal reasons and contains information about who is hosting your instance. There are two ways to add an imprint to your Project-W instance: Either you add an URL pointing to an imprint page hosted somewhere else, or you add custom imprint html for a dedicated imprint page on the Project-W frontend itself. Please note that in both versions the ``name`` field is always required since it is used as a link name in the API specification. Put your or your organizations name into this field. The ``email`` field adds a contact email address to the API specification and can be used in both imprint configurations but is optional.
+
+Dedicated imprint page
+``````````````````````
+
+Reference this example config to show an imprint on the Project-W frontend itself:
 
 .. code-block:: yaml
 
@@ -29,6 +34,18 @@ An imprint is often required for legal reasons and contains information about wh
          <dt><strong>Website:</strong></dt>
          <dd><a href="https://alice.example.org" target="_blank" rel="noopener noreferrer">alice.example.org</a></dd>
        </div>
+
+External imprint page
+`````````````````````
+
+Reference this example config to link to an imprint page hosted somewhere else:
+
+.. code-block:: yaml
+
+   imprint:
+     name: Alice
+     email: alice@example.org
+     url: https://example.org/imprint
 
 Add Terms of Services
 ---------------------

@@ -312,14 +312,33 @@ class ImprintSettings(BaseModel):
     name: str = Field(
         description="The name of the person/institution hosting this instance",
     )
-    email: EmailValidated = Field(
-        description="The contact email address of the person/institution hosting this instance",
-    )
-    additional_imprint_html: str | None = Field(
-        description="Content of the imprint in addition to the other fields",
+    email: EmailValidated | None = Field(
+        description="A contact email address of the person/institution hosting this instance",
         default=None,
         validate_default=True,
     )
+    url: HttpUrl | None = Field(
+        description="The URL to forward users to if they click on the imprint button on the frontend. Useful if you want to link to an imprint on a different website instead of having a dedicated imprint for Project-W. Mutually exclusive with the 'additional_imprint_html' option.",
+        default=None,
+        validate_default=True,
+    )
+    additional_imprint_html: str | None = Field(
+        description="Content of the imprint in addition to the name and email fields. Mutually exclusive with the 'url' option.",
+        default=None,
+        validate_default=True,
+    )
+
+    @model_validator(mode="after")
+    def exactly_one_of_url_additional_imprint_html(self) -> Self:
+        if self.url is None and self.additional_imprint_html is None:
+            raise ValueError(
+                "You need to define one of 'url' or 'additional_imprint_html' if you want to have an imprint"
+            )
+        elif self.url is not None and self.additional_imprint_html is not None:
+            raise ValueError(
+                "You cannot define both 'url' and 'additional_imprint_html' at the same time, these options are mutually exclusive"
+            )
+        return self
 
 
 class TosSettings(BaseModel):
