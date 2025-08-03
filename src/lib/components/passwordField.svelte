@@ -4,6 +4,7 @@ import {
 	EyeOutline,
 	EyeSlashOutline,
 	InfoCircleSolid,
+	LockSolid,
 } from "flowbite-svelte-icons";
 
 function disableError(): void {
@@ -24,7 +25,10 @@ let {
 
 <div class="mb-6 w-full">
   <Label for={id} color={error ? "red" : "gray"} class="mb-2">{@render children?.()}</Label>
-  <Input wrapperClass="w-full" type={passwordVisible ? "text" : "password"} {id} name="password" autocomplete={password_new ? "new-password" : "current-password"} color={error ? "red" : "default"} placeholder={passwordVisible ? "alice's password" : "••••••••••••••••"} required oninput={disableError} {...rest} bind:value={value}>
+  <Input class="ps-9" wrapperClass="w-full" type={passwordVisible ? "text" : "password"} {id} name="password" autocomplete={password_new ? "new-password" : "current-password"} color={error ? "red" : "default"} placeholder={passwordVisible ? "alice's password" : "••••••••••••••••"} required oninput={disableError} {...rest} bind:value={value}>
+    {#snippet left()}
+      <LockSolid class="h-5 w-5"/>
+    {/snippet}
     {#snippet right()}
       <button onclick={() => (passwordVisible = !passwordVisible)} tabindex={-1} class="cursor-pointer" type="button">
         {#if passwordVisible}

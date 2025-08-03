@@ -19,8 +19,6 @@ import {
 	FooterLinkGroup,
 	NavBrand,
 	NavHamburger,
-	NavLi,
-	NavUl,
 	Navbar,
 } from "flowbite-svelte";
 import {
@@ -53,7 +51,7 @@ let { data, children }: Props = $props();
       <NavBrand href="#/">
         <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
         <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project</span>
-        <img src="/favicon.png" class="ml-1.5 h-7 sm:h-9" alt="Logo in the form of a W"/>
+        <img src="/favicon.png" class="ml-1.5 h-7 sm:h-8" alt="Logo in the form of a W"/>
       </NavBrand>
       <div class="flex gap-2 sm:gap-4 md:order-2">
         <DarkMode/>
@@ -70,11 +68,6 @@ let { data, children }: Props = $props();
           <DropdownItem class="cursor-pointer" onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
         </Dropdown>
       {/if}
-      <NavUl activeUrl={routing.location}>
-        <NavLi href="#/">Home</NavLi>
-        <NavLi href="#/about">About</NavLi>
-        <NavLi href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="mx-auto"/></NavLi>
-      </NavUl>
     </Navbar>
 
     {#each data.about.site_banners as banner}
@@ -111,7 +104,6 @@ let { data, children }: Props = $props();
         {#if Object.keys(data.about.terms_of_services).length !== 0}
           <FooterLink href="#/tos">Terms of Services</FooterLink>
         {/if}
-        <FooterLink href="https://project-w.readthedocs.io" target="_blank" rel="noopener noreferrer">Docs</FooterLink>
         <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API docs (Swagger)</FooterLink>
         <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/redoc`} target="_blank" rel="noopener noreferrer">API docs (Redoc)</FooterLink>
         <FooterLink href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Backend</FooterLink>

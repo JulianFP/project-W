@@ -17,7 +17,7 @@ import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
 interface Props {
 	open?: boolean;
-	post_action: () => Promise<void>;
+	post_action?: () => Promise<void>;
 }
 let { open = $bindable(false), post_action = async () => {} }: Props = $props();
 

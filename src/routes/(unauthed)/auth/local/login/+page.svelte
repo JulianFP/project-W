@@ -10,6 +10,7 @@ import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
 import { auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
+import { AngleRightOutline } from "flowbite-svelte-icons";
 
 type Data = {
 	auth_settings: components["schemas"]["AuthSettings"];
@@ -64,13 +65,15 @@ async function postLogin(event: Event): Promise<void> {
     {/if}
 
     <div class="flex max-w-lg justify-between items-center my-2">
-      <WaitingButton waiting={waitingForPromise} tabindex={3}>Login</WaitingButton>
       {#if data.auth_settings.local_account.mode === "enabled"}
-        <Button color="alternative" type="button" href="#/auth/local/signup" tabindex={4}>Signup instead</Button>
+        <Button color="alternative" type="button" href="#/auth/local/signup" tabindex={4}>Sign up instead</Button>
       {/if}
+      <WaitingButton waiting={waitingForPromise} tabindex={3}><AngleRightOutline class="mr-2"/>Log in</WaitingButton>
     </div>
 
-    <A href="#/auth/local/request-password-reset" tabindex={5}>Forgot password?</A>
+    <div class="flex justify-end">
+      <A href="#/auth/local/request-password-reset" tabindex={5}>Forgot password?</A>
+    </div>
 
   </form>
 </FormPage>

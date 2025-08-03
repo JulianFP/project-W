@@ -29,7 +29,6 @@ import {
 	EditSolid,
 	InfoCircleSolid,
 	PlusOutline,
-	RefreshOutline,
 	StopSolid,
 	TrashBinSolid,
 } from "flowbite-svelte-icons";
@@ -70,6 +69,12 @@ type ProcessedJob = Job & {
 let fetchingJobs = $state(false);
 let jobs_ordered_selected: SvelteMap<number, boolean> = $state(new SvelteMap());
 let jobs_info: SvelteMap<number, ProcessedJob> = $state(new SvelteMap());
+let jobs_creation_timeout_ids: SvelteMap<number, number> = $state(
+	new SvelteMap(),
+);
+let jobs_finish_timeout_ids: SvelteMap<number, number> = $state(
+	new SvelteMap(),
+);
 let job_count: number = $state(0);
 let job_count_total: number = $state(0);
 
@@ -104,22 +109,87 @@ let descending: boolean = $state(true);
 let exclude_finished = $state(false);
 let exclude_downloaded = $state(true);
 
-function process_job(job: Job): ProcessedJob {
+function update_creation_timestamp(job_id: number) {
+	const job = jobs_info.get(job_id);
+	if (job) {
+		const [creation_date_since, creation_date_next_update] = timeAgo(
+			job.creation_date,
+		);
+		jobs_info.set(job_id, {
+			...job,
+			creation_date_since: creation_date_since,
+		});
+		console.log(
+			`Called creation timestamp update for job ${job_id}, calling again in ${creation_date_next_update}`,
+		);
+		if (creation_date_next_update) {
+			jobs_creation_timeout_ids.set(
+				job_id,
+				setTimeout(() => {
+					update_creation_timestamp(job_id);
+				}, creation_date_next_update),
+			);
+		}
+	}
+}
+function update_finish_timestamp(job_id: number) {
+	const job = jobs_info.get(job_id);
+	if (job?.finish_date) {
+		const [finish_date_since, finish_date_next_update] = timeAgo(
+			job.finish_date,
+		);
+		jobs_info.set(job_id, {
+			...job,
+			finish_date_since: finish_date_since,
+		});
+		console.log(
+			`Called finish timestamp update for job ${job_id}, calling again in ${finish_date_next_update}`,
+		);
+		if (finish_date_next_update) {
+			jobs_finish_timeout_ids.set(
+				job_id,
+				setTimeout(() => {
+					update_finish_timestamp(job_id);
+				}, finish_date_next_update),
+			);
+		}
+	}
+}
+
+function process_job(job: Job) {
 	const creation_date = new Date(job.creation_timestamp);
-	const creation_date_since = timeAgo(creation_date);
+	const [creation_date_since, creation_date_next_update] =
+		timeAgo(creation_date);
+	if (creation_date_next_update && !jobs_creation_timeout_ids.has(job.id)) {
+		jobs_creation_timeout_ids.set(
+			job.id,
+			setTimeout(() => {
+				update_creation_timestamp(job.id);
+			}, creation_date_next_update),
+		);
+	}
 	let finish_date: Date | null = null;
 	let finish_date_since: string | null = null;
+	let finish_date_next_update: number | null = null;
 	if (job.finish_timestamp != null) {
 		finish_date = new Date(job.finish_timestamp);
-		finish_date_since = timeAgo(finish_date);
+		[finish_date_since, finish_date_next_update] = timeAgo(finish_date);
+		if (finish_date_next_update && !jobs_finish_timeout_ids.has(job.id)) {
+			jobs_finish_timeout_ids.set(
+				job.id,
+				setTimeout(() => {
+					update_finish_timestamp(job.id);
+				}, finish_date_next_update),
+			);
+		}
 	}
-	return {
+	jobs_info.set(job.id, {
 		...job,
 		creation_date: creation_date,
-		creation_date_since: creation_date_since,
 		finish_date: finish_date,
+		creation_date_since: creation_date_since,
 		finish_date_since: finish_date_since,
-	};
+	});
 }
 
 async function fetch_jobs() {
@@ -158,9 +228,9 @@ async function fetch_jobs() {
 					if (!job) {
 						args_formatted.push(["job_ids", job_id.toString()]);
 					} else {
-						job.creation_date_since = timeAgo(job.creation_date);
+						job.creation_date_since = timeAgo(job.creation_date)[0];
 						if (job.finish_date != null) {
-							job.finish_date_since = timeAgo(job.finish_date);
+							job.finish_date_since = timeAgo(job.finish_date)[0];
 						}
 						jobs_info.set(job_id, { ...job });
 					}
@@ -171,7 +241,7 @@ async function fetch_jobs() {
 						args_formatted,
 					);
 					for (const job of jobs_unsorted) {
-						jobs_info.set(job.id, process_job(job));
+						process_job(job);
 					}
 					for (const job_id of jobs_info.keys()) {
 						if (!jobs_ordered_selected_loc.has(job_id))
@@ -204,7 +274,7 @@ async function update_jobs(job_ids: number[]) {
 	try {
 		const jobs_unsorted = await getLoggedIn<Job[]>("jobs/info", args_formatted);
 		for (const job of jobs_unsorted) {
-			jobs_info.set(job.id, process_job(job));
+			process_job(job);
 		}
 	} catch (err: unknown) {
 		let errorMsg = "Error occured while updating job: ";
@@ -258,7 +328,6 @@ async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
 	}
 }
 async function postDeletejobs(): Promise<void> {
-	await fetch_jobs();
 	if (selectedItems.length > 0) {
 		updateHeaderCheckbox();
 	} else {
@@ -359,37 +428,46 @@ function updateHeaderCheckbox(job: Job | null = null) {
 	}
 }
 
-function timeAgo(date: Date): string {
+function timeAgo(date: Date): [string, number | null] {
 	const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
 
 	let interval = Math.floor(seconds / 31536000);
 	if (interval > 1) {
-		return `${interval.toString()} years ago`;
+		return [`${interval.toString()} years ago`, null];
 	}
 
 	interval = Math.floor(seconds / 2592000);
 	if (interval > 1) {
-		return `${interval.toString()} months ago`;
+		return [`${interval.toString()} months ago`, null];
 	}
 
 	interval = Math.floor(seconds / 86400);
 	if (interval > 1) {
-		return `${interval.toString()} days ago`;
+		return [`${interval.toString()} days ago`, null];
 	}
 
 	interval = Math.floor(seconds / 3600);
 	if (interval > 1) {
-		return `${interval.toString()} hours ago`;
+		return [
+			`${interval.toString()} hours ago`,
+			(3600 * (interval + 1) - seconds) * 1000,
+		];
 	}
 
 	interval = Math.floor(seconds / 60);
 	if (interval > 1) {
-		return `${interval.toString()} minutes ago`;
+		return [
+			`${interval.toString()} minutes ago`,
+			(60 * (interval + 1) - seconds) * 1000,
+		];
 	}
 
-	if (seconds < 10) return "just now";
+	if (seconds < 10) return ["just now", (10 - seconds) * 1000];
 
-	return `${Math.floor(seconds)} seconds ago`;
+	return [
+		`${Math.floor(seconds)} seconds ago`,
+		(10 * (Math.floor(seconds / 10) + 1) - seconds) * 1000,
+	];
 }
 
 // update jobs using SSE (Server-Sent Events)
@@ -407,7 +485,14 @@ const evtSource = new EventSource(
 			}),
 	},
 );
+evtSource.addEventListener("job_deleted", (_) => {
+	fetch_jobs();
+});
+evtSource.addEventListener("job_created", (_) => {
+	fetch_jobs();
+});
 evtSource.addEventListener("job_updated", (event) => {
+	console.log("Job updated!");
 	const job_id: number = Number.parseInt(event.data);
 	if (jobs_info.has(job_id)) {
 		update_jobs([job_id]);
@@ -426,13 +511,6 @@ evtSource.addEventListener("job_updated", (event) => {
 
     <div class="flex justify-between items-center">
       <div class="flex items-center gap-4">
-        {#if fetchingJobs}
-          <Button disabled pill size="sm" class="p-2!">
-            <Spinner class="h-6 w-6" size="4" color="secondary" />
-          </Button>
-        {:else}
-          <Button pill size="sm" class="p-2!" onclick={fetch_jobs}><RefreshOutline class="h-6 w-6"/></Button>
-        {/if}
         <div>
           <Checkbox id="hide_finished_jobs" bind:checked={exclude_finished} onchange={fetch_jobs}>Hide finished jobs</Checkbox>
           <Checkbox id="hide_downloaded_jobs" bind:checked={exclude_downloaded} disabled={exclude_finished} onchange={fetch_jobs}>Hide downloaded jobs</Checkbox>
@@ -488,8 +566,8 @@ evtSource.addEventListener("job_updated", (event) => {
               <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => tableEditMode = false}>
                 <CloseOutline/>
               </Button>
-            {:else if jobs_ordered_selected.size > 0}
-              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => {tableEditMode = true; deselect_all_jobs(); updateHeaderCheckbox();}}>
+            {:else}
+              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => {tableEditMode = true; deselect_all_jobs(); updateHeaderCheckbox();}} disabled={jobs_ordered_selected.size == 0}>
                 <EditSolid/>
               </Button>
             {/if}
@@ -508,7 +586,7 @@ evtSource.addEventListener("job_updated", (event) => {
               {/if}
               <TableBodyCell>
                 <P size="sm">{job.creation_date_since}</P>
-                <Tooltip type="auto">{job.creation_timestamp}</Tooltip>
+                <Tooltip type="auto">{job.creation_date.toLocaleString()}</Tooltip>
               </TableBodyCell>
               <TableBodyCell>
                 {#if job.file_name.length > 28}
@@ -568,11 +646,11 @@ evtSource.addEventListener("job_updated", (event) => {
                       <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
                       <P class="inline" size="sm">{job.step}</P>
                     </div>
-                    {#if job.finish_date_since}
+                    {#if job.finish_date_since && job.finish_date}
                       <div>
                         <P class="inline" weight="extrabold" size="sm">Finish time: </P>
                         <P class="inline" size="sm">{job.finish_date_since}</P>
-                        <Tooltip type="auto">{job.finish_timestamp}</Tooltip>
+                        <Tooltip type="auto">{job.finish_date.toLocaleString()}</Tooltip>
                       </div>
                     {/if}
                     {#if job.runner_id}
@@ -671,6 +749,6 @@ evtSource.addEventListener("job_updated", (event) => {
   {/if}
 </ConfirmModal>
 
-<SubmitJobsModal bind:open={submitModalOpen} post_action={fetch_jobs}/>
+<SubmitJobsModal bind:open={submitModalOpen}/>
 
 <DownloadTranscriptModal bind:open={downloadModalOpen} job_id={downloadJobId} job_file_name={downloadFileName} post_action={async () => await update_jobs([downloadJobId])}/>

@@ -10,6 +10,7 @@ import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
+import { UserAddSolid } from "flowbite-svelte-icons";
 
 let email: string = $state("");
 let password: string = $state("");
@@ -87,8 +88,8 @@ let helper_text = $derived(
     {/if}
 
     <div class="flex max-w-lg justify-between items-center my-2">
-      <WaitingButton waiting={waitingForPromise} tabindex={3}>Signup</WaitingButton>
-      <Button color="alternative" type="button" href="#/auth/local/login" tabindex={4}>Login instead</Button>
+      <Button color="alternative" type="button" href="#/auth/local/login" tabindex={4}>Log in instead</Button>
+      <WaitingButton waiting={waitingForPromise} tabindex={3}><UserAddSolid class="mr-2"/>Sign up</WaitingButton>
     </div>
   </form>
 </FormPage>

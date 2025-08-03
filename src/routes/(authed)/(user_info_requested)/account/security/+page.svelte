@@ -269,12 +269,12 @@ async function invalidateAllTokens(): Promise<void> {
     {/if}
     <div>
       {#if data.user_info.user_type !== "oidc"}
-        <Button outline color="red" class="w-full" onclick={() => invalidSessionModalOpen = true} tabindex={4}>Invalidate all sessions</Button>
+        <Button outline color="red" onclick={() => invalidSessionModalOpen = true} tabindex={4}>Invalidate all sessions</Button>
       {/if}
       {#if api_token_creation_allowed}
-        <Button outline color="red" class="w-full mt-2" onclick={() => invalidModalOpen = true} tabindex={5}>{data.user_info.user_type !== "oidc" ? "Invalidate all sessions and API tokens" : "Invalidate all API tokens"}</Button>
+        <Button outline color="red" onclick={() => invalidModalOpen = true} tabindex={5}>{data.user_info.user_type !== "oidc" ? "Invalidate all sessions and API tokens" : "Invalidate all API tokens"}</Button>
         {#if invalidError}
-          <Helper class="mt-2" color="red">{invalidErrorMsg}</Helper>
+          <Helper class="w-full mt-2" color="red">{invalidErrorMsg}</Helper>
         {/if}
       {/if}
     </div>
