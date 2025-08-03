@@ -130,3 +130,9 @@ class OnlineRunner(RunnerRegisterRequest):
     assigned_job_id: int | None = None
     in_process: bool = False
     session_token_hash: str = Field(min_length=43, max_length=43)
+
+
+class SSEEvent(str, Enum):
+    JOB_UPDATED = "job_updated"
+    JOB_CREATED = "job_created"
+    JOB_DELETED = "job_deleted"
