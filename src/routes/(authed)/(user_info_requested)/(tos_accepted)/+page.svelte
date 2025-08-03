@@ -3,7 +3,7 @@ import { EventSource } from "eventsource";
 import {
 	A,
 	Alert,
-	ButtonGroup,
+	Banner,
 	Checkbox,
 	P,
 	PaginationNav,
@@ -26,13 +26,13 @@ import {
 	ChevronRightOutline,
 	CloseOutline,
 	DownloadSolid,
-	EditSolid,
 	InfoCircleSolid,
 	PlusOutline,
 	StopSolid,
 	TrashBinSolid,
 } from "flowbite-svelte-icons";
 import { SvelteMap } from "svelte/reactivity";
+import { slide } from "svelte/transition";
 
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import Button from "$lib/components/button.svelte";
@@ -82,7 +82,6 @@ let job_count_total: number = $state(0);
 const jobs_per_page = 10;
 let currentPage = $state(1);
 let totalPages = $derived(Math.max(Math.ceil(job_count / jobs_per_page), 1));
-let tableEditMode = $state(false);
 let selectedItems: number[] = $derived(
 	Array.from(jobs_ordered_selected.entries())
 		.filter(([, val]) => val)
@@ -119,9 +118,6 @@ function update_creation_timestamp(job_id: number) {
 			...job,
 			creation_date_since: creation_date_since,
 		});
-		console.log(
-			`Called creation timestamp update for job ${job_id}, calling again in ${creation_date_next_update}`,
-		);
 		if (creation_date_next_update) {
 			jobs_creation_timeout_ids.set(
 				job_id,
@@ -142,9 +138,6 @@ function update_finish_timestamp(job_id: number) {
 			...job,
 			finish_date_since: finish_date_since,
 		});
-		console.log(
-			`Called finish timestamp update for job ${job_id}, calling again in ${finish_date_next_update}`,
-		);
 		if (finish_date_next_update) {
 			jobs_finish_timeout_ids.set(
 				job_id,
@@ -288,9 +281,11 @@ async function update_jobs(job_ids: number[]) {
 }
 
 function deselect_all_jobs() {
+	console.log("deselected");
 	for (let id of jobs_ordered_selected.keys()) {
 		jobs_ordered_selected.set(id, false);
 	}
+	updateHeaderCheckbox();
 }
 
 function sortClickHandler(key: SortKey) {
@@ -330,8 +325,6 @@ async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
 async function postDeletejobs(): Promise<void> {
 	if (selectedItems.length > 0) {
 		updateHeaderCheckbox();
-	} else {
-		tableEditMode = false;
 	}
 }
 
@@ -492,7 +485,6 @@ evtSource.addEventListener("job_created", (_) => {
 	fetch_jobs();
 });
 evtSource.addEventListener("job_updated", (event) => {
-	console.log("Job updated!");
 	const job_id: number = Number.parseInt(event.data);
 	if (jobs_info.has(job_id)) {
 		update_jobs([job_id]);
@@ -509,22 +501,18 @@ evtSource.addEventListener("job_updated", (event) => {
       </Alert>
     {/if}
 
-    <div class="flex justify-between items-center">
-      <div class="flex items-center gap-4">
-        <div>
-          <Checkbox id="hide_finished_jobs" bind:checked={exclude_finished} onchange={fetch_jobs}>Hide finished jobs</Checkbox>
-          <Checkbox id="hide_downloaded_jobs" bind:checked={exclude_downloaded} disabled={exclude_finished} onchange={fetch_jobs}>Hide downloaded jobs</Checkbox>
-        </div>
+    <div class="flex justify-between items-center gap-8">
+      <div class="flex items-center gap-x-8 gap-y-1.5 flex-wrap">
+        <Checkbox id="hide_finished_jobs" bind:checked={exclude_finished} onchange={fetch_jobs}>Hide finished jobs</Checkbox>
+        <Checkbox id="hide_downloaded_jobs" bind:checked={exclude_downloaded} disabled={exclude_finished} onchange={fetch_jobs}>Hide downloaded jobs</Checkbox>
       </div>
-      <Button pill onclick={() => openSubmitModal()}><PlusOutline class="mr-2"/>New Job</Button>
+      <Button pill onclick={() => openSubmitModal()} class="shrink-0"><PlusOutline class="mr-2"/>New Job</Button>
     </div>
-    <Table shadow hoverable={true}>
+    <Table shadow hoverable={true} border={false}>
       <TableHead>
-        {#if tableEditMode}
-          <TableHeadCell class="!p-4">
-            <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} onchange={() => {jobs_ordered_selected.forEach((_,job_id) => jobs_ordered_selected.set(job_id, headerCheckboxSelected)); updateHeaderCheckbox();}}/>
-          </TableHeadCell>
-        {/if}
+        <TableHeadCell class="!p-4">
+          <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} onchange={() => {jobs_ordered_selected.forEach((_,job_id) => jobs_ordered_selected.set(job_id, headerCheckboxSelected)); updateHeaderCheckbox();}}/>
+        </TableHeadCell>
         <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" onclick={() => sortClickHandler("creation_time")}>
           <div class="flex">
             {#if sort_key === "creation_time"}
@@ -555,35 +543,16 @@ evtSource.addEventListener("job_updated", (event) => {
         </TableHeadCell>
         <TableHeadCell>progress</TableHeadCell>
         <TableHeadCell class="text-center" padding="py-1 pr-4">
-          <ButtonGroup class="normal-case">
-            {#if tableEditMode}
-              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
-                <StopSolid class="inline mr-1" color="red"/> {selectedItems.length}
-              </Button>
-              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => openDeleteModal(selectedItems)} disabled={selectedDeleteButtonDisabled}>
-                <TrashBinSolid class="inline mr-1" color="red"/> {selectedItems.length}
-              </Button>
-              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => tableEditMode = false}>
-                <CloseOutline/>
-              </Button>
-            {:else}
-              <Button pill outline class="!p-2" size="xs" color="alternative" onclick={() => {tableEditMode = true; deselect_all_jobs(); updateHeaderCheckbox();}} disabled={jobs_ordered_selected.size == 0}>
-                <EditSolid/>
-              </Button>
-            {/if}
-          </ButtonGroup>
         </TableHeadCell>
       </TableHead>
       <TableBody>
         {#each jobs_ordered_selected.entries() as [job_id,selected] (job_id)}
           {@const job = jobs_info.get(job_id)}
           {#if job}
-            <TableBodyRow onclick={() => openRow = openRow === job.id ? null : job.id}>
-              {#if tableEditMode}
-                <TableBodyCell class="!p-4">
-                  <Checkbox id="select_job_{job}" class="hover:cursor-pointer" bind:checked={() => selected, (c: boolean) => jobs_ordered_selected.set(job.id, c)} onchange={() => updateHeaderCheckbox(job)} onclick={(e) => e.stopPropagation()}/>
-                </TableBodyCell>
-              {/if}
+            <TableBodyRow onclick={() => openRow = openRow === job.id ? null : job.id} color={selected ? "primary" : "default"} class={selected ? "border-l-5 bg-primary-200 dark:bg-primary-1000 border-primary-500 dark:border-primary-800 hover:bg-primary-300 dark:hover:bg-primary-950" : ""}>
+              <TableBodyCell class="!p-4">
+                <Checkbox id="select_job_{job}" class="hover:cursor-pointer" bind:checked={() => selected, (c: boolean) => jobs_ordered_selected.set(job.id, c)} onchange={() => updateHeaderCheckbox(job)} onclick={(e) => e.stopPropagation()}/>
+              </TableBodyCell>
               <TableBodyCell>
                 <P size="sm">{job.creation_date_since}</P>
                 <Tooltip type="auto">{job.creation_date.toLocaleString()}</Tooltip>
@@ -614,29 +583,17 @@ evtSource.addEventListener("job_updated", (event) => {
                 {/if}
               </TableBodyCell>
               <TableBodyCell class="pr-4 py-4 whitespace-nowrap font-medium text-center">
-                <ButtonGroup>
-                  {#if (["success", "downloaded"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e: MouseEvent) => {e.stopPropagation(); openDownloadModal(job_id, job.file_name);}}>
-                      <DownloadSolid/>
-                    </Button>
-                  {/if}
-                  {#if (["not_queued", "pending_runner", "runner_assigned", "runner_in_progress"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e: MouseEvent) => {e.stopPropagation(); openAbortModal([job.id]);}}>
-
-                      <StopSolid color="red"/>
-                    </Button>
-                  {:else if (["success", "downloaded", "failed"].includes(job.step))}
-                    <Button pill outline class="!p-2" size="xs" color="alternative" onclick={(e: MouseEvent) => {e.stopPropagation(); openDeleteModal([job.id]);}}>
-
-                      <TrashBinSolid color="red"/>
-                    </Button>
-                  {/if}
-                </ButtonGroup>
+                {#if (["success", "downloaded"].includes(job.step))}
+                  <Button class="!p-2 flex flex-col" size="xs" onclick={(e: MouseEvent) => {e.stopPropagation(); openDownloadModal(job_id, job.file_name);}}>
+                    <DownloadSolid/>
+                    Download
+                  </Button>
+                {/if}
               </TableBodyCell>
             </TableBodyRow>
             {#if openRow === job.id}
-              <TableBodyRow class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-100 hover:dark:bg-slate-700">
-                <TableBodyCell colspan={tableEditMode ? 5 : 4}>
+              <TableBodyRow color={selected ? "primary" : "default"} class={selected ? "bg-primary-300 dark:bg-primary-950 hover:bg-primary-400 dark:hover:bg-primary-900" : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-100 hover:dark:bg-slate-700"}>
+                <TableBodyCell colspan={5}>
                   <div class="grid grid-cols-2 gap-x-8 gap-y-2">
                     <div class="col-span-full">
                       <P class="inline" weight="extrabold" size="sm">Job ID: </P>
@@ -689,7 +646,7 @@ evtSource.addEventListener("job_updated", (event) => {
             {/if}
           {:else}
             <TableBodyRow>
-              <TableBodyCell colspan={tableEditMode ? 5 : 4}>
+              <TableBodyCell colspan={5}>
                 <div class="flex items-center justify-center">
                   <Spinner/>
                 </div>
@@ -699,11 +656,11 @@ evtSource.addEventListener("job_updated", (event) => {
         {:else}
           {#if job_count_total === 0}
             <TableBodyRow>
-              <TableBodyCell colspan={tableEditMode ? 5 : 4}>You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+              <TableBodyCell colspan={5}>You don't have any jobs yet. <Span underline>Create your first job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
             </TableBodyRow>
           {:else}
             <TableBodyRow>
-              <TableBodyCell colspan={tableEditMode ? 5 : 4}>You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide finished jobs</P> or <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide downloaded jobs</P>, or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
+              <TableBodyCell colspan={5}>You don't have any current jobs. Deselect <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide finished jobs</P> or <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">Hide downloaded jobs</P>, or <Span underline>create a new job</Span> by clicking on the <P color="text-primary-600 dark:text-primary-500" weight="bold" size="sm" class="inline">New Job</P> button.</TableBodyCell>
             </TableBodyRow>
           {/if}
         {/each}
@@ -731,6 +688,23 @@ evtSource.addEventListener("job_updated", (event) => {
 			{/snippet}
     </PaginationNav>
   </div>
+
+  <Banner open={selectedItems.length > 0} innerClass="w-full max-w-screen-md flex flex-row justify-between items-center" type="bottom" transition={slide} dismissable={false}>
+    <P>{selectedItems.length} selected</P>
+    <div class="flex items-center gap-2">
+      <Button class="!p-2" size="xs" color="red" onclick={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>
+        <StopSolid class="inline mr-1"/>
+        Abort
+      </Button>
+      <Button class="!p-2" size="xs" color="red" onclick={() => openDeleteModal(selectedItems)} disabled={selectedDeleteButtonDisabled}>
+        <TrashBinSolid class="inline mr-1"/>
+        Delete
+      </Button>
+      <button class="text-gray-500 focus:ring-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-300 m-0.5 rounded-lg focus:ring-2 p-2" color="alternative" onclick={deselect_all_jobs}>
+        <CloseOutline/>
+      </button>
+    </div>
+  </Banner>
 </CenterPage>
 
 <ConfirmModal bind:open={abortModalOpen} action={() => abortJobs(abortModalJobs)} post_action={() => postAbortJobs(abortModalJobs)}>
