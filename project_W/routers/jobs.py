@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_400_BAD_REQUEST
 
 import project_W.dependencies as dp
-from project_W.models.internal import JobAndSettingsInDb, JobInDb, JobSortKey
+from project_W.models.internal import JobAndSettingsInDb, JobInDb, JobSortKey, SSEEvent
 
 from ..models.request_data import JobSettings, TranscriptTypeEnum
 from ..models.response_data import (
@@ -127,6 +127,7 @@ async def submit_job(
 
     await dp.ch.enqueue_new_job(job_id, job_id * -1)
     await dp.ch.assign_queue_job_to_runner_if_possible()
+    await dp.ch.send_event(current_user.id, SSEEvent.JOB_CREATED, str(job_id))
     return job_id
 
 
@@ -270,6 +271,7 @@ async def abort_jobs(
             if jobStatus is JobStatus.PENDING_RUNNER:
                 await dp.ch.remove_job_from_queue(job.id)
             await dp.db.finish_failed_job(job.id, "Job was aborted")
+            await dp.ch.send_event(current_user.id, SSEEvent.JOB_UPDATED, str(job.id))
 
     return "Success"
 
@@ -307,6 +309,8 @@ async def delete_jobs(
             )
 
     await dp.db.delete_jobs_of_user(current_user.id, job_ids)
+    for job_id in job_ids:
+        await dp.ch.send_event(current_user.id, SSEEvent.JOB_DELETED, str(job_id))
 
     return "Success"
 
@@ -361,7 +365,7 @@ async def events(
     ],
 ) -> StreamingResponse:
     """
-    This is a special route for subscribing to server-sent events (SSE).
-    Currently there is only one type of event called 'job_updated'. It returns the job id of a currently running job which attributes (e.g. processing step, progress, assigned runner, ...) have changed. This event can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs.
+    This is a special route for subscribing to server-sent events (SSE) which all contain an event field.
+    Currently there are three events: job_created, job_updated and job_deleted. As data they all return the job id of the job the event refers to (i.e. the id of the job that just got created, updated or deleted). This route can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs. Refer to https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#listening_for_custom_events for more information about SSE.
     """
     return StreamingResponse(dp.ch.event_generator(current_user.id), media_type="text/event-stream")
