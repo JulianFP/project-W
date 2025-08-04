@@ -24,7 +24,6 @@ import {
 	CaretUpSolid,
 	ChevronLeftOutline,
 	ChevronRightOutline,
-	CloseOutline,
 	DownloadSolid,
 	InfoCircleSolid,
 	PlusOutline,
@@ -38,6 +37,7 @@ import { slide } from "svelte/transition";
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import Button from "$lib/components/button.svelte";
 import CenterPage from "$lib/components/centerPage.svelte";
+import CloseButton from "$lib/components/closeButton.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";
 import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
 import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
@@ -713,9 +713,7 @@ evtSource.addEventListener("job_updated", (event) => {
         <TrashBinSolid class="inline mr-1"/>
         Delete
       </Button>
-      <button class="text-gray-500 focus:ring-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-300 m-0.5 rounded-lg focus:ring-2 p-2" color="alternative" onclick={deselect_all_jobs}>
-        <CloseOutline/>
-      </button>
+      <CloseButton onclick={deselect_all_jobs}/>
     </div>
   </Banner>
 </CenterPage>
