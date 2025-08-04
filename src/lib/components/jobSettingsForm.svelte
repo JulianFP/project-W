@@ -12,7 +12,7 @@ import {
 	Textarea,
 	Tooltip,
 } from "flowbite-svelte";
-import { QuestionCircleOutline, RedoOutline } from "flowbite-svelte-icons";
+import { QuestionCircleOutline, UndoOutline } from "flowbite-svelte-icons";
 
 import { BackendCommError, getLoggedIn } from "$lib/utils/httpRequests.svelte";
 import {
@@ -24,7 +24,18 @@ import {
 import RangeWithField from "./rangeWithField.svelte";
 import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-let { get_job_settings = $bindable(), re_query = $bindable() } = $props();
+type JobSettingsResp = components["schemas"]["JobSettings-Output"];
+interface Props {
+	get_job_settings?: () => object;
+	re_query?: () => Promise<void>;
+	pre_filled_in_settings?: JobSettingsResp;
+}
+
+let {
+	get_job_settings = $bindable(),
+	re_query = $bindable(),
+	pre_filled_in_settings,
+}: Props = $props();
 
 get_job_settings = () => {
 	return job_settings;
@@ -33,10 +44,8 @@ get_job_settings = () => {
 re_query = async () => {
 	await setToDefault(true);
 };
-
-let default_settings: components["schemas"]["JobSettings-Output"] | undefined =
-	$state();
-let wait_for_reset: boolean = $state(false);
+let default_settings: JobSettingsResp | undefined = $state();
+let wait_for_set: boolean = $state(false);
 
 let translate: boolean = $state(false);
 let language: components["schemas"]["JobLangEnum"] | "detect" =
@@ -89,76 +98,81 @@ async function queryDefaultValues(): Promise<
 	}
 }
 
+function setStateFromJobSettingsResp(job_settings: JobSettingsResp) {
+	wait_for_set = true;
+	language =
+		job_settings.language === null || job_settings.language === undefined
+			? "detect"
+			: job_settings.language;
+	translate = job_settings.task === "translate";
+	model = job_settings.model;
+	email_notification = job_settings.email_notification;
+	alignment =
+		job_settings.alignment !== undefined && job_settings.alignment !== null;
+	if (job_settings.alignment) {
+		alignment_processing_highlight_words =
+			job_settings.alignment.processing.highlight_words;
+		alignment_processing_max_line_width =
+			job_settings.alignment.processing.max_line_width === null
+				? undefined
+				: job_settings.alignment.processing.max_line_width;
+		alignment_processing_max_line_count =
+			job_settings.alignment.processing.max_line_count === null
+				? undefined
+				: job_settings.alignment.processing.max_line_count;
+		alignment_return_char_alignments =
+			job_settings.alignment.return_char_alignments;
+		alignment_interpolate_method = job_settings.alignment.interpolate_method;
+	}
+	diarization =
+		job_settings.diarization !== undefined && job_settings.diarization !== null;
+	if (job_settings.diarization) {
+		diarization_min_speakers =
+			job_settings.diarization.min_speakers === null
+				? undefined
+				: job_settings.diarization.min_speakers;
+		diarization_max_speakers =
+			job_settings.diarization.max_speakers === null
+				? undefined
+				: job_settings.diarization.max_speakers;
+	}
+	vad_onset = job_settings.vad_settings.vad_onset;
+	vad_offset = job_settings.vad_settings.vad_offset;
+	vad_chunk_size = job_settings.vad_settings.chunk_size;
+	asr_beam_size = job_settings.asr_settings.beam_size;
+	asr_patience = job_settings.asr_settings.patience;
+	asr_length_penalty = job_settings.asr_settings.length_penalty;
+	asr_temperature = job_settings.asr_settings.temperature;
+	asr_temperature_increment_on_fallback =
+		job_settings.asr_settings.temperature_increment_on_fallback;
+	asr_compression_ratio_threshold =
+		job_settings.asr_settings.compression_ratio_threshold;
+	asr_log_prob_threshold = job_settings.asr_settings.log_prob_threshold;
+	asr_no_speech_threshold = job_settings.asr_settings.no_speech_threshold;
+	asr_initial_prompt =
+		job_settings.asr_settings.initial_prompt === null ||
+		job_settings.asr_settings.initial_prompt === undefined
+			? ""
+			: job_settings.asr_settings.initial_prompt;
+	asr_suppressed_tokens = job_settings.asr_settings.suppress_tokens.join(",");
+	asr_suppress_numerals = job_settings.asr_settings.suppress_numerals;
+
+	wait_for_set = false;
+}
+
 async function setToDefault(requery = false) {
-	wait_for_reset = true;
+	wait_for_set = true;
 	if (default_settings === undefined || requery) {
 		default_settings = await queryDefaultValues();
 	}
-	language =
-		default_settings.language === null ||
-		default_settings.language === undefined
-			? "detect"
-			: default_settings.language;
-	translate = default_settings.task === "translate";
-	model = default_settings.model;
-	email_notification = default_settings.email_notification;
-	alignment =
-		default_settings.alignment !== undefined &&
-		default_settings.alignment !== null;
-	if (default_settings.alignment) {
-		alignment_processing_highlight_words =
-			default_settings.alignment.processing.highlight_words;
-		alignment_processing_max_line_width =
-			default_settings.alignment.processing.max_line_width === null
-				? undefined
-				: default_settings.alignment.processing.max_line_width;
-		alignment_processing_max_line_count =
-			default_settings.alignment.processing.max_line_count === null
-				? undefined
-				: default_settings.alignment.processing.max_line_count;
-		alignment_return_char_alignments =
-			default_settings.alignment.return_char_alignments;
-		alignment_interpolate_method =
-			default_settings.alignment.interpolate_method;
-	}
-	diarization =
-		default_settings.diarization !== undefined &&
-		default_settings.diarization !== null;
-	if (default_settings.diarization) {
-		diarization_min_speakers =
-			default_settings.diarization.min_speakers === null
-				? undefined
-				: default_settings.diarization.min_speakers;
-		diarization_max_speakers =
-			default_settings.diarization.max_speakers === null
-				? undefined
-				: default_settings.diarization.max_speakers;
-	}
-	vad_onset = default_settings.vad_settings.vad_onset;
-	vad_offset = default_settings.vad_settings.vad_offset;
-	vad_chunk_size = default_settings.vad_settings.chunk_size;
-	asr_beam_size = default_settings.asr_settings.beam_size;
-	asr_patience = default_settings.asr_settings.patience;
-	asr_length_penalty = default_settings.asr_settings.length_penalty;
-	asr_temperature = default_settings.asr_settings.temperature;
-	asr_temperature_increment_on_fallback =
-		default_settings.asr_settings.temperature_increment_on_fallback;
-	asr_compression_ratio_threshold =
-		default_settings.asr_settings.compression_ratio_threshold;
-	asr_log_prob_threshold = default_settings.asr_settings.log_prob_threshold;
-	asr_no_speech_threshold = default_settings.asr_settings.no_speech_threshold;
-	asr_initial_prompt =
-		default_settings.asr_settings.initial_prompt === null ||
-		default_settings.asr_settings.initial_prompt === undefined
-			? ""
-			: default_settings.asr_settings.initial_prompt;
-	asr_suppressed_tokens =
-		default_settings.asr_settings.suppress_tokens.join(",");
-	asr_suppress_numerals = default_settings.asr_settings.suppress_numerals;
-
-	wait_for_reset = false;
+	setStateFromJobSettingsResp(default_settings);
 }
-setToDefault();
+
+if (pre_filled_in_settings) {
+	setStateFromJobSettingsResp(pre_filled_in_settings);
+} else {
+	setToDefault();
+}
 
 let job_settings: components["schemas"]["JobSettings-Input"] = $derived.by(
 	() => {
@@ -535,5 +549,5 @@ function onTranslationChange() {
       </div>
     </AccordionItem>
   </Accordion>
-  <WaitingSubmitButton type="button" color="alternative" onclick={setToDefault} waiting={wait_for_reset}><RedoOutline class="mr-2"/>Reset values to account defaults</WaitingSubmitButton>
+  <WaitingSubmitButton type="button" color="alternative" onclick={setToDefault} waiting={wait_for_set}><UndoOutline class="mr-2"/>Reset values to account defaults</WaitingSubmitButton>
 </div>

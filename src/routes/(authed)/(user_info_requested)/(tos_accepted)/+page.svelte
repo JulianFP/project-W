@@ -28,6 +28,7 @@ import {
 	DownloadSolid,
 	InfoCircleSolid,
 	PlusOutline,
+	RedoOutline,
 	StopSolid,
 	TrashBinSolid,
 } from "flowbite-svelte-icons";
@@ -49,6 +50,7 @@ import {
 } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 
+type JobSettingsResp = components["schemas"]["JobSettings-Output"];
 type Data = {
 	about: components["schemas"]["AboutResponse"];
 };
@@ -93,6 +95,7 @@ let selectedDeleteButtonDisabled = $state(true);
 let openRow: number | null = $state(null);
 
 //modal stuff
+let pre_filled_job_settings: JobSettingsResp | undefined = $state();
 let submitModalOpen = $state(false);
 let downloadModalOpen = $state(false);
 let downloadJobId: number = $state(-1);
@@ -354,7 +357,14 @@ function openDeleteModal(jobIds: number[]) {
 	}
 }
 
-function openSubmitModal() {
+function openSubmitModal(pre_fill_with_settings_of_job: number | null = null) {
+	if (pre_fill_with_settings_of_job != null) {
+		pre_filled_job_settings = jobs_info.get(
+			pre_fill_with_settings_of_job,
+		)?.settings;
+	} else {
+		pre_filled_job_settings = undefined;
+	}
 	if (
 		!submitModalOpen &&
 		!abortModalOpen &&
@@ -595,9 +605,12 @@ evtSource.addEventListener("job_updated", (event) => {
               <TableBodyRow color={selected ? "primary" : "default"} class={selected ? "bg-primary-300 dark:bg-primary-950 hover:bg-primary-400 dark:hover:bg-primary-900" : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-100 hover:dark:bg-slate-700"}>
                 <TableBodyCell colspan={5}>
                   <div class="grid grid-cols-2 gap-x-8 gap-y-2">
-                    <div class="col-span-full">
+                    <div>
                       <P class="inline" weight="extrabold" size="sm">Job ID: </P>
                       <P class="inline" size="sm">{job.id}</P>
+                    </div>
+                    <div>
+                      <A class="font-semibold" onclick={() => openSubmitModal(job_id)}>Job settings <RedoOutline size="md" class="ml-1.5"/></A>
                     </div>
                     <div>
                       <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
@@ -630,7 +643,7 @@ evtSource.addEventListener("job_updated", (event) => {
                     {/if}
                     {#if job.runner_git_hash && job.runner_source_code_url}
                       <div>
-                        <A href={job.runner_source_code_url} target="_blank" rel="noopener noreferrer">Runner source code</A>
+                        <A class="font-semibold" href={job.runner_source_code_url} target="_blank" rel="noopener noreferrer">Runner source code</A>
                         <P class="inline" size="sm">checked out at git hash {job.runner_git_hash}</P>
                       </div>
                     {/if}
@@ -723,6 +736,6 @@ evtSource.addEventListener("job_updated", (event) => {
   {/if}
 </ConfirmModal>
 
-<SubmitJobsModal bind:open={submitModalOpen}/>
+<SubmitJobsModal bind:open={submitModalOpen} pre_filled_in_settings={pre_filled_job_settings}/>
 
 <DownloadTranscriptModal bind:open={downloadModalOpen} job_id={downloadJobId} job_file_name={downloadFileName} post_action={async () => await update_jobs([downloadJobId])}/>

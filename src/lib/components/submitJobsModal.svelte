@@ -12,14 +12,21 @@ import { QuestionCircleOutline } from "flowbite-svelte-icons";
 
 import { alerts, auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
+import { type components } from "$lib/utils/schema";
 import JobSettingsForm from "./jobSettingsForm.svelte";
 import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
+type JobSettingsResp = components["schemas"]["JobSettings-Output"];
 interface Props {
 	open?: boolean;
 	post_action?: () => Promise<void>;
+	pre_filled_in_settings?: JobSettingsResp;
 }
-let { open = $bindable(false), post_action = async () => {} }: Props = $props();
+let {
+	open = $bindable(false),
+	post_action = async () => {},
+	pre_filled_in_settings,
+}: Props = $props();
 
 let files: FileList | null = $state(null);
 
@@ -133,7 +140,7 @@ function onAction(params: { action: string; data: FormData }): boolean {
 </script>
 
 <Modal form title={files !== null && files.length > 1 ? `Submit ${files.length.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction}>
-  <JobSettingsForm bind:get_job_settings={get_job_settings}/>
+  <JobSettingsForm bind:get_job_settings={get_job_settings} pre_filled_in_settings={pre_filled_in_settings}/>
   <div class="flex gap-2 items-center">
     <Checkbox id="make_new_account_defaults" bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>
     <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>

@@ -104,8 +104,7 @@ let { data, children }: Props = $props();
         {#if Object.keys(data.about.terms_of_services).length !== 0}
           <FooterLink href="#/tos">Terms of Services</FooterLink>
         {/if}
-        <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API docs (Swagger)</FooterLink>
-        <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/redoc`} target="_blank" rel="noopener noreferrer">API docs (Redoc)</FooterLink>
+        <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API docs</FooterLink>
         <FooterLink href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Backend</FooterLink>
         <FooterLink href="https://github.com/JulianFP/project-W-frontend" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Frontend</FooterLink>
         <FooterLink href="https://github.com/JulianFP/project-W-runner" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Runner</FooterLink>
