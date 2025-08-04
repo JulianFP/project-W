@@ -32,7 +32,6 @@ let {
 
 let files: FileList | null = $state(null);
 let all_files: SvelteMap<string, File> = $state(new SvelteMap<string, File>());
-$inspect(all_files);
 $effect(() => {
 	if (files) {
 		for (let i = 0; i < files.length; i++) {
@@ -137,7 +136,7 @@ function onAction(params: { action: string; data: FormData }): boolean {
 }
 </script>
 
-<Modal form title={all_files.size > 1 ? `Submit ${all_files.size.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction}>
+<Modal form title={all_files.size > 1 ? `Submit ${all_files.size.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction} onclose={() => all_files.clear()}>
   <JobSettingsForm bind:get_job_settings={get_job_settings} pre_filled_in_settings={pre_filled_in_settings}/>
   <div class="flex gap-2 items-center">
     <Checkbox id="make_new_account_defaults" bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>

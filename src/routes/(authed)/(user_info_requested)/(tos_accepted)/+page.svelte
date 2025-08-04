@@ -568,8 +568,8 @@ evtSource.addEventListener("job_updated", (event) => {
                 <Tooltip type="auto">{job.creation_date.toLocaleString()}</Tooltip>
               </TableBodyCell>
               <TableBodyCell>
-                {#if job.file_name.length > 28}
-                  <P size="sm">{`${job.file_name.slice(0,28)}...`}</P>
+                {#if job.file_name.length > 32}
+                  <P size="sm" class="break-all">{`${job.file_name.slice(0,32)}...`}</P>
                   <Tooltip type="auto">{job.file_name}</Tooltip>
                 {:else}
                   <P size="sm">{job.file_name}</P>
