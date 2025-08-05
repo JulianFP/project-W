@@ -7,7 +7,7 @@ The following installation guides are for Linux only. Theoretically all the comp
    The config files shown here are for a setup with local Project-W accounts only. If you want to setup LDAP and/or OIDC, please refer to TODO for more advanced example configs.
 
 .. important::
-   If you plan to host the backend public to the internet: Make sure to only serve the backend over https regardless of your installation method! Without ssl encryption sensitive information like passwords, JWT Tokens for the clients and runners or user data will be transmitted in clear text!
+   If you plan to host the backend public to the internet: Make sure to only serve the backend over https regardless of your installation method! Without ssl encryption sensitive information like passwords, tokens for the clients and runners or user data will be transmitted in clear text!
 
 .. note::
    Prerequisites: Make sure that your DNS and Firewall settings are correct. In particular, the domain that you want to use has to point to the ip address of your server, and your servers firewall needs to allow incoming tcp traffic on your http port
@@ -44,7 +44,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
    .. warning::
       Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
-   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_TOKEN_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
    .. code-block:: yaml
 
@@ -61,7 +61,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
         connection_string: 'redis://redis:6379/project-W'
       security:
       local_token:
-        session_secret_key: !ENV ${JWT_SECRET_KEY}
+        session_secret_key: !ENV ${TOKEN_SECRET_KEY}
       local_account:
         user_provisioning:
           0:
@@ -122,7 +122,7 @@ This will setup the backend/frontend without a reverse proxy or any additional c
           volumes:
             - ./project-W-data/:/etc/xdg/project-W/
           environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
+            - TOKEN_SECRET_KEY=${PROJECT_W_TOKEN_SECRET_KEY}
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD}
             - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
             - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
@@ -139,21 +139,21 @@ This will setup the backend/frontend without a reverse proxy or any additional c
           volumes:
             - ./project-W-data/:/etc/xdg/project-W/
           environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
+            - TOKEN_SECRET_KEY=${PROJECT_W_TOKEN_SECRET_KEY}
             - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
             - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
 
-6. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
+6. Generate a TOKEN_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
 
    .. code-block:: console
 
       python -c 'import secrets; print(secrets.token_hex(32))'
 
-7. Run the containers. Replace <JWT Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the JWT_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
+7. Run the containers. Replace <Token Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the TOKEN_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
 
    .. code-block:: console
 
-      PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" PROJECT_W_POSTGRES_PASSWORD="<Postgres password>" PROJECT_W_ADMIN_PASSWORD="<project-w admin user password>" docker compose up -d
+      PROJECT_W_TOKEN_SECRET_KEY="<Token Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" PROJECT_W_POSTGRES_PASSWORD="<Postgres password>" PROJECT_W_ADMIN_PASSWORD="<project-w admin user password>" docker compose up -d
 
 8. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database, your ssl certificate and your config.yml) and maybe your docker-compose.yml if you made changes to it.
 
@@ -192,7 +192,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
    .. warning::
       Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
-   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_JWT_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_TOKEN_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
    .. code-block:: yaml
 
@@ -210,7 +210,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
         connection_string: 'redis://redis:6379/project-W'
       security:
       local_token:
-        session_secret_key: !ENV ${JWT_SECRET_KEY}
+        session_secret_key: !ENV ${TOKEN_SECRET_KEY}
       local_account:
         user_provisioning:
           0:
@@ -270,7 +270,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
           volumes:
             - ./project-W-data/:/etc/xdg/project-W/
           environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
+            - TOKEN_SECRET_KEY=${PROJECT_W_TOKEN_SECRET_KEY}
             - SMTP_PASSWORD=${PROJECT_W_SMTP_PASSWORD}
             - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
             - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
@@ -285,7 +285,7 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
           volumes:
             - ./project-W-data/:/etc/xdg/project-W/
           environment:
-            - JWT_SECRET_KEY=${PROJECT_W_JWT_SECRET_KEY}
+            - TOKEN_SECRET_KEY=${PROJECT_W_TOKEN_SECRET_KEY}
             - POSTGRES_PASSWORD=${PROJECT_W_POSTGRES_PASSWORD}
             - ADMIN_PASSWORD=${PROJECT_W_ADMIN_PASSWORD}
         caddy:
@@ -305,17 +305,17 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
             - 443:443
             - 443:443/udp
 
-6. Generate a JWT_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
+6. Generate a TOKEN_SECRET_KEY that will be used to for generating Session Tokens. If you have python installed you can use the following command for this:
 
    .. code-block:: console
 
       python -c 'import secrets; print(secrets.token_hex(32))'
 
-7. Run the containers. Replace <JWT Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the JWT_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
+7. Run the containers. Replace <Token Secret Key>, <Your SMTP Password>, <Postgres password> and <project-w admin user password> with the TOKEN_SECRET_KEY we generated before, the password of the SMTP Server you want to use, some secure password that the admin user should have, and some secure password that you want to use for Postgresql respectively:
 
    .. code-block:: console
 
-      PROJECT_W_JWT_SECRET_KEY="<JWT Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" PROJECT_W_POSTGRES_PASSWORD="<Postgres password>" PROJECT_W_ADMIN_PASSWORD="<project-w admin user password>" docker compose up -d
+      PROJECT_W_TOKEN_SECRET_KEY="<Token Secret Key>" PROJECT_W_SMTP_PASSWORD="<Your SMTP Password>" PROJECT_W_POSTGRES_PASSWORD="<Postgres password>" PROJECT_W_ADMIN_PASSWORD="<project-w admin user password>" docker compose up -d
 
 8. You may want to set up some kind of backup solution. For this you just need to backup the project-W-data directory (which will include the database and your config.yml), the caddy-data directory (which will include your ssl certs, ocsp staples and so on) and maybe your docker-compose.yml if you made changes to it.
 

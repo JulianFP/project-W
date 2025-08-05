@@ -70,17 +70,34 @@ class SessionTokenValidated(RootModel):
         return self
 
 
-class LocalTokenSettings(BaseModel):
+class TokenSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    session_secret_key: SessionTokenValidated = Field(
-        description="The secret key used to generate JWT Tokens. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
+    secret_key: SessionTokenValidated = Field(
+        description="The secret key used to sign payloads in emails. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
     )
     session_expiration_time_minutes: int = Field(
-        ge=5,
+        ge=15,
         default=60,
-        description="Time for which a users/clients JWT Tokens stay valid (in minutes). After this time the user will be logged out automatically and has to authenticate again using their username and password.",
+        description="Time for which auth tokens stay valid (not API tokens, they stay valid indefinitely). Project-W uses rolling tokens, so beginning from 10 minutes before expiration the auth token will be rotated automatically to prevent active users from being logged out. Inactive users however will be logged out after this period. Increase if you want to keep inactive users logged in for longer (on the prize of a higher risk of the auth token being stolen)",
         validate_default=True,
     )
+    rolling_session_before_expiration_minutes: int = Field(
+        ge=5,
+        default=10,
+        description="The amount of minutes before a token expires when a user should get a new auth token if the user is still active",
+        validate_default=True,
+    )
+
+    @model_validator(mode="after")
+    def rlling_session_before_session_significantly_smaller_than_session_exp(self) -> Self:
+        if (
+            self.rolling_session_before_expiration_minutes
+            > 0.4 * self.session_expiration_time_minutes
+        ):
+            raise ValueError(
+                "'rolling_session_before_expiration_minutes' is too large compared to 'session_expiration_time_minutes'!"
+            )
+        return self
 
 
 class ProviderSettings(ProviderSettingsBase):
@@ -230,7 +247,7 @@ class LdapProviderSettings(ProviderSettings):
 class SecuritySettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     local_account: LocalAccountSettings = LocalAccountSettings()
-    local_token: LocalTokenSettings
+    tokens: TokenSettings
     oidc_providers: Annotated[
         dict[str, OidcProviderSettings],
         Field(

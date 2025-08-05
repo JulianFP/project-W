@@ -1,5 +1,6 @@
 import base64
 import hashlib
+from datetime import datetime, timedelta, timezone
 
 
 def parse_version_tuple(version_tuple: tuple[int | str, ...]) -> tuple[int, int, int, int, bool]:
@@ -21,10 +22,10 @@ def parse_version_tuple(version_tuple: tuple[int | str, ...]) -> tuple[int, int,
     )
 
 
-def hash_runner_token(token: str):
+def hash_token(token: str):
     """
     We only store the hash of the token, otherwise a db leak would make
-    it possible to impersonate any runner. We don't need to use a salted hash
+    it possible to impersonate any runner/user. We don't need to use a salted hash
     because the token is created by the server and already has sufficient entropy.
     The hash itself is stored using base64.
     """
@@ -33,3 +34,8 @@ def hash_runner_token(token: str):
         .rstrip(b"=")
         .decode("ascii")
     )
+
+
+def minutes_from_now_to_datetime(minutes_from_now: int) -> datetime:
+    expires_delta = timedelta(minutes=minutes_from_now)
+    return datetime.now(timezone.utc) + expires_delta

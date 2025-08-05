@@ -5,6 +5,7 @@ import click
 from granian.constants import Interfaces
 from granian.log import LogLevels
 from granian.server import Server
+from itsdangerous import URLSafeTimedSerializer
 
 import project_W.dependencies as dp
 
@@ -74,6 +75,9 @@ def main(
 
     # parse config file
     dp.config = load_config([custom_config_path]) if custom_config_path else load_config()
+    dp.auth_s = URLSafeTimedSerializer(
+        dp.config.security.tokens.secret_key.root.get_secret_value(), "Project-W"
+    )
 
     granian_options = {
         "target": "project_W.app",

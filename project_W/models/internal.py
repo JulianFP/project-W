@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from .base import (
     AdditionalUserInfo,
@@ -10,11 +10,7 @@ from .base import (
     UserInDb,
 )
 from .request_data import JobSettings, RunnerRegisterRequest
-from .response_data import TokenSecretInfo, UserTypeEnum
-
-
-class UserInDbAll(UserInDb, AdditionalUserInfo):
-    pass
+from .response_data import TokenInfo, User
 
 
 # user models for the database
@@ -67,31 +63,22 @@ class JobSettingsInDb(BaseModel):
     settings: JobSettings
 
 
+class TokenInfoInternal(TokenInfo):
+    oidc_refresh_token: SecretStr | None = None
+
+
+class LoginContext(BaseModel):
+    user: User
+    token: TokenInfoInternal
+
+
 class AccountActivationTokenData(BaseModel):
     old_email: EmailValidated
-    new_email: EmailValidated
+    new_email: EmailValidated | None = None
 
 
 class PasswordResetTokenData(BaseModel):
     email: EmailValidated
-
-
-class AuthTokenData(BaseModel):
-    user_type: UserTypeEnum
-    sub: str
-    email: EmailValidated
-    is_verified: bool
-
-
-class DecodedAuthTokenData(AuthTokenData):
-    token_id: int | None = None
-    is_admin: bool
-    iss: str
-
-
-class TokenSecret(TokenSecretInfo):
-    user_id: int
-    secret: str = Field(min_length=32, max_length=32)
 
 
 class LdapUserInfo(BaseModel):
