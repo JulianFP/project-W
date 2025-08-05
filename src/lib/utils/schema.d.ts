@@ -44,6 +44,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	"/api/users/logout": {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/**
+		 * Logout
+		 * @description Like /invalidate_token, but invalidates the token currently being used and additionally unsets the token cookie
+		 */
+		delete: operations["logout_api_users_logout_delete"];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	"/api/users/get_new_api_token": {
 		parameters: {
 			query?: never;
@@ -55,7 +75,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Get New Api Token
-		 * @description Create a new API token. The main difference between API tokens and the JWT tokens that you get after login is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfuly response contains the newly created token.
+		 * @description Create a new API token. The main difference between API tokens and regular auth tokens is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfuly response contains the newly created token.
 		 */
 		post: operations["get_new_api_token_api_users_get_new_api_token_post"];
 		delete?: never;
@@ -93,7 +113,7 @@ export interface paths {
 		};
 		/**
 		 * User Info
-		 * @description This route returns all information about the currently logged in user. In addition to the information that is encoded in the JWT token itself (which the client could just extract on its own) it also returns information from the database and replaces iss/sub information with the provider name and account type of the user (local/ldap/oidc).
+		 * @description This route returns all information about the currently logged in user.
 		 */
 		get: operations["user_info_api_users_info_get"];
 		put?: never;
@@ -437,8 +457,8 @@ export interface paths {
 		};
 		/**
 		 * Events
-		 * @description This is a special route for subscribing to server-sent events (SSE).
-		 *     Currently there is only one type of event called 'job_updated'. It returns the job id of a currently running job which attributes (e.g. processing step, progress, assigned runner, ...) have changed. This event can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs.
+		 * @description This is a special route for subscribing to server-sent events (SSE) which all contain an event field.
+		 *     Currently there are three events: job_created, job_updated and job_deleted. As data they all return the job id of the job the event refers to (i.e. the id of the job that just got created, updated or deleted). This route can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs. Refer to https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#listening_for_custom_events for more information about SSE.
 		 */
 		get: operations["events_api_jobs_events_get"];
 		put?: never;
@@ -666,7 +686,7 @@ export interface paths {
 		/**
 		 * Login
 		 * @description Log in with an LDAP user queried from the LDAP server with the name 'idp_name'. This name was specified by the admin in the config of this instance. Use the /api/auth_settings route to get the authentication-related configuration of this instance.
-		 *     If logging in with an admin account the returned JWT token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
+		 *     If logging in with an admin account the returned auth token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
 		 */
 		post: operations["login_api_ldap_login__idp_name__post"];
 		delete?: never;
@@ -687,7 +707,7 @@ export interface paths {
 		/**
 		 * Login
 		 * @description Log in to an existing local Project-W account. This is an OAuth2 compliant password request form where the username is the user's email address. A successful response will contain a token that needs to be attached in the authentication header of responses for routes that require the user to be logged in.
-		 *     If logging in with an admin account the returned JWT token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
+		 *     If logging in with an admin account the returned auth token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
 		 */
 		post: operations["login_api_local_account_login_post"];
 		delete?: never;
@@ -1077,7 +1097,7 @@ export interface components {
 			 */
 			name: string;
 			/** @description A contact email address of the person/institution hosting this instance */
-			email: components["schemas"]["EmailValidated"] | null;
+			email?: components["schemas"]["EmailValidated"] | null;
 			/**
 			 * Url
 			 * @description The URL to forward users to if they click on the imprint button on the frontend. Useful if you want to link to an imprint on a different website instead of having a dedicated imprint for Project-W. Mutually exclusive with the 'additional_imprint_html' option.
@@ -1562,14 +1582,18 @@ export interface components {
 		 * @enum {string}
 		 */
 		TaskEnum: "transcribe" | "translate";
-		/** TokenSecretInfo */
-		TokenSecretInfo: {
+		/** TokenInfo */
+		TokenInfo: {
 			/** Id */
 			id: number;
 			/** Name */
-			name: string | null;
-			/** Temp Token Secret */
-			temp_token_secret: boolean;
+			name: string;
+			/** Admin Privileges */
+			admin_privileges: boolean;
+			/** Explicit */
+			explicit: boolean;
+			/** Expires At */
+			expires_at?: string | null;
 		};
 		/** TosSettings */
 		TosSettings: {
@@ -1687,7 +1711,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -1736,7 +1760,47 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
+			401: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description Token doesn't grand enough permissions */
+			403: {
+				headers: {
+					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+		};
+	};
+	logout_api_users_logout_delete: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Successful Response */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": string;
+				};
+			};
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -1787,7 +1851,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -1833,10 +1897,10 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content: {
-					"application/json": components["schemas"]["TokenSecretInfo"][];
+					"application/json": components["schemas"]["TokenInfo"][];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -1876,7 +1940,7 @@ export interface operations {
 					"application/json": components["schemas"]["User"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -1928,7 +1992,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -1977,7 +2041,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2017,7 +2081,7 @@ export interface operations {
 					"application/json": components["schemas"]["RunnerCreatedInfo"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2059,7 +2123,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2112,7 +2176,7 @@ export interface operations {
 					"application/json": number;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2163,7 +2227,7 @@ export interface operations {
 					"application/json": unknown;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2216,7 +2280,7 @@ export interface operations {
 					"application/json": unknown;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2271,7 +2335,7 @@ export interface operations {
 					"application/json": number;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2320,7 +2384,7 @@ export interface operations {
 					"application/json": components["schemas"]["JobSettings-Output"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2375,7 +2439,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2389,6 +2453,15 @@ export interface operations {
 			403: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
+					[name: string]: unknown;
+				};
+				content: {
+					"application/json": components["schemas"]["ErrorResponse"];
+				};
+			};
+			/** @description The provided audio files has an invalid format */
+			415: {
+				headers: {
 					[name: string]: unknown;
 				};
 				content: {
@@ -2427,7 +2500,7 @@ export interface operations {
 					"application/json": number;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2483,7 +2556,7 @@ export interface operations {
 					"application/json": number[];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2534,7 +2607,7 @@ export interface operations {
 					"application/json": components["schemas"]["JobInfo"][];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2596,7 +2669,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2658,7 +2731,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2723,7 +2796,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2772,7 +2845,7 @@ export interface operations {
 					"application/json": unknown;
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2816,7 +2889,7 @@ export interface operations {
 					"application/json": components["schemas"]["RegisteredResponse"];
 				};
 			};
-			/** @description No runner with that token exists */
+			/** @description No runner with that token exists, nor not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2864,7 +2937,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description No runner with that token exists */
+			/** @description No runner with that token exists, nor not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2905,7 +2978,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description No runner with that token exists */
+			/** @description No runner with that token exists, nor not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -2973,7 +3046,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description No runner with that token exists */
+			/** @description No runner with that token exists, nor not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -3045,7 +3118,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description No runner with that token exists */
+			/** @description No runner with that token exists, nor not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -3099,7 +3172,7 @@ export interface operations {
 					"application/json": components["schemas"]["HeartbeatResponse"];
 				};
 			};
-			/** @description No runner with that token exists */
+			/** @description No runner with that token exists, nor not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -3202,7 +3275,9 @@ export interface operations {
 	};
 	oidc_auth_api_oidc_auth__idp_name__get: {
 		parameters: {
-			query?: never;
+			query?: {
+				user_agent?: string | null;
+			};
 			header?: never;
 			path: {
 				idp_name: string;
@@ -3261,7 +3336,9 @@ export interface operations {
 	};
 	login_api_ldap_login__idp_name__post: {
 		parameters: {
-			query?: never;
+			query?: {
+				user_agent?: string | null;
+			};
 			header?: never;
 			path: {
 				idp_name: string;
@@ -3314,7 +3391,9 @@ export interface operations {
 	};
 	login_api_local_account_login_post: {
 		parameters: {
-			query?: never;
+			query?: {
+				user_agent?: string | null;
+			};
 			header?: never;
 			path?: never;
 			cookie?: never;
@@ -3425,7 +3504,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description Activation token doesn't match any user, or user has already been activated */
+			/** @description Activation token doesn't match any LoginContext, or user has already been activated */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -3472,7 +3551,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description User is not a local Project-W user or has been provisioned through the config file */
+			/** @description This user is not a local user or is already activated */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -3481,7 +3560,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -3616,7 +3695,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description User is not a local Project-W user or has been provisioned through the config file */
+			/** @description Email domain not allowed or email already in use */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -3625,7 +3704,7 @@ export interface operations {
 					"application/json": components["schemas"]["ErrorResponse"];
 				};
 			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;
@@ -3678,16 +3757,7 @@ export interface operations {
 					"application/json": string;
 				};
 			};
-			/** @description User is not a local Project-W user or has been provisioned through the config file */
-			400: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content: {
-					"application/json": components["schemas"]["ErrorResponse"];
-				};
-			};
-			/** @description Validation error of JWT token */
+			/** @description Validation error of auth token, or not authenticated */
 			401: {
 				headers: {
 					"WWW-Authenticate"?: unknown;

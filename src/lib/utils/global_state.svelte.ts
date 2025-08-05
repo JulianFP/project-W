@@ -2,36 +2,23 @@ import { goto } from "$app/navigation";
 import { page } from "$app/state";
 
 class AuthManager {
-	#authHeader = $state<Record<string, string>>({});
-	loggedIn = $derived<boolean>("Authorization" in this.#authHeader);
+	//set logged in by default so that it tries to use authenticated route first before failing and logging out
+	#first_load = true;
+	loggedIn = $state<boolean>(true);
 
-	updateTokenFromStorage() {
-		try {
-			//put this in try block because this will throw if executed on the server-side (which is being tested during build)
-			const returnVal: string | null = localStorage.getItem("authHeader");
-			if (returnVal)
-				this.#authHeader = { Authorization: `Bearer ${returnVal}` };
-		} catch (err: unknown) {
-			return;
+	login() {
+		this.loggedIn = true;
+	}
+
+	logout(detail: string | null = null) {
+		if (detail != null && !this.#first_load) {
+			alerts.push({
+				msg: `You have been logged out: ${detail}`,
+				color: "red",
+			});
+			this.#first_load = false;
 		}
-	}
-
-	constructor() {
-		this.updateTokenFromStorage();
-	}
-
-	setToken(token: string) {
-		this.#authHeader = { Authorization: `Bearer ${token}` };
-		localStorage.setItem("authHeader", token);
-	}
-
-	forgetToken() {
-		this.#authHeader = {};
-		localStorage.removeItem("authHeader");
-	}
-
-	getAuthHeader() {
-		return this.#authHeader;
+		this.loggedIn = false;
 	}
 }
 

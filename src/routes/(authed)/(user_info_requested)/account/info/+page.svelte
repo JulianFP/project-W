@@ -7,11 +7,7 @@ import ChangeEmailField from "$lib/components/changeEmailField.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
-import {
-	BackendCommError,
-	deletLoggedIn,
-	getLoggedIn,
-} from "$lib/utils/httpRequests.svelte";
+import { BackendCommError, delet, get } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 
 type Data = {
@@ -30,9 +26,9 @@ let modalOpen = $state(false);
 
 async function deleteUser() {
 	try {
-		await deletLoggedIn<null>("users/delete");
+		await delet<null>("users/delete");
 		alerts.push({ msg: "User was deleted successfully!", color: "green" });
-		auth.forgetToken();
+		auth.logout();
 	} catch (err: unknown) {
 		let errorMsg = "Error occured during user deletion: ";
 		if (err instanceof BackendCommError) {
@@ -50,7 +46,7 @@ async function getResendEmail() {
 	resendErrorMsg = "";
 
 	try {
-		let resendResponse = await getLoggedIn<string>(
+		let resendResponse = await get<string>(
 			"local-account/resend_activation_email",
 		);
 		alerts.push({ msg: resendResponse, color: "green" });

@@ -27,17 +27,12 @@ import ConfirmPasswordModal from "$lib/components/confirmPasswordModal.svelte";
 import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
-import {
-	BackendCommError,
-	deletLoggedIn,
-	postLoggedIn,
-} from "$lib/utils/httpRequests.svelte";
+import { BackendCommError, delet, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
-import { error } from "@sveltejs/kit";
 
 type Data = {
 	user_info: components["schemas"]["User"];
-	token_info: components["schemas"]["TokenSecretInfo"][];
+	token_info: components["schemas"]["TokenInfo"][];
 	auth_settings: components["schemas"]["AuthSettings"];
 };
 interface Props {
@@ -45,23 +40,25 @@ interface Props {
 }
 let { data }: Props = $props();
 
-let table_items: { id: number; name: string }[] = $derived.by(() => {
-	let items = [];
-	for (let item of data.token_info) {
-		if (!item.temp_token_secret) {
-			items.push({ id: item.id, name: item.name ? item.name : "" });
+let table_items: { id: number; name: string; temp: boolean }[] = $derived.by(
+	() => {
+		let items = [];
+		for (let item of data.token_info) {
+			items.push({
+				id: item.id,
+				name: item.name ? item.name : "",
+				temp: !item.explicit,
+			});
 		}
+		return items;
+	},
+);
+let temp_tokens: number[] = $derived.by(() => {
+	let items: number[] = [];
+	for (let item of data.token_info) {
+		if (!item.explicit) items.push(item.id);
 	}
 	return items;
-});
-let temp_token_secret_id: number = $derived.by(() => {
-	for (let item of data.token_info) {
-		if (item.temp_token_secret) return item.id;
-	}
-	error(
-		400,
-		"There is no info about the temporary token secret among the token infos the backend returned",
-	);
 });
 let api_token_creation_allowed: boolean = $derived.by(() => {
 	if (
@@ -123,13 +120,10 @@ function openInvalidateAPITokenModal(id: number) {
 }
 
 async function changePassword(): Promise<void> {
-	const response = await postLoggedIn<string>(
-		"local-account/change_user_password",
-		{
-			password: password,
-			new_password: newPassword,
-		},
-	);
+	const response = await post<string>("local-account/change_user_password", {
+		password: password,
+		new_password: newPassword,
+	});
 	alerts.push({ msg: response, color: "green" });
 	newPassword = "";
 }
@@ -140,12 +134,9 @@ async function createAPIToken(event: Event): Promise<void> {
 	waitingForToken = true;
 	createAPITokenError = false;
 	try {
-		createdAPIToken = await postLoggedIn<string>(
-			"users/get_new_api_token",
-			{},
-			false,
-			{ name: tokenName },
-		);
+		createdAPIToken = await post<string>("users/get_new_api_token", {}, false, {
+			name: tokenName,
+		});
 		createAPITokenModalOpen = true;
 		tokenName = "";
 	} catch (err: unknown) {
@@ -162,7 +153,7 @@ async function createAPIToken(event: Event): Promise<void> {
 
 async function invalidateToken(id: number): Promise<void> {
 	try {
-		await deletLoggedIn<null>(
+		await delet<null>(
 			"users/invalidate_token",
 			{},
 			{ token_id: id.toString() },
@@ -184,13 +175,13 @@ async function invalidateToken(id: number): Promise<void> {
 
 async function invalidateAllTokens(): Promise<void> {
 	try {
-		await deletLoggedIn<null>("users/invalidate_all_tokens");
+		await delet<null>("users/invalidate_all_tokens");
 		alerts.push({
 			msg: "All tokens succuessfully invalidated",
 			color: "green",
 		});
 		if (data.user_info.user_type !== "oidc") {
-			auth.forgetToken();
+			auth.logout();
 		} else {
 			invalidate("app:token_info");
 		}
@@ -245,19 +236,21 @@ async function invalidateAllTokens(): Promise<void> {
         <TableHead>
           <TableHeadCell>ID</TableHeadCell>
           <TableHeadCell>Name</TableHeadCell>
+          <TableHeadCell>Token type</TableHeadCell>
           <TableHeadCell></TableHeadCell>
         </TableHead>
         <TableBody>
           {#if table_items.length === 0}
             <TableBodyRow>
-              <TableBodyCell colspan={3}><P>You don't have any API tokens yet. You can create API tokens for for your custom clients/scripts/automations by clicking on the 'Create API Token' button. API tokens will never expire unless you invalidate them manually.</P></TableBodyCell>
+              <TableBodyCell colspan={4}><P>You don't have any API tokens yet. You can create API tokens for for your custom clients/scripts/automations by clicking on the 'Create API Token' button. API tokens will never expire unless you invalidate them manually.</P></TableBodyCell>
             </TableBodyRow>
           {/if}
           {#each table_items as item}
             <TableBodyRow>
               <TableBodyCell>{item.id}</TableBodyCell>
-              <TableBodyCell class="w-full">{item.name}</TableBodyCell>
-              <TableBodyCell>
+              <TableBodyCell><P size="xs" class="break-all text-gray-500 dark:text-gray-400">{item.name}</P></TableBodyCell>
+              <TableBodyCell>{item.temp ? "Session" : "API token"}</TableBodyCell>
+              <TableBodyCell class="max-w-content">
                 <Button pill outline class="!p-2" size="xs" color="red" onclick={() => {openInvalidateAPITokenModal(item.id)}}>
                   <TrashBinSolid class="mr-2"/>Invalidate
                 </Button>
@@ -289,7 +282,7 @@ async function invalidateAllTokens(): Promise<void> {
   The API token with ID {invalidateTokenId} will be invalidated. This will log out the device using that token. Are you sure?
 </ConfirmModal>
 
-<ConfirmModal bind:open={invalidSessionModalOpen} action={async () => {await invalidateToken(temp_token_secret_id); auth.forgetToken();}}>
+<ConfirmModal bind:open={invalidSessionModalOpen} action={async () => {temp_tokens.forEach(async (token_id) => await invalidateToken(token_id)); auth.logout();}}>
   We will invalidate all your session tokens thus logging you out from all your temporary devices (e.g. browsers, including this one). API tokens will stay valid. You will have to login again.
 </ConfirmModal>
 

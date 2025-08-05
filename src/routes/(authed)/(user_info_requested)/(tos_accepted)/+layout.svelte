@@ -2,7 +2,7 @@
 import { invalidate } from "$app/navigation";
 import CenterPage from "$lib/components/centerPage.svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 import { Checkbox, Heading, Helper, P } from "flowbite-svelte";
 import type { Snippet } from "svelte";
@@ -44,7 +44,7 @@ async function acceptTos(): Promise<void> {
 	try {
 		for (let [tos_id, selected] of not_accepted_tos) {
 			if (selected) {
-				await postLoggedIn<string>("users/accept_tos", {}, false, {
+				await post<string>("users/accept_tos", {}, false, {
 					tos_id: tos_id,
 					tos_version: data.about.terms_of_services[tos_id].version.toString(),
 				});

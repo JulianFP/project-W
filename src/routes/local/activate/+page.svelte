@@ -1,7 +1,7 @@
 <script lang="ts">
 import { Spinner } from "flowbite-svelte";
 
-import { alerts, auth, routing } from "$lib/utils/global_state.svelte";
+import { alerts, routing } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 
 async function activate(): Promise<void> {
@@ -14,10 +14,9 @@ async function activate(): Promise<void> {
 			Object.fromEntries(routing.querystring),
 		);
 		alerts.push({
-			msg: "Account activation successful, please login again",
+			msg: "Account activation successful!",
 			color: "green",
 		});
-		auth.forgetToken();
 		await routing.set({
 			destination: "#/auth/local/login",
 			params: {},

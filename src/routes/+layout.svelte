@@ -3,6 +3,7 @@ import "../app.css";
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import { routing } from "$lib/utils/global_state.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
+import { BackendCommError, delet } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 import {
 	Alert,
@@ -42,6 +43,22 @@ interface Props {
 	children: Snippet;
 }
 let { data, children }: Props = $props();
+
+async function logout(): Promise<void> {
+	//send post request and wait for response
+	try {
+		await delet<string>("users/logout");
+		auth.logout();
+	} catch (err: unknown) {
+		let errorMsg: string;
+		if (err instanceof BackendCommError) {
+			errorMsg = err.message;
+		} else {
+			errorMsg = "Unknown error";
+		}
+		alerts.push({ msg: `Error during logout: ${errorMsg}`, color: "red" });
+	}
+}
 </script>
 <!-- On smaller screens (height <1250px) the login site will be expanded to the size of the screen pushing the footer outside the screen. Looks better that way-->
 <div class={`flex flex-col gap-8 ${routing.location.startsWith("#/auth") ? "min-h-[min(calc(100vh+180px),max(100vh,1250px))]" : "min-h-screen"}`}>
@@ -65,7 +82,7 @@ let { data, children }: Props = $props();
           <DropdownItem href="#/account/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
           <DropdownItem href="#/account/default_settings" onclick={() => {dropDownOpen = false}}><AdjustmentsHorizontalSolid class="inline mr-2"/>Default settings</DropdownItem>
           <DropdownDivider />
-          <DropdownItem class="cursor-pointer" onclick={() => {dropDownOpen = false; auth.forgetToken()}}>Log out</DropdownItem>
+          <DropdownItem class="cursor-pointer" onclick={() => {dropDownOpen = false; logout()}}>Log out</DropdownItem>
         </Dropdown>
       {/if}
     </Navbar>

@@ -3,7 +3,7 @@ import { Helper, Input, Label, Span } from "flowbite-svelte";
 import { CloseOutline, PenSolid } from "flowbite-svelte-icons";
 
 import { alerts } from "$lib/utils/global_state.svelte";
-import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import Button from "./button.svelte";
 import ConfirmPasswordModal from "./confirmPasswordModal.svelte";
 
@@ -33,7 +33,7 @@ function openModal(event: Event) {
 }
 
 async function changeUserEmail(): Promise<void> {
-	const response: string = await postLoggedIn<string>(
+	const response: string = await post<string>(
 		"local-account/change_user_email",
 		{
 			password: password,

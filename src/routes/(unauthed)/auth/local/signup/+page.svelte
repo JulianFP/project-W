@@ -32,7 +32,7 @@ async function postSignup(event: Event): Promise<void> {
 		});
 
 		try {
-			const token = await post<string>(
+			await post<string>(
 				"local-account/login",
 				{
 					grant_type: "password",
@@ -41,7 +41,7 @@ async function postSignup(event: Event): Promise<void> {
 				},
 				true,
 			);
-			auth.setToken(token);
+			auth.login();
 			alerts.push({ msg: signup_response, color: "green" });
 		} catch (err: unknown) {
 			if (err instanceof BackendCommError) {

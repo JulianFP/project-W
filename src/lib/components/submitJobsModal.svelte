@@ -11,8 +11,8 @@ import {
 import { FileMusicSolid, QuestionCircleOutline } from "flowbite-svelte-icons";
 import { SvelteMap } from "svelte/reactivity";
 
-import { alerts, auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
+import { alerts } from "$lib/utils/global_state.svelte";
+import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import { type components } from "$lib/utils/schema";
 import CloseButton from "./closeButton.svelte";
 import JobSettingsForm from "./jobSettingsForm.svelte";
@@ -68,7 +68,7 @@ async function postJob(file: File, job_settings_id: number) {
 		`${PUBLIC_BACKEND_BASE_URL}/api/jobs/submit_job?job_settings_id=${job_settings_id.toString()}`,
 		{
 			method: "POST",
-			headers: auth.getAuthHeader(),
+			credentials: "include",
 			body: form_data,
 		},
 	);
@@ -80,7 +80,7 @@ async function submitJob(): Promise<void> {
 
 		//send job settings
 		try {
-			const settings_id = await postLoggedIn<number>(
+			const settings_id = await post<number>(
 				"jobs/submit_settings",
 				get_job_settings(),
 				false,

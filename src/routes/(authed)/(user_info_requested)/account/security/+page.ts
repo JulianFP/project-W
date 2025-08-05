@@ -1,5 +1,5 @@
 import { auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError, getLoggedIn } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError, get } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 import { error } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
@@ -10,8 +10,9 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 	depends("app:token_info");
 	if (auth.loggedIn) {
 		try {
-			const token_info = await getLoggedIn<TokenInfo[]>(
+			const token_info = await get<TokenInfo[]>(
 				"users/get_all_token_info",
+				{},
 				{},
 				fetch,
 			);

@@ -32,7 +32,7 @@ async function postLogin(event: Event): Promise<void> {
 
 	//send post request and wait for response
 	try {
-		const token = await post<string>(
+		await post<string>(
 			`ldap/login/${data.prov}`,
 			{
 				grant_type: "password",
@@ -41,7 +41,7 @@ async function postLogin(event: Event): Promise<void> {
 			},
 			true,
 		);
-		auth.setToken(token);
+		auth.login();
 	} catch (err: unknown) {
 		if (err instanceof BackendCommError) {
 			errorMsg = err.message;

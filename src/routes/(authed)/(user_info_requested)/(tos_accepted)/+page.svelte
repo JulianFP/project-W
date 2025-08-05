@@ -41,12 +41,12 @@ import CloseButton from "$lib/components/closeButton.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";
 import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
 import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
-import { alerts, auth } from "$lib/utils/global_state.svelte";
+import { alerts } from "$lib/utils/global_state.svelte";
 import {
 	BackendCommError,
-	deletLoggedIn,
-	getLoggedIn,
-	postLoggedIn,
+	delet,
+	get,
+	post,
 } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 
@@ -191,16 +191,16 @@ function process_job(job: Job) {
 async function fetch_jobs() {
 	fetchingJobs = true;
 	try {
-		job_count = await getLoggedIn<number>("jobs/count", {
+		job_count = await get<number>("jobs/count", {
 			exclude_finished: exclude_finished.toString(),
 			exclude_downloaded: exclude_downloaded.toString(),
 		});
-		job_count_total = await getLoggedIn<number>("jobs/count", {
+		job_count_total = await get<number>("jobs/count", {
 			exclude_finished: "false",
 			exclude_downloaded: "false",
 		});
 		if (job_count > 0) {
-			const job_ids = await getLoggedIn<number[]>("jobs/get", {
+			const job_ids = await get<number[]>("jobs/get", {
 				start_index: (jobs_per_page * (currentPage - 1)).toString(),
 				end_index: (jobs_per_page * currentPage - 1).toString(),
 				sort_key: sort_key,
@@ -232,10 +232,7 @@ async function fetch_jobs() {
 					}
 				}
 				if (args_formatted.length > 0) {
-					const jobs_unsorted = await getLoggedIn<Job[]>(
-						"jobs/info",
-						args_formatted,
-					);
+					const jobs_unsorted = await get<Job[]>("jobs/info", args_formatted);
 					for (const job of jobs_unsorted) {
 						process_job(job);
 					}
@@ -268,7 +265,7 @@ async function update_jobs(job_ids: number[]) {
 		args_formatted.push(["job_ids", job_id.toString()]);
 	}
 	try {
-		const jobs_unsorted = await getLoggedIn<Job[]>("jobs/info", args_formatted);
+		const jobs_unsorted = await get<Job[]>("jobs/info", args_formatted);
 		for (const job of jobs_unsorted) {
 			process_job(job);
 		}
@@ -284,7 +281,6 @@ async function update_jobs(job_ids: number[]) {
 }
 
 function deselect_all_jobs() {
-	console.log("deselected");
 	for (let id of jobs_ordered_selected.keys()) {
 		jobs_ordered_selected.set(id, false);
 	}
@@ -299,7 +295,7 @@ function sortClickHandler(key: SortKey) {
 
 async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
-		await postLoggedIn("jobs/abort", jobIdsToAbort);
+		await post("jobs/abort", jobIdsToAbort);
 	} catch (err: unknown) {
 		let errorMsg = `Error occured while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;
@@ -317,7 +313,7 @@ async function postAbortJobs(abortedJobIds: number[]): Promise<void> {
 
 async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
-		await deletLoggedIn("jobs/delete", jobIdsToAbort);
+		await delet("jobs/delete", jobIdsToAbort);
 	} catch (err: unknown) {
 		let errorMsg = `Error occured while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;
@@ -474,30 +470,39 @@ function timeAgo(date: Date): [string, number | null] {
 }
 
 // update jobs using SSE (Server-Sent Events)
-const evtSource = new EventSource(
-	`${PUBLIC_BACKEND_BASE_URL}/api/jobs/events`,
-	{
-		withCredentials: true,
-		fetch: (input, init) =>
-			fetch(input, {
-				...init,
-				headers: {
-					...init.headers,
-					...auth.getAuthHeader(),
-				},
-			}),
-	},
-);
-evtSource.addEventListener("job_deleted", (_) => {
-	fetch_jobs();
-});
-evtSource.addEventListener("job_created", (_) => {
-	fetch_jobs();
-});
-evtSource.addEventListener("job_updated", (event) => {
+function updateJobOnSSEEvent(event: MessageEvent) {
 	const job_id: number = Number.parseInt(event.data);
 	if (jobs_info.has(job_id)) {
 		update_jobs([job_id]);
+	}
+}
+function reloadSSEListeners() {
+	const evtSource = new EventSource(
+		`${PUBLIC_BACKEND_BASE_URL}/api/jobs/events`,
+		{
+			withCredentials: true,
+			fetch: (input, init) =>
+				fetch(input, {
+					...init,
+					headers: {
+						...init.headers,
+					},
+				}),
+		},
+	);
+	evtSource.removeEventListener("job_deleted", fetch_jobs);
+	evtSource.removeEventListener("job_created", fetch_jobs);
+	evtSource.removeEventListener("job_updated", updateJobOnSSEEvent);
+	evtSource.addEventListener("job_deleted", fetch_jobs);
+	evtSource.addEventListener("job_created", fetch_jobs);
+	evtSource.addEventListener("job_updated", updateJobOnSSEEvent);
+}
+reloadSSEListeners();
+cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
+	for (const { name, value } of event.changed) {
+		if (name === "token" && value) {
+			reloadSSEListeners();
+		}
 	}
 });
 </script>
@@ -734,6 +739,6 @@ evtSource.addEventListener("job_updated", (event) => {
   {/if}
 </ConfirmModal>
 
-<SubmitJobsModal bind:open={submitModalOpen} pre_filled_in_settings={pre_filled_job_settings}/>
+<SubmitJobsModal bind:open={submitModalOpen} pre_filled_in_settings={pre_filled_job_settings} post_action={async () => reloadSSEListeners()}/>
 
 <DownloadTranscriptModal bind:open={downloadModalOpen} job_id={downloadJobId} job_file_name={downloadFileName} post_action={async () => await update_jobs([downloadJobId])}/>

@@ -1,5 +1,5 @@
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-import { alerts, auth } from "./global_state.svelte";
+import { auth } from "./global_state.svelte";
 import { routing } from "./global_state.svelte";
 import type { components } from "./schema";
 
@@ -42,6 +42,10 @@ async function response_parser<ResponseType>(
 				}
 			}
 		}
+		if (response.status === 401 && auth.loggedIn) {
+			auth.logout(detail);
+			await routing.dest_forward();
+		}
 		throw new BackendCommError(response.status, detail);
 	}
 	if (!is_json) {
@@ -52,43 +56,6 @@ async function response_parser<ResponseType>(
 	}
 	const result: ResponseType = await response.json();
 	return result;
-}
-
-async function loggedInWrapper<ResponseType>(
-	query_method: () => Promise<ResponseType>,
-	depth = 0,
-): Promise<ResponseType> {
-	if (auth.loggedIn) {
-		try {
-			return await query_method();
-		} catch (error: unknown) {
-			if (error instanceof BackendCommError && error.status === 401) {
-				//update and try again (maybe the user logged in in a different tab?)
-				if (depth < 0) {
-					auth.updateTokenFromStorage();
-					return await loggedInWrapper(query_method, depth + 1);
-				}
-				auth.forgetToken();
-				alerts.push({
-					msg: `You have been logged out: ${error.message}`,
-					color: "red",
-				});
-				await routing.dest_forward();
-			}
-			throw error;
-		}
-	} else if (depth < 0) {
-		auth.updateTokenFromStorage();
-		return await loggedInWrapper(query_method, depth + 1);
-	} else {
-		auth.forgetToken();
-		alerts.push({
-			msg: "You are not logged in anymore",
-			color: "red",
-		});
-		await routing.dest_forward();
-		throw new BackendCommError(401, "Not logged in");
-	}
 }
 
 export async function get<ResponseType>(
@@ -102,21 +69,11 @@ export async function get<ResponseType>(
 		`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
 		{
 			method: "GET",
+			credentials: "include",
 			headers: headers,
 		},
 	);
 	return await response_parser<ResponseType>(response);
-}
-
-export async function getLoggedIn<ResponseType>(
-	route: string,
-	args: Record<string, string> | string[][] = {},
-	fetch = window.fetch,
-): Promise<ResponseType> {
-	const query_method = async () => {
-		return await get<ResponseType>(route, args, auth.getAuthHeader(), fetch);
-	};
-	return loggedInWrapper<ResponseType>(query_method);
 }
 
 export async function post<ResponseType>(
@@ -135,6 +92,7 @@ export async function post<ResponseType>(
 			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
 			{
 				method: "POST",
+				credentials: "include",
 				headers: {
 					"Content-Type": "application/x-www-form-urlencoded",
 					...headers,
@@ -147,6 +105,7 @@ export async function post<ResponseType>(
 			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
 			{
 				method: "POST",
+				credentials: "include",
 				headers: {
 					"Content-Type": "application/json",
 					...headers,
@@ -156,26 +115,6 @@ export async function post<ResponseType>(
 		);
 	}
 	return await response_parser<ResponseType>(response);
-}
-
-export async function postLoggedIn<ResponseType>(
-	route: string,
-	body = {},
-	body_as_form_url_encoded = false,
-	args: Record<string, string> | string[][] = {},
-	fetch = window.fetch,
-): Promise<ResponseType> {
-	const query_method = async () => {
-		return await post<ResponseType>(
-			route,
-			body,
-			body_as_form_url_encoded,
-			args,
-			auth.getAuthHeader(),
-			fetch,
-		);
-	};
-	return await loggedInWrapper<ResponseType>(query_method);
 }
 
 export async function delet<ResponseType>(
@@ -190,6 +129,7 @@ export async function delet<ResponseType>(
 		`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
 		{
 			method: "DELETE",
+			credentials: "include",
 			headers: {
 				"Content-Type": "application/json",
 				...headers,
@@ -198,22 +138,4 @@ export async function delet<ResponseType>(
 		},
 	);
 	return await response_parser<ResponseType>(response);
-}
-
-export async function deletLoggedIn<ResponseType>(
-	route: string,
-	body = {},
-	args: Record<string, string> | string[][] = {},
-	fetch = window.fetch,
-): Promise<ResponseType> {
-	const query_method = async () => {
-		return await delet<ResponseType>(
-			route,
-			body,
-			args,
-			auth.getAuthHeader(),
-			fetch,
-		);
-	};
-	return loggedInWrapper<ResponseType>(query_method);
 }
