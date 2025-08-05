@@ -15,8 +15,6 @@ The red annotations are the attributes how they are actually currently enforced 
 
 - The `is-default-of` relations are not actually implemented as relations but as a `is_default` field in one of the tables with some added constraints. If I had implemented them as actual relations that would have introduced tables that reference each other which is always a pain to work with.
 
-- I have implemented two PostgreSQL functions and triggers: rotatesecret() and deleteaudio().
-
-   - rotatesecret() creates a new default token secret if the default token secret of a user was deleted, effectively ensuring that there always exists a token secret for signing temporary JWT tokens.
+- I have implemented these PostgreSQL functions and triggers: deleteaudio().
 
    - deleteaudio() deletes PostgreSQL large objects containing the audio file once a Job gets deleted (which can also happen due to a CASCADE, e.g. when a user gets deleted). This is necessary because `audio_oid` is not explicitly referencing large objects (because it is not possible to reference system tables by default in PostgreSQL) which means that it wouldn't CASCADE DELETE the large object otherwise.

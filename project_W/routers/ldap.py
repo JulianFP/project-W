@@ -1,14 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 import project_W.dependencies as dp
 import project_W.security.ldap_deps as ldap
 
-from ..models.internal import AuthTokenData
-from ..models.response_data import ErrorResponse, UserTypeEnum
-from ..security.local_token import create_auth_token
+from ..models.response_data import ErrorResponse
+from ..security.auth import check_admin_privileges, set_token_cookie
 
 router = APIRouter(
     prefix="/ldap",
@@ -31,10 +30,15 @@ http_exc = HTTPException(
         401: {"model": ErrorResponse, "description": "Authentication was unsuccessful"},
     },
 )
-async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> str:
+async def login(
+    idp_name: str,
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    response: Response,
+    user_agent: Annotated[str | None, Header()] = None,
+) -> str:
     """
     Log in with an LDAP user queried from the LDAP server with the name 'idp_name'. This name was specified by the admin in the config of this instance. Use the /api/auth_settings route to get the authentication-related configuration of this instance.
-    If logging in with an admin account the returned JWT token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
+    If logging in with an admin account the returned auth token will not give you admin privileges by default. If you need a token with admin privileges then specify the scope 'admin' during login.
     """
 
     if not ldap.ldap_adapter.check_idp_name(idp_name):
@@ -47,10 +51,21 @@ async def login(idp_name: str, form_data: Annotated[OAuth2PasswordRequestForm, D
 
     if await ldap.ldap_adapter.authenticate_user(idp_name, user.dn, form_data.password):
         user_id = await dp.db.ensure_ldap_user_exists(idp_name, user.uid, user.email)
-        data = AuthTokenData(
-            user_type=UserTypeEnum.LDAP, sub=str(user_id), email=user.email, is_verified=True
+
+        admin_privileges = check_admin_privileges(form_data.scopes, user.is_admin)
+        if user_agent is None:
+            token_name = "Unknown device"
+        else:
+            token_name = user_agent
+
+        token = await dp.db.add_new_user_token(
+            user_id,
+            token_name,
+            False,
+            admin_privileges,
+            dp.config.security.tokens.session_expiration_time_minutes,
         )
-        token = await create_auth_token(dp.config, data, user_id, user.is_admin, form_data.scopes)
-        return token
+        set_token_cookie(response, token)
+        return "Success. Returning your login token as a cookie"
     else:
         raise http_exc

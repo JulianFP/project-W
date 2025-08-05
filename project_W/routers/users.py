@@ -1,16 +1,16 @@
-from typing import Annotated
+from typing import Annotated, Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 import project_W.dependencies as dp
+from project_W.models.internal import LoginContext
 
-from ..models.internal import AuthTokenData
-from ..models.response_data import ErrorResponse, TokenSecretInfo, User, UserTypeEnum
+from ..models.response_data import ErrorResponse, TokenInfo, User, UserTypeEnum
 from ..security.auth import (
     auth_dependency_responses,
-    validate_user_and_get_from_db,
+    unset_cookie,
+    validate_user,
 )
-from ..security.local_token import create_auth_token
 
 router = APIRouter(
     prefix="/users",
@@ -21,38 +21,46 @@ router = APIRouter(
 
 @router.delete("/invalidate_token")
 async def invalidate_token(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=False, require_admin=False, require_tos=False
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
     token_id: int,
 ) -> str:
     """
     Invalidate the local token with the provided id. Doesn't work for OIDC tokens. After calling this route the token with the provided id can't be used anymore.
     """
-    await dp.db.delete_token_secret_of_user(current_user.id, token_id)
+    await dp.db.delete_token_of_user(login_context.user.id, token_id)
     return "Success"
 
 
 @router.delete("/invalidate_all_tokens")
 async def invalidate_all_tokens(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=False, require_admin=False, require_tos=False
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
 ) -> str:
     """
     Invalidate all local tokens of the logged in user account. Doesn't work for OIDC tokens. After calling this route all local tokens of the logged in user account won't work anymore.
     """
-    await dp.db.delete_all_token_secrets_of_user(int(current_user.id))
+    await dp.db.delete_all_tokens_of_user(int(login_context.user.id))
+    return "Success"
+
+
+@router.delete("/logout")
+async def logout(
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
+    ],
+    response: Response,
+) -> str:
+    """
+    Like /invalidate_token, but invalidates the token currently being used and additionally unsets the token cookie
+    """
+    unset_cookie(response)
+    await dp.db.delete_token_of_user(login_context.user.id, login_context.token.id)
     return "Success"
 
 
@@ -66,18 +74,14 @@ async def invalidate_all_tokens(
     },
 )
 async def get_new_api_token(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=False
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=False)),
     ],
-    name: Annotated[str, Query(max_length=64)],
+    name: str,
 ) -> str:
     """
-    Create a new API token. The main difference between API tokens and the JWT tokens that you get after login is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfuly response contains the newly created token.
+    Create a new API token. The main difference between API tokens and regular auth tokens is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfuly response contains the newly created token.
     """
     # check if current user is from a provider which allows creation of api tokens
     disabled_exc = HTTPException(
@@ -85,68 +89,64 @@ async def get_new_api_token(
         detail=f"Creation of api tokens is disabled for your account type. Login using a different provider or ask the administrator to enable this.",
     )
     if (
-        current_user.user_type == UserTypeEnum.OIDC
+        login_context.user.user_type == UserTypeEnum.OIDC
         and not dp.config.security.oidc_providers[
-            current_user.provider_name
+            login_context.user.provider_name
         ].allow_creation_of_api_tokens
     ):
         raise disabled_exc
     if (
-        current_user.user_type == UserTypeEnum.LDAP
+        login_context.user.user_type == UserTypeEnum.LDAP
         and not dp.config.security.ldap_providers[
-            current_user.provider_name
+            login_context.user.provider_name
         ].allow_creation_of_api_tokens
     ):
         raise disabled_exc
     if (
-        current_user.user_type == UserTypeEnum.LOCAL
+        login_context.user.user_type == UserTypeEnum.LOCAL
         and not dp.config.security.local_account.allow_creation_of_api_tokens
     ):
         raise disabled_exc
 
-    data = AuthTokenData(
-        user_type=current_user.user_type,
-        sub=str(current_user.id),
-        email=current_user.email,
-        is_verified=current_user.is_verified,
+    token = await dp.db.add_new_user_token(
+        login_context.user.id,
+        name,
+        True,
+        False,
+        None,
+        (
+            login_context.token.oidc_refresh_token.get_secret_value()
+            if login_context.token.oidc_refresh_token is not None
+            else None
+        ),
     )
-    return await create_auth_token(
-        dp.config, data, current_user.id, current_user.is_admin, infinite_lifetime=True, name=name
-    )
+    return token.get_secret_value()
 
 
 @router.get("/get_all_token_info")
 async def get_all_token_info(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=False, require_admin=False, require_tos=False
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
-) -> list[TokenSecretInfo]:
+) -> Sequence[TokenInfo]:
     """
     Get a list of all token id's and names currently in use by this account. Temporary tokens created by the login route all share the same id and this id is marked as such. All other id's/names refer to API tokens that the user explicitly created using the get_new_api_token route.
     """
-    return await dp.db.get_info_of_all_tokens_of_user(current_user.id)
+    return await dp.db.get_info_of_all_tokens_of_user(login_context.user.id)
 
 
 @router.get("/info")
 async def user_info(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=False, require_admin=False, require_tos=False
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
 ) -> User:
     """
-    This route returns all information about the currently logged in user. In addition to the information that is encoded in the JWT token itself (which the client could just extract on its own) it also returns information from the database and replaces iss/sub information with the provider name and account type of the user (local/ldap/oidc).
+    This route returns all information about the currently logged in user.
     """
-    return current_user
+    return login_context.user
 
 
 @router.post(
@@ -159,13 +159,9 @@ async def user_info(
     },
 )
 async def accept_tos(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=False, require_admin=False, require_tos=False
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
     tos_id: int,
     tos_version: int,
@@ -175,7 +171,7 @@ async def accept_tos(
     """
     for server_tos_id, server_tos in dp.config.terms_of_services.items():
         if tos_id == server_tos_id and tos_version <= server_tos.version:
-            await dp.db.accept_tos_of_user(current_user.id, tos_id, tos_version)
+            await dp.db.accept_tos_of_user(login_context.user.id, tos_id, tos_version)
             return "Success"
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -185,11 +181,14 @@ async def accept_tos(
 
 @router.delete("/delete")
 async def delete_user(
-    current_user: Annotated[
-        User,
+    login_context: Annotated[
+        LoginContext,
         Depends(
-            validate_user_and_get_from_db(
-                require_verified=False, require_admin=False, require_tos=False
+            validate_user(
+                require_verified=False,
+                require_admin=False,
+                require_tos=False,
+                no_provisioned_users=True,
             )
         ),
     ],
@@ -197,5 +196,5 @@ async def delete_user(
     """
     Deletes the currently logged in user and all information related to it (like jobs, tokens, etc.)
     """
-    await dp.db.delete_user(current_user.id)
+    await dp.db.delete_user(login_context.user.id)
     return "Success"

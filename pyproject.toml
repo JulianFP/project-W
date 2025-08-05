@@ -43,8 +43,7 @@ dependencies = [
     "redis[hiredis]",
     # auth & security stuff
     "authlib",
-    "pyjwt",
-    "itsdangerous", #required by starlette's SessionMiddleware
+    "itsdangerous",
     "bonsai",
     # async smtp library
     "aiosmtplib",

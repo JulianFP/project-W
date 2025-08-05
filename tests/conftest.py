@@ -83,8 +83,8 @@ def backend(request, smtpd, secret_key, helper_functions):
             "connection_string": redis_conn,
         },
         "security": {
-            "local_token": {
-                "session_secret_key": secret_key,
+            "tokens": {
+                "secret_key": secret_key,
             },
             "local_account": {
                 "user_provisioning": {
@@ -162,10 +162,10 @@ def backend(request, smtpd, secret_key, helper_functions):
 def get_client(backend):
     clients = []
 
-    def _client_factory(headers: dict[str, str] = {}):
+    def _client_factory(cookies: dict[str, str] = {}):
         cafile = "./backend-config/certs/cert.pem"
         ctx = ssl.create_default_context(cafile=cafile)
-        client = httpx.Client(base_url=backend[0], headers=headers, verify=ctx)
+        client = httpx.Client(base_url=backend[0], cookies=cookies, verify=ctx)
         clients.append(client)
         return client
 
@@ -195,8 +195,8 @@ def get_logged_in_client(get_client):
             },
         )
         response.raise_for_status()
-        headers = {"Authorization": f"Bearer {response.json()}"}
-        return get_client(headers)
+        cookies = {"token": response.cookies["token"]}
+        return get_client(cookies)
 
     return _client_factory
 

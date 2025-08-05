@@ -21,7 +21,7 @@ To create a new site banner, login as an admin (refer to :ref:`login_with_admin_
 
    .. code-block:: console
 
-      curl -X POST -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" https://<backend url>/api/admins/add_site_banner -d '{"html": "Project-W will be down for maintenance tomorrow between 3 and 5 PM. <a href=\"https://example.org" target=\"_blank\" rel=\"noopener noreferrer\">Click here for our full maintenance schedules.</a>", "urgency": 100}'
+      curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://<backend url>/api/admins/add_site_banner -d '{"html": "Project-W will be down for maintenance tomorrow between 3 and 5 PM. <a href=\"https://example.org" target=\"_blank\" rel=\"noopener noreferrer\">Click here for our full maintenance schedules.</a>", "urgency": 100}'
 
 Deleting a banner
 ``````````````````
@@ -32,7 +32,7 @@ Now you can call the ``/api/admins/delete_site_banner`` route. With curl this lo
 
    .. code-block:: console
 
-      curl -X DELETE -H "Authorization: Bearer $JWT" https://<backend url>/api/admins/delete_site_banner?banner_id=<banner id>
+      curl -X DELETE -H "Authorization: Bearer $TOKEN" https://<backend url>/api/admins/delete_site_banner?banner_id=<banner id>
 
 Sending emails to your users
 ----------------------------
@@ -43,4 +43,4 @@ To do this, login as an admin (refer to :ref:`login_with_admin_privileges` for t
 
    .. code-block:: console
 
-      curl -X POST https://<backend url>/api/admins/send_email_to_all_users -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" -d '{"subject": "Project-W: Notice about change of the terms of services", "body": "Our Data Privacy Agreement changed\nHere is an overview of all the changes\n\nblabla"}'
+      curl -X POST https://<backend url>/api/admins/send_email_to_all_users -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"subject": "Project-W: Notice about change of the terms of services", "body": "Our Data Privacy Agreement changed\nHere is an overview of all the changes\n\nblabla"}'

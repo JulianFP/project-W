@@ -6,12 +6,11 @@ from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, status
 from httpx import AsyncClient, HTTPError, HTTPStatusError
 
-import project_W.dependencies as dp
 from project_W.logger import get_logger
 from project_W.models.settings import OidcProviderSettings, OidcRoleSettings, Settings
 
-from ..models.internal import DecodedAuthTokenData
-from ..models.response_data import User, UserTypeEnum
+from ..models.internal import TokenInfoInternal
+from ..models.response_data import UserTypeEnum
 
 oauth = OAuth()
 
@@ -20,6 +19,8 @@ oauth_iss_to_nice_name = {}
 local_oidc_prov: dict[str, OidcProviderSettings] = (
     {}
 )  # local copy of settings with normalized provider names
+oauth_iss_to_config: dict[str, dict] = {}
+oauth_iss_to_ctx: dict[str, ssl.SSLContext] = {}
 
 logger = get_logger("project-W")
 
@@ -63,8 +64,11 @@ async def register_with_oidc_providers(config: Settings):
                 raise Exception(
                     f"Error occured while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
                 )
-            oauth_iss_to_nice_name[oidc_config["issuer"]] = name
-            oauth_iss_to_name[oidc_config["issuer"]] = norm_name
+            issuer = oidc_config["issuer"]
+            oauth_iss_to_nice_name[issuer] = name
+            oauth_iss_to_name[issuer] = norm_name
+            oauth_iss_to_config[issuer] = oidc_config
+            oauth_iss_to_ctx[issuer] = ctx
         logger.info(f"Connected with OIDC provider {name}")
 
 
@@ -76,7 +80,20 @@ def has_role(role_conf: OidcRoleSettings, user) -> bool:
         return role_name == role_conf.name
 
 
-async def validate_oidc_token(token: str, iss: str) -> DecodedAuthTokenData:
+def get_provider_name(iss: str) -> str:
+    provider_name = oauth_iss_to_nice_name.get(iss)
+    if not provider_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authentication successful, but the user was not found in database",
+        )
+    return provider_name
+
+
+async def validate_id_token(id_token: str, iss: str) -> bool:
+    """
+    Validates the id_token returned by the IdP and returns whether the user is an admin
+    """
     assert local_oidc_prov is not {}
     # get current oidc config name
     name = oauth_iss_to_name.get(iss)
@@ -89,7 +106,7 @@ async def validate_oidc_token(token: str, iss: str) -> DecodedAuthTokenData:
         )
 
     try:
-        user = await getattr(oauth, name).parse_id_token({"id_token": token}, None)
+        user = await getattr(oauth, name).parse_id_token({"id_token": id_token}, None)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -111,10 +128,8 @@ async def validate_oidc_token(token: str, iss: str) -> DecodedAuthTokenData:
     # check if user is admin
     admin_role_conf = local_oidc_prov[name].admin_role
     if admin_role_conf is not None and has_role(admin_role_conf, user):
-        user["is_admin"] = True
+        return True
     else:
-        user["is_admin"] = False
-
         # check if non-admin user even has permission to access project-W
         user_role_conf = local_oidc_prov[name].user_role
         if user_role_conf is not None and not has_role(user_role_conf, user):
@@ -124,53 +139,34 @@ async def validate_oidc_token(token: str, iss: str) -> DecodedAuthTokenData:
                 # can't put scope here because if the issuer is unknown we also don't know which scope might be required
                 headers={"WWW-Authenticate": "Bearer"},
             )
-
-    return DecodedAuthTokenData.model_validate(user)
-
-
-async def lookup_oidc_user_in_db_from_token(user_token_data: DecodedAuthTokenData) -> User:
-    oidc_user = await dp.db.get_oidc_user_by_iss_sub(user_token_data.iss, user_token_data.sub)
-    if not oidc_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication successful, but the user was not found in database",
-        )
-    provider_name = oauth_iss_to_nice_name.get(oidc_user.iss)
-    if not provider_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Authentication successful, but the user was not found in database",
-        )
-    return User(
-        id=oidc_user.id,
-        user_type=UserTypeEnum.OIDC,
-        email=oidc_user.email,
-        provider_name=provider_name,
-        is_admin=user_token_data.is_admin,
-        is_verified=user_token_data.is_verified,
-        accepted_tos=oidc_user.accepted_tos,
-    )
+        return False
 
 
-async def lookup_oidc_user_in_db_from_api_token(user_token_data: DecodedAuthTokenData) -> User:
-    oidc_user = await dp.db.get_oidc_user_by_id(int(user_token_data.sub))
-    if not oidc_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication successful, but the user was not found in database",
-        )
-    provider_name = oauth_iss_to_nice_name.get(oidc_user.iss)
-    if not provider_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Authentication successful, but the user was not found in database",
-        )
-    return User(
-        id=oidc_user.id,
-        user_type=UserTypeEnum.OIDC,
-        email=oidc_user.email,
-        provider_name=provider_name,
-        is_admin=user_token_data.is_admin,
-        is_verified=user_token_data.is_verified,
-        accepted_tos=oidc_user.accepted_tos,
-    )
+async def check_if_user_token_should_stay_valid(token: TokenInfoInternal, iss: str):
+    # TODO:
+    oauth_config = oauth_iss_to_config[iss]
+    ctx = oauth_iss_to_ctx[iss]
+    token_endpoint = oauth_config["token_endpoint"]
+    userinfo_endpoint = oauth_config["userinfo_endpoint"]
+    name = oauth_iss_to_name["iss"]
+    oidc_prov = local_oidc_prov[name]
+
+    async with AsyncClient(verify=ctx) as client:
+        try:
+            data = {
+                "client_id": oidc_prov.client_id,
+                "client_secret": oidc_prov.client_secret.get_secret_value(),
+                "grant_type": "refresh_token",
+                "refresh_token": token.oidc_refresh_token,
+                "scope": "openid email",
+            }
+            token_resp = (await client.post(token_endpoint, data=data)).raise_for_status().json()
+            access_token = token_resp["access_token"]
+            headers = {"Authorization": f"Bearer {access_token}"}
+            userinfo_resp = (
+                (await client.get(userinfo_endpoint, headers=headers)).raise_for_status().json()
+            )
+        except (HTTPError, HTTPStatusError, JSONDecodeError) as e:
+            raise Exception(
+                f"Error occured while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
+            )

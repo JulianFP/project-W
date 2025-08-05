@@ -14,7 +14,7 @@ from project_W.models.request_data import RunnerRegisterRequest
 from .logger import get_logger
 from .models.internal import InProcessJob, OnlineRunner, SSEEvent
 from .models.settings import RedisConnection
-from .utils import hash_runner_token
+from .utils import hash_token
 
 
 class CachingAdapter(ABC):
@@ -238,7 +238,7 @@ class RedisAdapter(CachingAdapter):
         self, runner_id: int, runner_data: RunnerRegisterRequest
     ) -> str:
         token = secrets.token_urlsafe()
-        token_hash = hash_runner_token(token)
+        token_hash = hash_token(token)
         async with self.client.pipeline(transaction=True) as pipe:
             key_name = self.__get_runner_key(runner_id)
             runner_dump = runner_data.model_dump(exclude_none=True)

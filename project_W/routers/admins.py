@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 import project_W.dependencies as dp
 from project_W.models.request_data import EmailToUsers, SiteBanner
 
-from ..models.internal import DecodedAuthTokenData
+from ..models.internal import LoginContext
 from ..models.response_data import RunnerCreatedInfo
 from ..security.auth import auth_dependency_responses, validate_user
 
@@ -20,7 +20,8 @@ router = APIRouter(
 @router.post("/create_runner")
 async def create_runner(
     _: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
     ],
 ) -> RunnerCreatedInfo:
     """
@@ -32,7 +33,8 @@ async def create_runner(
 @router.delete("/invalidate_runner")
 async def invalidate_runner(
     _: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
     ],
     runner_id: int,
 ) -> str:
@@ -50,7 +52,8 @@ async def invalidate_runner(
 @router.post("/add_site_banner")
 async def add_site_banner(
     _: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
     ],
     banner_info: SiteBanner,
 ) -> int:
@@ -70,7 +73,8 @@ async def add_site_banner(
 @router.delete("/delete_site_banner")
 async def delete_site_banner(
     _: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
     ],
     banner_id: int,
 ):
@@ -80,7 +84,8 @@ async def delete_site_banner(
 @router.post("/send_email_to_all_users")
 async def send_email_to_all_users(
     _: Annotated[
-        DecodedAuthTokenData, Depends(validate_user(require_verified=True, require_admin=True))
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
     ],
     background_tasks: BackgroundTasks,
     email: EmailToUsers,

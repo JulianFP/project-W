@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException, Request, status
+from typing import Annotated
+
+from fastapi import APIRouter, Header, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 
 import project_W.dependencies as dp
 import project_W.security.oidc_deps as oidc
-from project_W.models.base import EmailValidated
 
+from ..models.base import EmailValidated
 from ..models.response_data import ErrorResponse
+from ..security.auth import set_token_cookie
 
 router = APIRouter(
     prefix="/oidc",
@@ -46,7 +49,9 @@ async def login(idp_name: str, request: Request) -> RedirectResponse:
         },
     },
 )
-async def auth(idp_name: str, request: Request) -> RedirectResponse:
+async def auth(
+    idp_name: str, request: Request, user_agent: Annotated[str | None, Header()] = None
+) -> RedirectResponse:
     """
     Landing route: After authenticating on the login page of the identity provider the provider will redirect you to this route so that the backend can process the IdP's response. This route will then redirect you to the official client's page (as set by the instance's admin) so that the client can get and store the OIDC id_token.
     """
@@ -84,15 +89,35 @@ async def auth(idp_name: str, request: Request) -> RedirectResponse:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get an id_token from the identity provider",
         )
+    if not (refresh_token := oidc_response.get("refresh_token")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get a refresh_token from the identity provider",
+        )
 
     # validate id_token before creating user so that possible errors are already displayed here to the user
     # and we don't create accounts in the database for nothing
     # this also verifies email_verified and user_role/admin_role claims
-    await oidc.validate_oidc_token(id_token, iss)
+    admin_privileges = await oidc.validate_id_token(id_token, iss)
 
-    await dp.db.ensure_oidc_user_exists(
+    if user_agent is None:
+        token_name = "Unknown device"
+    else:
+        token_name = user_agent
+
+    user_id = await dp.db.ensure_oidc_user_exists(
         iss,
         sub,
         email,
     )
-    return RedirectResponse(f"{dp.config.client_url}/auth/oidc-accept?token={id_token}")
+    token = await dp.db.add_new_user_token(
+        user_id,
+        token_name,
+        False,
+        admin_privileges,
+        dp.config.security.tokens.session_expiration_time_minutes,
+        refresh_token,
+    )
+    response = RedirectResponse(dp.config.client_url)
+    set_token_cookie(response, token)
+    return response

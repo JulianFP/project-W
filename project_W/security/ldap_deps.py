@@ -6,11 +6,9 @@ from bonsai.asyncio import AIOConnectionPool, AIOLDAPConnection
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 
-import project_W.dependencies as dp
 from project_W.logger import get_logger
 from project_W.models.base import EmailValidated
-from project_W.models.internal import DecodedAuthTokenData, LdapUserInfo
-from project_W.models.response_data import User, UserTypeEnum
+from project_W.models.internal import LdapUserInfo
 from project_W.models.settings import LdapProviderSettings
 
 http_exc = HTTPException(
@@ -196,21 +194,3 @@ class LdapAdapter:
 
 
 ldap_adapter: LdapAdapter
-
-
-async def lookup_ldap_user_in_db_from_token(user_token_data: DecodedAuthTokenData) -> User:
-    ldap_user = await dp.db.get_ldap_user_by_id(int(user_token_data.sub))
-    if not ldap_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication successful, but the user was not found in database",
-        )
-    return User(
-        id=ldap_user.id,
-        user_type=UserTypeEnum.LDAP,
-        email=ldap_user.email,
-        provider_name=ldap_user.provider_name,
-        is_admin=user_token_data.is_admin,
-        is_verified=user_token_data.is_verified,
-        accepted_tos=ldap_user.accepted_tos,
-    )
