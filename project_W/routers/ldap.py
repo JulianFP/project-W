@@ -47,7 +47,7 @@ async def login(
             detail=f"Could not query user, ldap server {idp_name} not known",
         )
 
-    user = await ldap.ldap_adapter.query_user(idp_name, form_data.username)
+    user = await ldap.ldap_adapter.query_user_with_username(idp_name, form_data.username)
 
     if await ldap.ldap_adapter.authenticate_user(idp_name, user.dn, form_data.password):
         user_id = await dp.db.ensure_ldap_user_exists(idp_name, user.uid, user.email)

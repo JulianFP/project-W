@@ -64,7 +64,18 @@ class JobSettingsInDb(BaseModel):
 
 
 class TokenInfoInternal(TokenInfo):
+    user_id: int
     oidc_refresh_token: SecretStr | None = None
+
+
+class LdapTokenInfoInternal(TokenInfoInternal):
+    provider_name: str
+    uid: str
+
+
+class OidcTokenInfoInternal(TokenInfoInternal):
+    iss: str
+    sub: str
 
 
 class LoginContext(BaseModel):
