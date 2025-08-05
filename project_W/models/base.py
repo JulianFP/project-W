@@ -127,8 +127,8 @@ class ProviderSettingsBase(BaseModel):
         ],
     )
     allow_creation_of_api_tokens: bool = Field(
-        default=False,
-        description="If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will not be automatically invalidated if the user gets deleted or looses permissions in the identity provider. This means that with this setting enabled, users that ones have access to Project-W can retain that access possibly forever. Consider if this is a problem for you before enabling this!",
+        default=True,
+        description="If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will be automatically invalidated if the user gets deleted from the identity provider ones the periodic background job gets called. Run the periodic background task more often to get user access revoked quicker.",
     )
 
 

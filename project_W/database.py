@@ -8,7 +8,7 @@ from argon2.exceptions import VerificationError
 from fastapi import UploadFile
 from psycopg import pq
 from psycopg.connection_async import AsyncConnection
-from psycopg.rows import class_row, dict_row, scalar_row
+from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 from pydantic import SecretStr, ValidationError
@@ -23,10 +23,12 @@ from .models.internal import (
     JobInDb,
     JobSettingsInDb,
     JobSortKey,
+    LdapTokenInfoInternal,
     LdapUserInDb,
     LdapUserInDbAll,
     LocalUserInDb,
     LocalUserInDbAll,
+    OidcTokenInfoInternal,
     OidcUserInDb,
     OidcUserInDbAll,
     OnlineRunner,
@@ -597,6 +599,30 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    async def get_ldap_tokens(self) -> list[LdapTokenInfoInternal]:
+        """
+        Get all tokens associated with LDAP users and their LDAP user attributes
+        """
+        pass
+
+    @abstractmethod
+    async def get_oidc_tokens(self) -> list[OidcTokenInfoInternal]:
+        """
+        Get all tokens associated with OIDC users and their OIDC user attributes
+        """
+        pass
+
+    @abstractmethod
+    async def token_replace_oidc_refresh_token(
+        self, old_refresh_token: SecretStr, new_refresh_token: SecretStr
+    ) -> list[int]:
+        """
+        Set the oidc refresh of all auth tokens with old_refresh_token to new_refresh_token
+        Returns a list of updated token ids
+        """
+        pass
+
+    @abstractmethod
     async def add_site_banner(self, urgency: int, html: str) -> int | None:
         """
         Creates a new site banner. Returns it's id if Successful, returns None if not
@@ -780,6 +806,25 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
+    async def __create_tokens_table(self, cur):
+        self.logger.info("Creating tokens table...")
+        await cur.execute(
+            f"""
+            CREATE TABLE {self.schema}.tokens (
+                id int GENERATED ALWAYS AS IDENTITY,
+                token_hash text UNIQUE CHECK(length(token_hash) = 43),
+                user_id int NOT NULL,
+                name text NOT NULL,
+                explicit boolean NOT NULL DEFAULT false,
+                admin_privileges boolean NOT NULL DEFAULT false,
+                expires_at timestamptz,
+                oidc_refresh_token text,
+                PRIMARY KEY (id),
+                FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
+            )
+        """
+        )
+
     async def __create_all_tables(self, conn: AsyncConnection):
         """
         All tables (except for the jobs table, see its creation function) need to created at the same time because of foreign key constraints
@@ -845,23 +890,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating tokens table...")
-            await cur.execute(
-                f"""
-                CREATE TABLE {self.schema}.tokens (
-                    id int GENERATED ALWAYS AS IDENTITY,
-                    token_hash text UNIQUE CHECK(length(token_hash) = 43),
-                    user_id int NOT NULL,
-                    name text NOT NULL,
-                    explicit boolean NOT NULL DEFAULT false,
-                    admin_privileges boolean NOT NULL DEFAULT false,
-                    expires_at timestamptz,
-                    oidc_refresh_token text,
-                    PRIMARY KEY (id),
-                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE
-                )
-            """
-            )
+            await self.__create_tokens_table(cur)
 
             self.logger.info("Creating local_accounts table...")
             # according to https://www.rfc-editor.org/errata/eid1003 the upper limit for mail address forward paths is 256 octets (2 of which are angle brackets and thus not part of the address itself). When using UTF-8 this might translate in even less characters, but is still a good upper limit
@@ -1056,13 +1085,33 @@ class PostgresAdapter(DatabaseAdapter):
             ):
                 parsed_version_tuple = parse_version_tuple(version_tuple)
                 parsed_db_version_tuple = parse_version_tuple(db_version_tuple)
+                min_db_version = parse_version_tuple((0, 3, 0))
+                if parsed_db_version_tuple < min_db_version:
+                    raise Exception(
+                        f"Your database was from Project-W version {db_version}, we only support database migration beginning from version {min_db_version}"
+                    )
                 if parsed_version_tuple > parsed_db_version_tuple:
                     # TODO: Add database migration code here once it becomes necessary after a future update
-
-                    # update version tuple if this application is newer than previous one after database migration has completed
-                    self.logger.info(
-                        "Application has been updated. Updating database metadata with new version..."
-                    )
+                    if parsed_db_version_tuple < parse_version_tuple((0, 4, 0)):  # in version 0.3.x
+                        # update version tuple if this application is newer than previous one after database migration has completed
+                        self.logger.info(
+                            f"Application has been updated from {db_version} to {version}. Migrating database to new version..."
+                        )
+                        await cur.execute(
+                            f"""
+                            DROP FUNCTION {self.schema}.rotatesecret() CASCADE
+                            """
+                        )
+                        await cur.execute(
+                            f"""
+                            DROP TABLE {self.schema}.token_secrets
+                            """
+                        )
+                        await self.__create_tokens_table(cur)
+                    else:
+                        raise Exception(
+                            f"No database migration code available for version {db_version}"
+                        )
                     await cur.execute(
                         f"""
                         UPDATE {self.schema}.metadata
@@ -1079,6 +1128,7 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                         (Jsonb(version), Jsonb(version_tuple)),
                     )
+                    self.logger.info(f"Database successfully migrated to version {version}")
 
                 elif parsed_version_tuple < parsed_db_version_tuple:
                     if parsed_version_tuple[0] < parsed_db_version_tuple[0]:
@@ -1463,7 +1513,7 @@ class PostgresAdapter(DatabaseAdapter):
         self, token_hash: str
     ) -> tuple[LocalUserInDbAll | OidcUserInDbAll | LdapUserInDbAll, TokenInfoInternal] | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=dict_row) as cur:
+            async with conn.cursor(row_factory=class_row(TokenInfoInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT user_id, id, name, explicit, admin_privileges, expires_at, oidc_refresh_token
@@ -1473,14 +1523,13 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                     (token_hash,),
                 )
-                result = await cur.fetchone()
-                if result is None:
+                token = await cur.fetchone()
+                if token is None:
                     return None
-                token_info = TokenInfoInternal.model_validate(result)
-                user = await self.__get_user_by_id(conn, result["user_id"])
+                user = await self.__get_user_by_id(conn, token.user_id)
                 if user is None:
                     return None
-                return user, token_info
+                return user, token
 
     async def __get_user_by_id(
         self, conn: AsyncConnection, user_id: int
@@ -1617,7 +1666,7 @@ class PostgresAdapter(DatabaseAdapter):
             async with conn.cursor(row_factory=class_row(TokenInfoInternal)) as cur:
                 await cur.execute(
                     f"""
-                        SELECT id, name, explicit, admin_privileges, expires_at, oidc_refresh_token
+                        SELECT user_id, id, name, explicit, admin_privileges, expires_at, oidc_refresh_token
                         FROM {self.schema}.tokens
                         WHERE user_id = %s
                         AND (expires_at IS NULL OR expires_at > NOW())
@@ -2276,7 +2325,7 @@ class PostgresAdapter(DatabaseAdapter):
                     f"""
                     DELETE
                     FROM {self.schema}.tokens
-                    WHERE expires_at NOT NULL
+                    WHERE expires_at IS NOT NULL
                     AND expires_at < NOW()
                     """
                 )
@@ -2472,6 +2521,46 @@ class PostgresAdapter(DatabaseAdapter):
                     (Jsonb(datetime.now().isoformat()),),
                 )
         self.logger.info("Job database cleanup complete")
+
+    async def get_ldap_tokens(self) -> list[LdapTokenInfoInternal]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(LdapTokenInfoInternal)) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT token.user_id, token.id, token.name, token.explicit, token.admin_privileges, token.expires_at, token.oidc_refresh_token, ldap.provider_name, ldap.uid
+                    FROM {self.schema}.tokens token, {self.schema}.ldap_accounts ldap
+                    WHERE token.user_id = ldap.id
+                    """
+                )
+                return await cur.fetchall()
+
+    async def get_oidc_tokens(self) -> list[OidcTokenInfoInternal]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=class_row(OidcTokenInfoInternal)) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT token.user_id, token.id, token.name, token.explicit, token.admin_privileges, token.expires_at, token.oidc_refresh_token, oidc.iss, oidc.sub
+                    FROM {self.schema}.tokens token, {self.schema}.oidc_accounts oidc
+                    WHERE token.user_id = oidc.id
+                    """
+                )
+                return await cur.fetchall()
+
+    async def token_replace_oidc_refresh_token(
+        self, old_refresh_token: SecretStr, new_refresh_token: SecretStr
+    ) -> list[int]:
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(
+                    f"""
+                    UPDATE {self.schema}.tokens
+                    SET oidc_refresh_token = %s
+                    WHERE oidc_refresh_token = %s
+                    RETURNING id
+                    """,
+                    (new_refresh_token.get_secret_value(), old_refresh_token.get_secret_value()),
+                )
+                return await cur.fetchall()
 
     async def add_site_banner(self, urgency: int, html: str) -> int | None:
         async with self.apool.connection() as conn:

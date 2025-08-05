@@ -5,12 +5,14 @@ import certifi
 from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, status
 from httpx import AsyncClient, HTTPError, HTTPStatusError
+from pydantic import SecretStr
 
-from project_W.logger import get_logger
-from project_W.models.settings import OidcProviderSettings, OidcRoleSettings, Settings
+import project_W.dependencies as dp
 
-from ..models.internal import TokenInfoInternal
-from ..models.response_data import UserTypeEnum
+from ..logger import get_logger
+from ..models.base import EmailValidated
+from ..models.internal import OidcTokenInfoInternal
+from ..models.settings import OidcProviderSettings, OidcRoleSettings, Settings
 
 oauth = OAuth()
 
@@ -90,6 +92,47 @@ def get_provider_name(iss: str) -> str:
     return provider_name
 
 
+def validate_oidc_attributes(provider_name: str, oidc_attrs: dict) -> bool:
+    if not oidc_attrs.get("iss"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get iss from the identity provider. Please make sure that the IdP supports the iss claim",
+        )
+    if not oidc_attrs.get("sub"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get sub from the identity provider. Please make sure that the IdP supports the sub claim",
+        )
+    if not EmailValidated.model_validate(oidc_attrs.get("email")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not get a valid email address from the identity provider. Please make sure that the IdP supports the email claim, that your account has an email address associated with it and that this email is valid",
+        )
+    if not oidc_attrs.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"The email address of this OIDC '{provider_name}' account is not verified",
+            # can't put scope here because if the issuer is unknown we also don't know which scope might be required
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # check if user is admin
+    admin_role_conf = local_oidc_prov[provider_name].admin_role
+    if admin_role_conf is not None and has_role(admin_role_conf, oidc_attrs):
+        return True
+    else:
+        # check if non-admin user even has permission to access project-W
+        user_role_conf = local_oidc_prov[provider_name].user_role
+        if user_role_conf is not None and not has_role(user_role_conf, oidc_attrs):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient permissions: Your user lacks the required value for the {user_role_conf.field_name} claim",
+                # can't put scope here because if the issuer is unknown we also don't know which scope might be required
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return False
+
+
 async def validate_id_token(id_token: str, iss: str) -> bool:
     """
     Validates the id_token returned by the IdP and returns whether the user is an admin
@@ -114,59 +157,57 @@ async def validate_id_token(id_token: str, iss: str) -> bool:
             # can't put scope here because if the issuer is unknown we also don't know which scope might be required
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return validate_oidc_attributes(name, user)
 
-    if not user.get("email_verified"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"The email address of this OIDC '{name}' account is not verified",
-            # can't put scope here because if the issuer is unknown we also don't know which scope might be required
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    user["is_verified"] = True
-    user["user_type"] = UserTypeEnum.OIDC
 
-    # check if user is admin
-    admin_role_conf = local_oidc_prov[name].admin_role
-    if admin_role_conf is not None and has_role(admin_role_conf, user):
-        return True
-    else:
-        # check if non-admin user even has permission to access project-W
-        user_role_conf = local_oidc_prov[name].user_role
-        if user_role_conf is not None and not has_role(user_role_conf, user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: Your user lacks the required value for the {user_role_conf.field_name} claim",
-                # can't put scope here because if the issuer is unknown we also don't know which scope might be required
-                headers={"WWW-Authenticate": "Bearer"},
+async def invalidate_tokens_if_oidc_user_lost_privileges(tokens: list[OidcTokenInfoInternal]):
+    for token in tokens:
+        oauth_config = oauth_iss_to_config[token.iss]
+        ctx = oauth_iss_to_ctx[token.iss]
+        token_endpoint = oauth_config["token_endpoint"]
+        userinfo_endpoint = oauth_config["userinfo_endpoint"]
+        name = oauth_iss_to_name[token.iss]
+        oidc_prov = local_oidc_prov[name]
+
+        if token.oidc_refresh_token is None:
+            await dp.db.delete_token_of_user(token.user_id, token.id)
+            logger.info(
+                f"Invalidated token with id {token.id} of OIDC user {token.user_id} because token didn't have refresh token attached to it"
             )
-        return False
+            return
 
-
-async def check_if_user_token_should_stay_valid(token: TokenInfoInternal, iss: str):
-    # TODO:
-    oauth_config = oauth_iss_to_config[iss]
-    ctx = oauth_iss_to_ctx[iss]
-    token_endpoint = oauth_config["token_endpoint"]
-    userinfo_endpoint = oauth_config["userinfo_endpoint"]
-    name = oauth_iss_to_name["iss"]
-    oidc_prov = local_oidc_prov[name]
-
-    async with AsyncClient(verify=ctx) as client:
-        try:
-            data = {
-                "client_id": oidc_prov.client_id,
-                "client_secret": oidc_prov.client_secret.get_secret_value(),
-                "grant_type": "refresh_token",
-                "refresh_token": token.oidc_refresh_token,
-                "scope": "openid email",
-            }
-            token_resp = (await client.post(token_endpoint, data=data)).raise_for_status().json()
-            access_token = token_resp["access_token"]
-            headers = {"Authorization": f"Bearer {access_token}"}
-            userinfo_resp = (
-                (await client.get(userinfo_endpoint, headers=headers)).raise_for_status().json()
-            )
-        except (HTTPError, HTTPStatusError, JSONDecodeError) as e:
-            raise Exception(
-                f"Error occured while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
-            )
+        async with AsyncClient(verify=ctx) as client:
+            try:
+                data = {
+                    "client_id": oidc_prov.client_id,
+                    "client_secret": oidc_prov.client_secret.get_secret_value(),
+                    "grant_type": "refresh_token",
+                    "refresh_token": token.oidc_refresh_token.get_secret_value(),
+                    "scope": "openid email",
+                }
+                token_resp = (
+                    (await client.post(token_endpoint, data=data)).raise_for_status().json()
+                )
+                access_token = token_resp["access_token"]
+                new_refresh_token = SecretStr(token_resp["refresh_token"])
+                headers = {"Authorization": f"Bearer {access_token}"}
+                userinfo_resp = (
+                    (await client.get(userinfo_endpoint, headers=headers)).raise_for_status().json()
+                )
+                is_admin = validate_oidc_attributes(name, userinfo_resp)
+                if not is_admin and token.admin_privileges:
+                    await dp.db.delete_token_of_user(token.user_id, token.id)
+                    logger.info(
+                        f"Invalidated admin token with id {token.id} of OIDC user {token.user_id} because user doesn't have admin privileges anymore"
+                    )
+                updated_tokens = await dp.db.token_replace_oidc_refresh_token(
+                    token.oidc_refresh_token, new_refresh_token
+                )
+                for token in tokens:
+                    if token.id in updated_tokens:
+                        token.oidc_refresh_token = new_refresh_token
+            except (HTTPStatusError, JSONDecodeError):
+                await dp.db.delete_token_of_user(token.user_id, token.id)
+                logger.info(
+                    f"Invalidated token with id {token.id} of OIDC user {token.user_id} because user couldn't be found at OIDC provider with all necessary attributes"
+                )
