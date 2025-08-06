@@ -1,5 +1,5 @@
 <script lang="ts">
-import { invalidate } from "$app/navigation";
+import { error } from "@sveltejs/kit";
 import {
 	Heading,
 	Helper,
@@ -19,6 +19,7 @@ import {
 	PlusOutline,
 	TrashBinSolid,
 } from "flowbite-svelte-icons";
+import { SvelteMap } from "svelte/reactivity";
 
 import Button from "$lib/components/button.svelte";
 import CenterPage from "$lib/components/centerPage.svelte";
@@ -27,12 +28,21 @@ import ConfirmPasswordModal from "$lib/components/confirmPasswordModal.svelte";
 import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError, delet, post } from "$lib/utils/httpRequests.svelte";
+import {
+	BackendCommError,
+	delet,
+	get,
+	post,
+} from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
+import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
 
+type TokenInfo = components["schemas"]["TokenInfo"];
+type ProcessedTokenInfo = TokenInfo & {
+	last_usage_date: Date;
+};
 type Data = {
 	user_info: components["schemas"]["User"];
-	token_info: components["schemas"]["TokenInfo"][];
 	auth_settings: components["schemas"]["AuthSettings"];
 };
 interface Props {
@@ -40,22 +50,57 @@ interface Props {
 }
 let { data }: Props = $props();
 
-let table_items: { id: number; name: string; temp: boolean }[] = $derived.by(
-	() => {
-		let items = [];
-		for (let item of data.token_info) {
-			items.push({
-				id: item.id,
-				name: item.name ? item.name : "",
-				temp: !item.explicit,
-			});
-		}
-		return items;
-	},
+let token_info_date_since: SvelteMap<number, string> = $state(new SvelteMap());
+let token_infos: SvelteMap<number, ProcessedTokenInfo> = $state(
+	new SvelteMap(),
 );
+
+function process_token_info(token: TokenInfo) {
+	const date_getter = () => {
+		const date = token_infos.get(token.id)?.last_usage_date;
+		if (!date) throw new Error();
+		return date;
+	};
+	const date_since_setter = (date_since: string) => {
+		token_info_date_since.set(token.id, date_since);
+	};
+	const last_usage_date = new Date(token.last_usage);
+	const last_usage_date_since = autoupdate_date_since(
+		date_getter,
+		date_since_setter,
+		last_usage_date,
+	);
+	token_info_date_since.set(token.id, last_usage_date_since);
+	token_infos.set(token.id, {
+		...token,
+		last_usage_date: last_usage_date,
+	});
+}
+
+async function fetch_token_infos() {
+	try {
+		const return_val = await get<TokenInfo[]>("users/get_all_token_info");
+		token_infos.clear();
+		for (const token of return_val) {
+			process_token_info(token);
+		}
+	} catch (err: unknown) {
+		if (err instanceof BackendCommError) {
+			error;
+			error(err.status, err.message);
+		} else {
+			error(
+				400,
+				"Unknown error occured while querying all token infos from the backend",
+			);
+		}
+	}
+}
+fetch_token_infos();
+
 let temp_tokens: number[] = $derived.by(() => {
 	let items: number[] = [];
-	for (let item of data.token_info) {
+	for (let item of token_infos.values()) {
 		if (!item.explicit) items.push(item.id);
 	}
 	return items;
@@ -147,7 +192,7 @@ async function createAPIToken(event: Event): Promise<void> {
 		}
 		createAPITokenError = true;
 	}
-	invalidate("app:token_info");
+	fetch_token_infos();
 	waitingForToken = false;
 }
 
@@ -180,11 +225,7 @@ async function invalidateAllTokens(): Promise<void> {
 			msg: "All tokens succuessfully invalidated",
 			color: "green",
 		});
-		if (data.user_info.user_type !== "oidc") {
-			auth.logout();
-		} else {
-			invalidate("app:token_info");
-		}
+		auth.logout();
 	} catch (err: unknown) {
 		if (err instanceof BackendCommError) {
 			invalidErrorMsg = err.message;
@@ -213,9 +254,9 @@ async function invalidateAllTokens(): Promise<void> {
   {/if}
 
   <div class="flex flex-col gap-4">
-    {#if api_token_creation_allowed || data.user_info.user_type !== "oidc"}
+    {#if api_token_creation_allowed}
       <Heading tag="h3">Sessions and API tokens</Heading>
-    {:else}
+    {:else if data.user_info.user_type === "oidc"}
       <P>There are no security settings available for this account</P>
     {/if}
     {#if api_token_creation_allowed}
@@ -234,24 +275,24 @@ async function invalidateAllTokens(): Promise<void> {
 
       <Table shadow>
         <TableHead>
-          <TableHeadCell>ID</TableHeadCell>
+          <TableHeadCell>Last used</TableHeadCell>
           <TableHeadCell>Name</TableHeadCell>
           <TableHeadCell>Token type</TableHeadCell>
           <TableHeadCell></TableHeadCell>
         </TableHead>
         <TableBody>
-          {#if table_items.length === 0}
+          {#if token_infos.size === 0}
             <TableBodyRow>
               <TableBodyCell colspan={4}><P>You don't have any API tokens yet. You can create API tokens for for your custom clients/scripts/automations by clicking on the 'Create API Token' button. API tokens will never expire unless you invalidate them manually.</P></TableBodyCell>
             </TableBodyRow>
           {/if}
-          {#each table_items as item}
+          {#each token_infos.entries() as [token_id,token] (token_id)}
             <TableBodyRow>
-              <TableBodyCell>{item.id}</TableBodyCell>
-              <TableBodyCell><P size="xs" class="break-all text-gray-500 dark:text-gray-400">{item.name}</P></TableBodyCell>
-              <TableBodyCell>{item.temp ? "Session" : "API token"}</TableBodyCell>
+              <TableBodyCell>{token_info_date_since.get(token_id)}</TableBodyCell>
+              <TableBodyCell><P size="xs" class="break-all text-gray-500 dark:text-gray-400">{token.name}</P></TableBodyCell>
+              <TableBodyCell>{token.explicit ? "API token" : "Session"}</TableBodyCell>
               <TableBodyCell class="max-w-content">
-                <Button pill outline class="!p-2" size="xs" color="red" onclick={() => {openInvalidateAPITokenModal(item.id)}}>
+                <Button pill outline class="!p-2" size="xs" color="red" onclick={() => {openInvalidateAPITokenModal(token_id)}}>
                   <TrashBinSolid class="mr-2"/>Invalidate
                 </Button>
               </TableBodyCell>
@@ -261,11 +302,9 @@ async function invalidateAllTokens(): Promise<void> {
       </Table>
     {/if}
     <div>
-      {#if data.user_info.user_type !== "oidc"}
-        <Button outline color="red" onclick={() => invalidSessionModalOpen = true} tabindex={4}>Invalidate all sessions</Button>
-      {/if}
+      <Button outline color="red" onclick={() => invalidSessionModalOpen = true} tabindex={4}>Invalidate all sessions</Button>
       {#if api_token_creation_allowed}
-        <Button outline color="red" onclick={() => invalidModalOpen = true} tabindex={5}>{data.user_info.user_type !== "oidc" ? "Invalidate all sessions and API tokens" : "Invalidate all API tokens"}</Button>
+        <Button outline color="red" onclick={() => invalidModalOpen = true} tabindex={5}>Invalidate all sessions and API tokens</Button>
         {#if invalidError}
           <Helper class="w-full mt-2" color="red">{invalidErrorMsg}</Helper>
         {/if}
@@ -278,7 +317,7 @@ async function invalidateAllTokens(): Promise<void> {
   You are about to change this accounts password. You have to remember your new password in order to login in the future.
 </ConfirmPasswordModal>
 
-<ConfirmModal bind:open={invalidAPIModalOpen} action={async () => {await invalidateToken(invalidateTokenId); invalidate("app:token_info");}}>
+<ConfirmModal bind:open={invalidAPIModalOpen} action={async () => {await invalidateToken(invalidateTokenId); fetch_token_infos();}}>
   The API token with ID {invalidateTokenId} will be invalidated. This will log out the device using that token. Are you sure?
 </ConfirmModal>
 
@@ -287,7 +326,7 @@ async function invalidateAllTokens(): Promise<void> {
 </ConfirmModal>
 
 <ConfirmModal bind:open={invalidModalOpen} action={invalidateAllTokens}>
-  {data.user_info.user_type !== "oidc" ? "We will invalidate all your session and API tokens thus logging you out from both all your temporary devices (e.g. browsers, including this one) and devices using API tokens. You will have to login again." : "We will invalidate all your API tokens thus logging you out from all devices using API tokens."}
+  We will invalidate all your session and API tokens thus logging you out from both all your temporary devices (e.g. browsers, including this one) and devices using API tokens. You will have to login again.
 </ConfirmModal>
 
 <Modal bind:open={createAPITokenModalOpen} onclose={() => createdAPIToken = ""}>

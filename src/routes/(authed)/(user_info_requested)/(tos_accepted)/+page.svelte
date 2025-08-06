@@ -49,6 +49,7 @@ import {
 	post,
 } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
+import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
 
 type JobSettingsResp = components["schemas"]["JobSettings-Output"];
 type Data = {
@@ -63,20 +64,16 @@ type SortKey = components["schemas"]["JobSortKey"];
 type Job = components["schemas"]["JobInfo"];
 type ProcessedJob = Job & {
 	creation_date: Date;
-	creation_date_since: string;
 	finish_date: Date | null;
-	finish_date_since: string | null;
 };
 
 let fetchingJobs = $state(false);
 let jobs_ordered_selected: SvelteMap<number, boolean> = $state(new SvelteMap());
 let jobs_info: SvelteMap<number, ProcessedJob> = $state(new SvelteMap());
-let jobs_creation_timeout_ids: SvelteMap<number, number> = $state(
+let job_creation_date_since: SvelteMap<number, string> = $state(
 	new SvelteMap(),
 );
-let jobs_finish_timeout_ids: SvelteMap<number, number> = $state(
-	new SvelteMap(),
-);
+let job_finish_date_since: SvelteMap<number, string> = $state(new SvelteMap());
 let job_count: number = $state(0);
 let job_count_total: number = $state(0);
 
@@ -111,80 +108,44 @@ let descending: boolean = $state(true);
 let exclude_finished = $state(false);
 let exclude_downloaded = $state(true);
 
-function update_creation_timestamp(job_id: number) {
-	const job = jobs_info.get(job_id);
-	if (job) {
-		const [creation_date_since, creation_date_next_update] = timeAgo(
-			job.creation_date,
-		);
-		jobs_info.set(job_id, {
-			...job,
-			creation_date_since: creation_date_since,
-		});
-		if (creation_date_next_update) {
-			jobs_creation_timeout_ids.set(
-				job_id,
-				setTimeout(() => {
-					update_creation_timestamp(job_id);
-				}, creation_date_next_update),
-			);
-		}
-	}
-}
-function update_finish_timestamp(job_id: number) {
-	const job = jobs_info.get(job_id);
-	if (job?.finish_date) {
-		const [finish_date_since, finish_date_next_update] = timeAgo(
-			job.finish_date,
-		);
-		jobs_info.set(job_id, {
-			...job,
-			finish_date_since: finish_date_since,
-		});
-		if (finish_date_next_update) {
-			jobs_finish_timeout_ids.set(
-				job_id,
-				setTimeout(() => {
-					update_finish_timestamp(job_id);
-				}, finish_date_next_update),
-			);
-		}
-	}
-}
-
 function process_job(job: Job) {
+	const creation_date_getter = () => {
+		const date = jobs_info.get(job.id)?.creation_date;
+		if (!date) throw new Error();
+		return date;
+	};
+	const creation_date_since_setter = (date_since: string) => {
+		job_creation_date_since.set(job.id, date_since);
+	};
 	const creation_date = new Date(job.creation_timestamp);
-	const [creation_date_since, creation_date_next_update] =
-		timeAgo(creation_date);
-	if (creation_date_next_update && !jobs_creation_timeout_ids.has(job.id)) {
-		jobs_creation_timeout_ids.set(
-			job.id,
-			setTimeout(() => {
-				update_creation_timestamp(job.id);
-			}, creation_date_next_update),
-		);
-	}
+	const creation_date_since = autoupdate_date_since(
+		creation_date_getter,
+		creation_date_since_setter,
+		creation_date,
+	);
+	job_creation_date_since.set(job.id, creation_date_since);
 	let finish_date: Date | null = null;
-	let finish_date_since: string | null = null;
-	let finish_date_next_update: number | null = null;
-	if (job.finish_timestamp != null) {
+	if (job.finish_timestamp) {
+		const finish_date_getter = () => {
+			const date = jobs_info.get(job.id)?.finish_date;
+			if (!date) throw new Error();
+			return date;
+		};
+		const finish_date_since_setter = (date_since: string) => {
+			job_finish_date_since.set(job.id, date_since);
+		};
 		finish_date = new Date(job.finish_timestamp);
-		[finish_date_since, finish_date_next_update] = timeAgo(finish_date);
-		if (finish_date_next_update && !jobs_finish_timeout_ids.has(job.id)) {
-			jobs_finish_timeout_ids.set(
-				job.id,
-				setTimeout(() => {
-					update_finish_timestamp(job.id);
-				}, finish_date_next_update),
-			);
-		}
+		const finish_date_since = autoupdate_date_since(
+			finish_date_getter,
+			finish_date_since_setter,
+			finish_date,
+		);
+		job_finish_date_since.set(job.id, finish_date_since);
 	}
 	jobs_info.set(job.id, {
 		...job,
 		creation_date: creation_date,
 		finish_date: finish_date,
-		creation_date_since: creation_date_since,
-		finish_date_since: finish_date_since,
 	});
 }
 
@@ -224,11 +185,7 @@ async function fetch_jobs() {
 					if (!job) {
 						args_formatted.push(["job_ids", job_id.toString()]);
 					} else {
-						job.creation_date_since = timeAgo(job.creation_date)[0];
-						if (job.finish_date != null) {
-							job.finish_date_since = timeAgo(job.finish_date)[0];
-						}
-						jobs_info.set(job_id, { ...job });
+						process_job(job);
 					}
 				}
 				if (args_formatted.length > 0) {
@@ -427,48 +384,6 @@ function updateHeaderCheckbox(job: Job | null = null) {
 	}
 }
 
-function timeAgo(date: Date): [string, number | null] {
-	const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-
-	let interval = Math.floor(seconds / 31536000);
-	if (interval > 1) {
-		return [`${interval.toString()} years ago`, null];
-	}
-
-	interval = Math.floor(seconds / 2592000);
-	if (interval > 1) {
-		return [`${interval.toString()} months ago`, null];
-	}
-
-	interval = Math.floor(seconds / 86400);
-	if (interval > 1) {
-		return [`${interval.toString()} days ago`, null];
-	}
-
-	interval = Math.floor(seconds / 3600);
-	if (interval > 1) {
-		return [
-			`${interval.toString()} hours ago`,
-			(3600 * (interval + 1) - seconds) * 1000,
-		];
-	}
-
-	interval = Math.floor(seconds / 60);
-	if (interval > 1) {
-		return [
-			`${interval.toString()} minutes ago`,
-			(60 * (interval + 1) - seconds) * 1000,
-		];
-	}
-
-	if (seconds < 10) return ["just now", (10 - seconds) * 1000];
-
-	return [
-		`${Math.floor(seconds)} seconds ago`,
-		(10 * (Math.floor(seconds / 10) + 1) - seconds) * 1000,
-	];
-}
-
 // update jobs using SSE (Server-Sent Events)
 function updateJobOnSSEEvent(event: MessageEvent) {
 	const job_id: number = Number.parseInt(event.data);
@@ -569,7 +484,7 @@ cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
                 <Checkbox id="select_job_{job}" class="hover:cursor-pointer" bind:checked={() => selected, (c: boolean) => jobs_ordered_selected.set(job.id, c)} onchange={() => updateHeaderCheckbox(job)} onclick={(e) => e.stopPropagation()}/>
               </TableBodyCell>
               <TableBodyCell>
-                <P size="sm">{job.creation_date_since}</P>
+                <P size="sm">{job_creation_date_since.get(job_id)}</P>
                 <Tooltip type="auto">{job.creation_date.toLocaleString()}</Tooltip>
               </TableBodyCell>
               <TableBodyCell>
@@ -621,10 +536,10 @@ cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
                       <P class="inline" weight="extrabold" size="sm">Current processing step: </P>
                       <P class="inline" size="sm">{job.step}</P>
                     </div>
-                    {#if job.finish_date_since && job.finish_date}
+                    {#if job.finish_date}
                       <div>
                         <P class="inline" weight="extrabold" size="sm">Finish time: </P>
-                        <P class="inline" size="sm">{job.finish_date_since}</P>
+                        <P class="inline" size="sm">{job_finish_date_since.get(job_id)}</P>
                         <Tooltip type="auto">{job.finish_date.toLocaleString()}</Tooltip>
                       </div>
                     {/if}

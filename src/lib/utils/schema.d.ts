@@ -1512,8 +1512,8 @@ export interface components {
 			icon_url?: string | null;
 			/**
 			 * Allow Creation Of Api Tokens
-			 * @description If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will not be automatically invalidated if the user gets deleted or looses permissions in the identity provider. This means that with this setting enabled, users that ones have access to Project-W can retain that access possibly forever. Consider if this is a problem for you before enabling this!
-			 * @default false
+			 * @description If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will be automatically invalidated if the user gets deleted from the identity provider ones the periodic background job gets called. Run the periodic background task more often to get user access revoked quicker.
+			 * @default true
 			 */
 			allow_creation_of_api_tokens: boolean;
 		};
@@ -1594,6 +1594,11 @@ export interface components {
 			explicit: boolean;
 			/** Expires At */
 			expires_at?: string | null;
+			/**
+			 * Last Usage
+			 * Format: date-time
+			 */
+			last_usage: string;
 		};
 		/** TosSettings */
 		TosSettings: {
@@ -3275,10 +3280,10 @@ export interface operations {
 	};
 	oidc_auth_api_oidc_auth__idp_name__get: {
 		parameters: {
-			query?: {
-				user_agent?: string | null;
+			query?: never;
+			header?: {
+				"user-agent"?: string | null;
 			};
-			header?: never;
 			path: {
 				idp_name: string;
 			};
@@ -3336,10 +3341,10 @@ export interface operations {
 	};
 	login_api_ldap_login__idp_name__post: {
 		parameters: {
-			query?: {
-				user_agent?: string | null;
+			query?: never;
+			header?: {
+				"user-agent"?: string | null;
 			};
-			header?: never;
 			path: {
 				idp_name: string;
 			};
@@ -3391,10 +3396,10 @@ export interface operations {
 	};
 	login_api_local_account_login_post: {
 		parameters: {
-			query?: {
-				user_agent?: string | null;
+			query?: never;
+			header?: {
+				"user-agent"?: string | null;
 			};
-			header?: never;
 			path?: never;
 			cookie?: never;
 		};
