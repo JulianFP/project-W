@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field
 
 from .base import (
     AdditionalUserInfo,
@@ -65,7 +65,7 @@ class JobSettingsInDb(BaseModel):
 
 class TokenInfoInternal(TokenInfo):
     user_id: int
-    oidc_refresh_token: SecretStr | None = None
+    oidc_refresh_token_id: int | None = None
 
 
 class LdapTokenInfoInternal(TokenInfoInternal):

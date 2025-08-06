@@ -57,24 +57,22 @@ class LocalAccountSettings(LocalAccountSettingsBase):
     ] = {}
 
 
-class SessionTokenValidated(RootModel):
+class SecretKeyValidated(RootModel):
     root: SecretStr
 
     @model_validator(mode="after")
     def session_token_validation(self) -> Self:
         # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, if second half is supplied by database then only first half of that is used)
-        if len(self.root.get_secret_value()) != 64:
+        as_bytes = bytes.fromhex(self.root.get_secret_value())
+        if len(as_bytes) != 32:
             raise ValueError(
-                "The session token has to be exactly 64 characters in length. Use the command `python -c 'import secrets; print(secrets.token_hex(32))'` to generate a valid session token!"
+                "The secret key has to be 256-bit encoded in hex (64 string characters). Use the command `python -c 'import secrets; print(secrets.token_hex(32))'` to generate a valid secret key!"
             )
         return self
 
 
 class TokenSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    secret_key: SessionTokenValidated = Field(
-        description="The secret key used to sign payloads in emails. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
-    )
     session_expiration_time_minutes: int = Field(
         ge=15,
         default=60,
@@ -246,8 +244,11 @@ class LdapProviderSettings(ProviderSettings):
 # modeling the config file (descriptions and examples are used for documentation)
 class SecuritySettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    secret_key: SecretKeyValidated = Field(
+        description="The secret key used to sign payloads in emails. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
+    )
     local_account: LocalAccountSettings = LocalAccountSettings()
-    tokens: TokenSettings
+    tokens: TokenSettings = TokenSettings()
     oidc_providers: Annotated[
         dict[str, OidcProviderSettings],
         Field(

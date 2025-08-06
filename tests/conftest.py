@@ -83,9 +83,7 @@ def backend(request, smtpd, secret_key, helper_functions):
             "connection_string": redis_conn,
         },
         "security": {
-            "tokens": {
-                "secret_key": secret_key,
-            },
+            "secret_key": secret_key,
             "local_account": {
                 "user_provisioning": {
                     0: {

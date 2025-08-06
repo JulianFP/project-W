@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from pydantic import SecretStr
 
 import project_W.dependencies as dp
 import project_W.security.oidc_deps as oidc
@@ -116,7 +117,8 @@ async def auth(
         False,
         admin_privileges,
         dp.config.security.tokens.session_expiration_time_minutes,
-        refresh_token,
+        None,
+        SecretStr(refresh_token),
     )
     response = RedirectResponse(dp.config.client_url)
     set_token_cookie(response, token)

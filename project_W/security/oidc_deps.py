@@ -160,54 +160,49 @@ async def validate_id_token(id_token: str, iss: str) -> bool:
     return validate_oidc_attributes(name, user)
 
 
-async def invalidate_tokens_if_oidc_user_lost_privileges(tokens: list[OidcTokenInfoInternal]):
-    for token in tokens:
-        oauth_config = oauth_iss_to_config[token.iss]
-        ctx = oauth_iss_to_ctx[token.iss]
-        token_endpoint = oauth_config["token_endpoint"]
-        userinfo_endpoint = oauth_config["userinfo_endpoint"]
-        name = oauth_iss_to_name[token.iss]
-        oidc_prov = local_oidc_prov[name]
+async def invalidate_token_if_oidc_user_lost_privileges(token: OidcTokenInfoInternal):
+    oauth_config = oauth_iss_to_config[token.iss]
+    ctx = oauth_iss_to_ctx[token.iss]
+    token_endpoint = oauth_config["token_endpoint"]
+    userinfo_endpoint = oauth_config["userinfo_endpoint"]
+    name = oauth_iss_to_name[token.iss]
+    oidc_prov = local_oidc_prov[name]
 
-        if token.oidc_refresh_token is None:
-            await dp.db.delete_token_of_user(token.user_id, token.id)
-            logger.info(
-                f"Invalidated token with id {token.id} of OIDC user {token.user_id} because token didn't have refresh token attached to it"
+    if (
+        token.oidc_refresh_token_id is None
+        or (refresh_token := await dp.db.get_oidc_refresh_token_of_token(token.id)) is None
+    ):
+        await dp.db.delete_token_of_user(token.user_id, token.id)
+        logger.info(
+            f"Invalidated token with id {token.id} of OIDC user {token.user_id} because token didn't have refresh token attached to it"
+        )
+        return
+
+    async with AsyncClient(verify=ctx) as client:
+        try:
+            data = {
+                "client_id": oidc_prov.client_id,
+                "client_secret": oidc_prov.client_secret.get_secret_value(),
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token.get_secret_value(),
+                "scope": "openid email",
+            }
+            token_resp = (await client.post(token_endpoint, data=data)).raise_for_status().json()
+            access_token = token_resp["access_token"]
+            new_refresh_token = SecretStr(token_resp["refresh_token"])
+            headers = {"Authorization": f"Bearer {access_token}"}
+            userinfo_resp = (
+                (await client.get(userinfo_endpoint, headers=headers)).raise_for_status().json()
             )
-            return
-
-        async with AsyncClient(verify=ctx) as client:
-            try:
-                data = {
-                    "client_id": oidc_prov.client_id,
-                    "client_secret": oidc_prov.client_secret.get_secret_value(),
-                    "grant_type": "refresh_token",
-                    "refresh_token": token.oidc_refresh_token.get_secret_value(),
-                    "scope": "openid email",
-                }
-                token_resp = (
-                    (await client.post(token_endpoint, data=data)).raise_for_status().json()
-                )
-                access_token = token_resp["access_token"]
-                new_refresh_token = SecretStr(token_resp["refresh_token"])
-                headers = {"Authorization": f"Bearer {access_token}"}
-                userinfo_resp = (
-                    (await client.get(userinfo_endpoint, headers=headers)).raise_for_status().json()
-                )
-                is_admin = validate_oidc_attributes(name, userinfo_resp)
-                if not is_admin and token.admin_privileges:
-                    await dp.db.delete_token_of_user(token.user_id, token.id)
-                    logger.info(
-                        f"Invalidated admin token with id {token.id} of OIDC user {token.user_id} because user doesn't have admin privileges anymore"
-                    )
-                updated_tokens = await dp.db.token_replace_oidc_refresh_token(
-                    token.oidc_refresh_token, new_refresh_token
-                )
-                for token in tokens:
-                    if token.id in updated_tokens:
-                        token.oidc_refresh_token = new_refresh_token
-            except (HTTPStatusError, JSONDecodeError):
+            is_admin = validate_oidc_attributes(name, userinfo_resp)
+            if not is_admin and token.admin_privileges:
                 await dp.db.delete_token_of_user(token.user_id, token.id)
                 logger.info(
-                    f"Invalidated token with id {token.id} of OIDC user {token.user_id} because user couldn't be found at OIDC provider with all necessary attributes"
+                    f"Invalidated admin token with id {token.id} of OIDC user {token.user_id} because user doesn't have admin privileges anymore"
                 )
+            await dp.db.replace_oidc_refresh_token(token.oidc_refresh_token_id, new_refresh_token)
+        except (HTTPStatusError, JSONDecodeError):
+            await dp.db.delete_token_of_user(token.user_id, token.id)
+            logger.info(
+                f"Invalidated token with id {token.id} of OIDC user {token.user_id} because user couldn't be found at OIDC provider with all necessary attributes"
+            )

@@ -76,7 +76,7 @@ def main(
     # parse config file
     dp.config = load_config([custom_config_path]) if custom_config_path else load_config()
     dp.auth_s = URLSafeTimedSerializer(
-        dp.config.security.tokens.secret_key.root.get_secret_value(), "Project-W"
+        dp.config.security.secret_key.root.get_secret_value(), "Project-W"
     )
 
     granian_options = {

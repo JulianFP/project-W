@@ -26,13 +26,13 @@ This works for both the backend and the runner.
 
 Instead of explicitly entering static variables into the config file, you can also choose to dynamically load the value of a variable from the programs environment at startup time. This is especially useful if you don't want to write secrets like the sessionSecretKey the smtp password or the runner token directly into the config file (e.g. if you keep your config files public).
 
-To do use the `!ENV` Tag followed by the env var you want to load from with a dollar sign and curly brackets. For example if you want to load security.local_token.session_secret_key from the env var `TOKEN_SECRET_KEY`, then you would write the following into your config file:
+To do use the `!ENV` Tag followed by the env var you want to load from with a dollar sign and curly brackets. For example if you want to load security.local_token.session_secret_key from the env var `SECRET_KEY`, then you would write the following into your config file:
 
    .. code-block:: YAML
 
       security:
         local_token:
-          session_secret_key: !ENV ${TOKEN_SECRET_KEY}
+          session_secret_key: !ENV ${SECRET_KEY}
 
 If you want you can also define a default value in case the env var isn't defined by using a colon. For example if you want signups to be possible by default but you want to be able to disable them temporarily by setting the env var `LOCAL_ACCOUNT_MODE` to `no_signup` then you could write the following:
 

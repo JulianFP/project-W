@@ -213,17 +213,16 @@ class LdapAdapter:
 ldap_adapter: LdapAdapter
 
 
-async def invalidate_tokens_if_ldap_user_lost_privileges(tokens: list[LdapTokenInfoInternal]):
-    for token in tokens:
-        try:
-            ldap_user = await ldap_adapter.query_user_with_uid(token.provider_name, token.uid)
-            if not ldap_user.is_admin and token.admin_privileges:
-                await dp.db.delete_token_of_user(token.user_id, token.id)
-                logger.info(
-                    f"Invalidated admin token with id {token.id} of LDAP user {token.user_id} because user doesn't have admin privileges anymore"
-                )
-        except HTTPException:
+async def invalidate_token_if_ldap_user_lost_privileges(token: LdapTokenInfoInternal):
+    try:
+        ldap_user = await ldap_adapter.query_user_with_uid(token.provider_name, token.uid)
+        if not ldap_user.is_admin and token.admin_privileges:
             await dp.db.delete_token_of_user(token.user_id, token.id)
             logger.info(
-                f"Invalidated token with id {token.id} of LDAP user {token.user_id} because user couldn't be found at LDAP provider with all necessary attributes"
+                f"Invalidated admin token with id {token.id} of LDAP user {token.user_id} because user doesn't have admin privileges anymore"
             )
+    except HTTPException:
+        await dp.db.delete_token_of_user(token.user_id, token.id)
+        logger.info(
+            f"Invalidated token with id {token.id} of LDAP user {token.user_id} because user couldn't be found at LDAP provider with all necessary attributes"
+        )

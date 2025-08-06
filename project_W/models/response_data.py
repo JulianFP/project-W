@@ -62,6 +62,7 @@ class TokenInfo(BaseModel):
     admin_privileges: bool
     explicit: bool
     expires_at: datetime | None = None
+    last_usage: datetime
 
 
 class RunnerCreatedInfo(BaseModel):

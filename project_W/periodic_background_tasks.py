@@ -43,7 +43,8 @@ async def oidc_token_invalidation():
         "Starting cleanup of tokens associated with non-existing OIDC users or users with insufficient permissions..."
     )
     tokens_of_oidc_users = await dp.db.get_oidc_tokens()
-    await oidc_deps.invalidate_tokens_if_oidc_user_lost_privileges(tokens_of_oidc_users)
+    for token in tokens_of_oidc_users:
+        await oidc_deps.invalidate_token_if_oidc_user_lost_privileges(token)
     logger.info(
         f"Finished cleanup of OIDC tokens, successfully checked {len(tokens_of_oidc_users)}"
     )
@@ -54,7 +55,8 @@ async def ldap_token_invalidation():
         "Starting cleanup of tokens associated with non-existing LDAP users or users with insufficient permissions..."
     )
     tokens_of_ldap_users = await dp.db.get_ldap_tokens()
-    await ldap_deps.invalidate_tokens_if_ldap_user_lost_privileges(tokens_of_ldap_users)
+    for token in tokens_of_ldap_users:
+        await ldap_deps.invalidate_token_if_ldap_user_lost_privileges(token)
     logger.info(
         f"Finished cleanup of LDAP tokens, successfully checked {len(tokens_of_ldap_users)}"
     )

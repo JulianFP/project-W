@@ -108,17 +108,9 @@ async def get_new_api_token(
     ):
         raise disabled_exc
 
+    print(login_context.token.oidc_refresh_token_id)
     token = await dp.db.add_new_user_token(
-        login_context.user.id,
-        name,
-        True,
-        False,
-        None,
-        (
-            login_context.token.oidc_refresh_token.get_secret_value()
-            if login_context.token.oidc_refresh_token is not None
-            else None
-        ),
+        login_context.user.id, name, True, False, None, login_context.token.oidc_refresh_token_id
     )
     return token.get_secret_value()
 
@@ -131,7 +123,7 @@ async def get_all_token_info(
     ],
 ) -> Sequence[TokenInfo]:
     """
-    Get a list of all token id's and names currently in use by this account. Temporary tokens created by the login route all share the same id and this id is marked as such. All other id's/names refer to API tokens that the user explicitly created using the get_new_api_token route.
+    Get a list of all token id's and names currently in use by this account, sorted by last usage timestamp.
     """
     return await dp.db.get_info_of_all_tokens_of_user(login_context.user.id)
 

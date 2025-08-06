@@ -163,7 +163,7 @@ app = FastAPI(
 # middleware required by authlib for oidc
 app.add_middleware(
     SessionMiddleware,
-    secret_key=dp.config.security.tokens.secret_key.root.get_secret_value(),
+    secret_key=dp.config.security.secret_key.root.get_secret_value(),
 )
 # middleware to guard against HTTP Host header attacks
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=dp.config.web_server.allowed_hosts)
