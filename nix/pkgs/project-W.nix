@@ -21,8 +21,9 @@ python3Packages.buildPythonPackage rec {
     psycopg-pool
     redis
     authlib
-    itsdangerous
     bonsai
+    itsdangerous
+    pycryptodome
     aiosmtplib
     granian
     uvicorn

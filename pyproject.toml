@@ -42,9 +42,10 @@ dependencies = [
     # Redis client library
     "redis[hiredis]",
     # auth & security stuff
-    "authlib",
-    "itsdangerous",
-    "bonsai",
+    "authlib", #for OIDC
+    "bonsai", #for LDAP
+    "itsdangerous", #for tokens sent in emails (password reset, account activation)
+    "pycryptodome", #for database encryption
     # async smtp library
     "aiosmtplib",
     # for deployment
