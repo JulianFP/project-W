@@ -2213,7 +2213,7 @@ class PostgresAdapter(DatabaseAdapter):
                 await cur.execute(
                     f"""
                         UPDATE {self.schema}.jobs
-                        SET (audio_oid, aborting) = (NULL, true)
+                        SET (audio_oid, nonce, aborting) = (NULL, NULL, true)
                         WHERE id = %s
                     """,
                     (job_id,),
@@ -2333,7 +2333,7 @@ class PostgresAdapter(DatabaseAdapter):
                 await cur.execute(
                     f"""
                         UPDATE {self.schema}.jobs
-                        SET (audio_oid, finish_timestamp, aborting, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, error_msg) = (NULL, NOW(), false, %s, %s, %s, %s, %s, %s)
+                        SET (audio_oid, nonce, finish_timestamp, aborting, runner_id, runner_name, runner_version, runner_git_hash, runner_source_code_url, error_msg) = (NULL, NULL, NOW(), false, %s, %s, %s, %s, %s, %s)
                         WHERE id = %s
                     """,
                     (
