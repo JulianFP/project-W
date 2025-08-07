@@ -1,9 +1,10 @@
 <script lang="ts">
-import "../app.css";
+import "../../app.css";
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import { routing } from "$lib/utils/global_state.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError, delet } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+import { deletLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
 import {
 	Alert,
@@ -47,7 +48,7 @@ let { data, children }: Props = $props();
 async function logout(): Promise<void> {
 	//send post request and wait for response
 	try {
-		await delet<string>("users/logout");
+		await deletLoggedIn<string>("users/logout");
 		auth.logout();
 	} catch (err: unknown) {
 		let errorMsg: string;

@@ -42,12 +42,12 @@ import ConfirmModal from "$lib/components/confirmModal.svelte";
 import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
 import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
 import { alerts } from "$lib/utils/global_state.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 import {
-	BackendCommError,
-	delet,
-	get,
-	post,
-} from "$lib/utils/httpRequests.svelte";
+	deletLoggedIn,
+	getLoggedIn,
+	postLoggedIn,
+} from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
 import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
 
@@ -152,16 +152,16 @@ function process_job(job: Job) {
 async function fetch_jobs() {
 	fetchingJobs = true;
 	try {
-		job_count = await get<number>("jobs/count", {
+		job_count = await getLoggedIn<number>("jobs/count", {
 			exclude_finished: exclude_finished.toString(),
 			exclude_downloaded: exclude_downloaded.toString(),
 		});
-		job_count_total = await get<number>("jobs/count", {
+		job_count_total = await getLoggedIn<number>("jobs/count", {
 			exclude_finished: "false",
 			exclude_downloaded: "false",
 		});
 		if (job_count > 0) {
-			const job_ids = await get<number[]>("jobs/get", {
+			const job_ids = await getLoggedIn<number[]>("jobs/get", {
 				start_index: (jobs_per_page * (currentPage - 1)).toString(),
 				end_index: (jobs_per_page * currentPage - 1).toString(),
 				sort_key: sort_key,
@@ -189,7 +189,10 @@ async function fetch_jobs() {
 					}
 				}
 				if (args_formatted.length > 0) {
-					const jobs_unsorted = await get<Job[]>("jobs/info", args_formatted);
+					const jobs_unsorted = await getLoggedIn<Job[]>(
+						"jobs/info",
+						args_formatted,
+					);
 					for (const job of jobs_unsorted) {
 						process_job(job);
 					}
@@ -222,7 +225,7 @@ async function update_jobs(job_ids: number[]) {
 		args_formatted.push(["job_ids", job_id.toString()]);
 	}
 	try {
-		const jobs_unsorted = await get<Job[]>("jobs/info", args_formatted);
+		const jobs_unsorted = await getLoggedIn<Job[]>("jobs/info", args_formatted);
 		for (const job of jobs_unsorted) {
 			process_job(job);
 		}
@@ -252,7 +255,7 @@ function sortClickHandler(key: SortKey) {
 
 async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
-		await post("jobs/abort", jobIdsToAbort);
+		await postLoggedIn("jobs/abort", jobIdsToAbort);
 	} catch (err: unknown) {
 		let errorMsg = `Error occured while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;
@@ -270,7 +273,7 @@ async function postAbortJobs(abortedJobIds: number[]): Promise<void> {
 
 async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
-		await delet("jobs/delete", jobIdsToAbort);
+		await deletLoggedIn("jobs/delete", jobIdsToAbort);
 	} catch (err: unknown) {
 		let errorMsg = `Error occured while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;

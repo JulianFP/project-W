@@ -4,7 +4,8 @@ import { Helper } from "flowbite-svelte";
 import CenterPage from "$lib/components/centerPage.svelte";
 import JobSettingsForm from "$lib/components/jobSettingsForm.svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 
 let get_job_settings = $state(() => {
 	return {};
@@ -21,7 +22,7 @@ async function submitAction(reset: boolean) {
 	waiting = true;
 
 	try {
-		await post<number>(
+		await postLoggedIn<number>(
 			"jobs/submit_settings",
 			reset ? {} : get_job_settings(),
 			false,

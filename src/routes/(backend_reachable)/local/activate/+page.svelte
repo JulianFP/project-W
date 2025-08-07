@@ -2,12 +2,13 @@
 import { Spinner } from "flowbite-svelte";
 
 import { alerts, routing } from "$lib/utils/global_state.svelte";
-import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 
 async function activate(): Promise<void> {
 	//send get request and wait for response
 	try {
-		await post<null>(
+		await postLoggedIn<null>(
 			"local-account/activate",
 			{},
 			false,

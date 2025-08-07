@@ -28,12 +28,12 @@ import ConfirmPasswordModal from "$lib/components/confirmPasswordModal.svelte";
 import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 import {
-	BackendCommError,
-	delet,
-	get,
-	post,
-} from "$lib/utils/httpRequests.svelte";
+	deletLoggedIn,
+	getLoggedIn,
+	postLoggedIn,
+} from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
 import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
 
@@ -79,14 +79,15 @@ function process_token_info(token: TokenInfo) {
 
 async function fetch_token_infos() {
 	try {
-		const return_val = await get<TokenInfo[]>("users/get_all_token_info");
+		const return_val = await getLoggedIn<TokenInfo[]>(
+			"users/get_all_token_info",
+		);
 		token_infos.clear();
 		for (const token of return_val) {
 			process_token_info(token);
 		}
 	} catch (err: unknown) {
 		if (err instanceof BackendCommError) {
-			error;
 			error(err.status, err.message);
 		} else {
 			error(
@@ -165,10 +166,13 @@ function openInvalidateAPITokenModal(id: number) {
 }
 
 async function changePassword(): Promise<void> {
-	const response = await post<string>("local-account/change_user_password", {
-		password: password,
-		new_password: newPassword,
-	});
+	const response = await postLoggedIn<string>(
+		"local-account/change_user_password",
+		{
+			password: password,
+			new_password: newPassword,
+		},
+	);
 	alerts.push({ msg: response, color: "green" });
 	newPassword = "";
 }
@@ -179,9 +183,14 @@ async function createAPIToken(event: Event): Promise<void> {
 	waitingForToken = true;
 	createAPITokenError = false;
 	try {
-		createdAPIToken = await post<string>("users/get_new_api_token", {}, false, {
-			name: tokenName,
-		});
+		createdAPIToken = await postLoggedIn<string>(
+			"users/get_new_api_token",
+			{},
+			false,
+			{
+				name: tokenName,
+			},
+		);
 		createAPITokenModalOpen = true;
 		tokenName = "";
 	} catch (err: unknown) {
@@ -198,7 +207,7 @@ async function createAPIToken(event: Event): Promise<void> {
 
 async function invalidateToken(id: number): Promise<void> {
 	try {
-		await delet<null>(
+		await deletLoggedIn<null>(
 			"users/invalidate_token",
 			{},
 			{ token_id: id.toString() },
@@ -220,7 +229,7 @@ async function invalidateToken(id: number): Promise<void> {
 
 async function invalidateAllTokens(): Promise<void> {
 	try {
-		await delet<null>("users/invalidate_all_tokens");
+		await deletLoggedIn<null>("users/invalidate_all_tokens");
 		alerts.push({
 			msg: "All tokens succuessfully invalidated",
 			color: "green",

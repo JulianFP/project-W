@@ -1,7 +1,8 @@
 <script lang="ts">
 import { ButtonGroup, Helper, Label, Modal, P } from "flowbite-svelte";
 
-import { BackendCommError, get } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
 import Button from "./button.svelte";
 import WaitingSubmitButton from "./waitingSubmitButton.svelte";
@@ -65,13 +66,13 @@ async function downloadTranscript(): Promise<void> {
 		let transcript: string;
 		if (format === "as_json") {
 			transcript = JSON.stringify(
-				await get("jobs/download_transcript", {
+				await getLoggedIn("jobs/download_transcript", {
 					job_id: job_id.toString(),
 					transcript_type: "as_json",
 				}),
 			);
 		} else {
-			transcript = await get<string>("jobs/download_transcript", {
+			transcript = await getLoggedIn<string>("jobs/download_transcript", {
 				job_id: job_id.toString(),
 				transcript_type: format,
 			});

@@ -14,7 +14,8 @@ import {
 } from "flowbite-svelte";
 import { QuestionCircleOutline, UndoOutline } from "flowbite-svelte-icons";
 
-import { BackendCommError, get } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import {
 	type components,
 	interpolateMethodEnumValues,
@@ -82,7 +83,7 @@ async function queryDefaultValues(): Promise<
 	components["schemas"]["JobSettings-Output"]
 > {
 	try {
-		return await get<components["schemas"]["JobSettings-Output"]>(
+		return await getLoggedIn<components["schemas"]["JobSettings-Output"]>(
 			"jobs/default_settings",
 		);
 	} catch (err: unknown) {

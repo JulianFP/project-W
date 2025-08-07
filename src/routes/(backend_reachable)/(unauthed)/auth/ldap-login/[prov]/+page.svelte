@@ -1,8 +1,6 @@
 <script lang="ts">
-import { A, Helper } from "flowbite-svelte";
+import { Helper, Input, Label } from "flowbite-svelte";
 
-import Button from "$lib/components/button.svelte";
-import EmailField from "$lib/components/emailField.svelte";
 import FormPage from "$lib/components/formPage.svelte";
 import PasswordField from "$lib/components/passwordField.svelte";
 import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
@@ -10,10 +8,11 @@ import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
 import { auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
-import { AngleRightOutline } from "flowbite-svelte-icons";
+import { AngleRightOutline, UserCircleSolid } from "flowbite-svelte-icons";
 
 type Data = {
 	auth_settings: components["schemas"]["AuthSettings"];
+	prov: string;
 };
 
 interface Props {
@@ -24,7 +23,7 @@ let { data }: Props = $props();
 let error: boolean = $state(false);
 let errorMsg: string = $state("");
 let waitingForPromise = $state(false);
-let email: string = $state("");
+let username: string = $state("");
 let password: string = $state("");
 
 async function postLogin(event: Event): Promise<void> {
@@ -34,12 +33,16 @@ async function postLogin(event: Event): Promise<void> {
 	//send post request and wait for response
 	try {
 		await post<string>(
-			"local-account/login",
+			`ldap/login/${data.prov}`,
 			{
 				grant_type: "password",
-				username: email,
+				username: username,
 				password: password,
 			},
+			true,
+			{},
+			{},
+			window.fetch,
 			true,
 		);
 		auth.login();
@@ -55,25 +58,25 @@ async function postLogin(event: Event): Promise<void> {
 }
 </script>
 
-<FormPage backButtonUri="#/auth" heading="Login with Project-W account">
+<FormPage backButtonUri="#/auth" heading={`Login with ${data.prov} account`}>
   <form class="mx-auto max-w-lg" onsubmit={postLogin}>
-    <EmailField bind:value={email} bind:error={error} tabindex={1}/>
+    <div class="mb-6">
+      <Label for="username" color={error ? "red" : "gray"} class="mb-2">Username</Label>
+      <!-- set type, id, name and autocomplete  according to chromes recommendations: https://www.chromium.org/developers/design-documents/form-styles-that-chromium-understands//>-->
+      <Input id="username" type="text" name="username" autocomplete="username" color={error ? "red" : "default"} class="ps-9" placeholder="alice" required bind:value={username} tabindex={1}>
+        {#snippet left()}
+          <UserCircleSolid/>
+        {/snippet}
+      </Input>
+    </div>
     <PasswordField bind:value={password} bind:error={error} tabindex={2}>Password</PasswordField>
 
     {#if error}
       <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {errorMsg}</Helper>
     {/if}
 
-    <div class="flex max-w-lg justify-between items-center my-2">
-      {#if data.auth_settings.local_account.mode === "enabled"}
-        <Button color="alternative" type="button" href="#/auth/local/signup" tabindex={4}>Sign up instead</Button>
-      {/if}
+    <div class="flex max-w-lg justify-end items-center my-2">
       <WaitingButton waiting={waitingForPromise} tabindex={3}><AngleRightOutline class="mr-2"/>Log in</WaitingButton>
     </div>
-
-    <div class="flex justify-end">
-      <A href="#/auth/local/request-password-reset" tabindex={5}>Forgot password?</A>
-    </div>
-
   </form>
 </FormPage>

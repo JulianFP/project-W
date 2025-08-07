@@ -1,24 +1,58 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
+import { BackendCommError, get } from "./httpRequests.svelte";
+import type { components } from "./schema";
+
+type User = components["schemas"]["User"];
 
 class AuthManager {
 	//set logged in by default so that it tries to use authenticated route first before failing and logging out
-	#first_load = true;
-	loggedIn = $state<boolean>(true);
+	#userDataFromCheck: User | null = null;
+	loggedIn = $state<boolean>(false);
+	loggedInSettled = $state<boolean>(false);
+	awaitLoggedIn: Promise<void> | null = null;
+
+	async checkLoggedIn(): Promise<void> {
+		try {
+			const user_info = await get<User>(
+				"users/info",
+				{},
+				{},
+				window.fetch,
+				true,
+			);
+			this.#userDataFromCheck = user_info;
+			this.loggedIn = true;
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError && err.status === 401) {
+				this.loggedIn = false;
+			}
+		}
+		this.loggedInSettled = true;
+	}
+
+	constructor() {
+		this.awaitLoggedIn = this.checkLoggedIn();
+	}
 
 	login() {
 		this.loggedIn = true;
 	}
 
 	logout(detail: string | null = null) {
-		if (detail != null && !this.#first_load) {
+		if (detail != null) {
 			alerts.push({
 				msg: `You have been logged out: ${detail}`,
 				color: "red",
 			});
-			this.#first_load = false;
 		}
 		this.loggedIn = false;
+	}
+
+	getUserDataFromCheck(): User | null {
+		const userData = this.#userDataFromCheck;
+		this.#userDataFromCheck = null;
+		return userData;
 	}
 }
 
