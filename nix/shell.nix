@@ -25,6 +25,10 @@ let
         ];
       };
       nixfmt-rfc-style.enable = true;
+      cspell = {
+        enable = true;
+        args = [ "-w" ];
+      };
     };
   };
 in

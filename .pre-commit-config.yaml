@@ -7,9 +7,14 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
       - id: check-symlinks
-  - repo: https://github.com/biomejs/pre-commit
 
+  - repo: https://github.com/biomejs/pre-commit
     rev: v2.1.4
     hooks:
       - id: biome-check
-        additional_dependencies: ["@biomejs/biome@1.9.3"]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: [-w ]
