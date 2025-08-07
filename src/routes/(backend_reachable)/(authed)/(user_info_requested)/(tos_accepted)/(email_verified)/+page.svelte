@@ -41,7 +41,7 @@ import CloseButton from "$lib/components/closeButton.svelte";
 import ConfirmModal from "$lib/components/confirmModal.svelte";
 import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
 import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
-import { alerts } from "$lib/utils/global_state.svelte";
+import { alerts, auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 import {
 	deletLoggedIn,
@@ -206,6 +206,7 @@ async function fetch_jobs() {
 			jobs_ordered_selected.clear();
 			jobs_info.clear();
 		}
+		updateHeaderCheckbox();
 	} catch (err: unknown) {
 		let errorMsg = "Error occured while fetching jobs from backend: ";
 		if (err instanceof BackendCommError) {
@@ -281,11 +282,6 @@ async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
 		alerts.push({ msg: errorMsg, color: "red" });
 	}
 }
-async function postDeletejobs(): Promise<void> {
-	if (selectedItems.length > 0) {
-		updateHeaderCheckbox();
-	}
-}
 
 function openAbortModal(jobIds: number[]) {
 	if (
@@ -346,7 +342,12 @@ function openDownloadModal(job_id: number, file_name: string) {
 
 function updateHeaderCheckbox(job: Job | null = null) {
 	//update headerCheckbox
-	if (job == null || jobs_ordered_selected.get(job.id)) {
+	if (
+		jobs_ordered_selected.size === 0 ||
+		(job != null && !jobs_ordered_selected.get(job.id))
+	) {
+		headerCheckboxSelected = false;
+	} else {
 		let allSelected = true;
 		for (let [job_id, selected] of jobs_ordered_selected.entries()) {
 			if (!selected) {
@@ -355,8 +356,6 @@ function updateHeaderCheckbox(job: Job | null = null) {
 			}
 		}
 		headerCheckboxSelected = allSelected;
-	} else {
-		headerCheckboxSelected = false;
 	}
 
 	//update disabled states
@@ -390,7 +389,7 @@ function updateHeaderCheckbox(job: Job | null = null) {
 // update jobs using SSE (Server-Sent Events)
 function updateJobOnSSEEvent(event: MessageEvent) {
 	const job_id: number = Number.parseInt(event.data);
-	if (jobs_info.has(job_id)) {
+	if (auth.loggedIn && jobs_info.has(job_id)) {
 		update_jobs([job_id]);
 	}
 }
@@ -444,7 +443,7 @@ cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
     <Table shadow hoverable={true} border={false}>
       <TableHead>
         <TableHeadCell class="!p-4">
-          <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} onchange={() => {jobs_ordered_selected.forEach((_,job_id) => jobs_ordered_selected.set(job_id, headerCheckboxSelected)); updateHeaderCheckbox();}}/>
+          <Checkbox id="select_all_visible_elements" class="hover:cursor-pointer" bind:checked={headerCheckboxSelected} disabled={jobs_ordered_selected.size === 0} onchange={() => {jobs_ordered_selected.forEach((_,job_id) => jobs_ordered_selected.set(job_id, headerCheckboxSelected)); updateHeaderCheckbox();}}/>
         </TableHeadCell>
         <TableHeadCell class="hover:dark:text-white hover:text-primary-600 hover:cursor-pointer" onclick={() => sortClickHandler("creation_time")}>
           <div class="flex">
@@ -649,7 +648,7 @@ cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
   {/if}
 </ConfirmModal>
 
-<ConfirmModal bind:open={deleteModalOpen} action={() => deleteJobs(deleteModalJobs)} post_action={postDeletejobs}>
+<ConfirmModal bind:open={deleteModalOpen} action={() => deleteJobs(deleteModalJobs)}>
   {#if deleteModalJobs.length === 1}
     Job {deleteModalJobs[0].toString()} including its audio file and transcription file will be deleted.
   {:else}
@@ -657,6 +656,6 @@ cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
   {/if}
 </ConfirmModal>
 
-<SubmitJobsModal bind:open={submitModalOpen} pre_filled_in_settings={pre_filled_job_settings} post_action={async () => reloadSSEListeners()}/>
+<SubmitJobsModal bind:open={submitModalOpen} pre_filled_in_settings={pre_filled_job_settings} pre_action={async () => reloadSSEListeners()}/>
 
 <DownloadTranscriptModal bind:open={downloadModalOpen} job_id={downloadJobId} job_file_name={downloadFileName} post_action={async () => await update_jobs([downloadJobId])}/>

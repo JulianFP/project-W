@@ -22,11 +22,13 @@ import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 type JobSettingsResp = components["schemas"]["JobSettings-Output"];
 interface Props {
 	open?: boolean;
+	pre_action?: () => Promise<void>;
 	post_action?: () => Promise<void>;
 	pre_filled_in_settings?: JobSettingsResp;
 }
 let {
 	open = $bindable(false),
+	pre_action = async () => {},
 	post_action = async () => {},
 	pre_filled_in_settings,
 }: Props = $props();
@@ -77,6 +79,7 @@ async function postJob(file: File, job_settings_id: number) {
 
 async function submitJob(): Promise<void> {
 	if (all_files.size > 0) {
+		await pre_action();
 		waitingForPromise = true;
 
 		//send job settings
@@ -101,12 +104,7 @@ async function submitJob(): Promise<void> {
 
 			for (const [i, file] of Array.from(all_files.values()).entries()) {
 				const response: PromiseSettledResult<Response> = responses[i];
-				if (response.status === "fulfilled" && response.value.ok) {
-					alerts.push({
-						msg: `You successfully submitted job with filename '${file.name}'`,
-						color: "green",
-					});
-				} else {
+				if (response.status !== "fulfilled" || !response.value.ok) {
 					alerts.push({
 						msg: `Error occurred while submitting job with filename '${file.name}'`,
 						color: "red",

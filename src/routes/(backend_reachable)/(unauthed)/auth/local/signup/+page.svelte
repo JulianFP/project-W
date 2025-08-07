@@ -7,7 +7,7 @@ import FormPage from "$lib/components/formPage.svelte";
 import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
 
-import { alerts, auth } from "$lib/utils/global_state.svelte";
+import { auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 import { UserAddSolid } from "flowbite-svelte-icons";
@@ -26,7 +26,7 @@ async function postSignup(event: Event): Promise<void> {
 
 	//send post request and wait for response
 	try {
-		const signup_response = await post<string>("local-account/signup", {
+		await post<string>("local-account/signup", {
 			email: email,
 			password: password,
 		});
@@ -40,9 +40,12 @@ async function postSignup(event: Event): Promise<void> {
 					password: password,
 				},
 				true,
+				{},
+				{},
+				window.fetch,
+				true,
 			);
 			auth.login();
-			alerts.push({ msg: signup_response, color: "green" });
 		} catch (err: unknown) {
 			if (err instanceof BackendCommError) {
 				errorMsg = `Account created, however automatic login failed: ${err.message}`;

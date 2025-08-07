@@ -90,7 +90,7 @@ async function downloadTranscript(): Promise<void> {
 		element.download = `${job_file_name.replace(
 			/\.[^/.]+$/,
 			"",
-		)}_transcribed.${format_ending}`;
+		)}.${format_ending}`;
 		element.click();
 	} catch (err: unknown) {
 		if (err instanceof BackendCommError) {

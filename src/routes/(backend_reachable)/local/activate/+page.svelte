@@ -1,14 +1,14 @@
 <script lang="ts">
 import { Spinner } from "flowbite-svelte";
 
+import { invalidate } from "$app/navigation";
 import { alerts, routing } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 
 async function activate(): Promise<void> {
 	//send get request and wait for response
 	try {
-		await postLoggedIn<null>(
+		await post<null>(
 			"local-account/activate",
 			{},
 			false,
@@ -17,11 +17,6 @@ async function activate(): Promise<void> {
 		alerts.push({
 			msg: "Account activation successful!",
 			color: "green",
-		});
-		await routing.set({
-			destination: "#/auth/local/login",
-			params: {},
-			overwriteParams: true,
 		});
 	} catch (err: unknown) {
 		let errorMsg = "Unknown error";
@@ -32,8 +27,9 @@ async function activate(): Promise<void> {
 			msg: `Error occured during account activation: ${errorMsg}`,
 			color: "red",
 		});
-		await routing.set({ destination: "#/", params: {}, overwriteParams: true });
 	}
+	await routing.set({ destination: "#/", params: {}, overwriteParams: true });
+	await invalidate("app:user_info");
 }
 </script>
 
