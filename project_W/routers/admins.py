@@ -21,7 +21,7 @@ router = APIRouter(
 async def create_runner(
     _: Annotated[
         LoginContext,
-        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
 ) -> RunnerCreatedInfo:
     """
@@ -34,7 +34,7 @@ async def create_runner(
 async def invalidate_runner(
     _: Annotated[
         LoginContext,
-        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
     runner_id: int,
 ) -> str:
@@ -53,7 +53,7 @@ async def invalidate_runner(
 async def add_site_banner(
     _: Annotated[
         LoginContext,
-        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
     banner_info: SiteBanner,
 ) -> int:
@@ -74,7 +74,7 @@ async def add_site_banner(
 async def delete_site_banner(
     _: Annotated[
         LoginContext,
-        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
     banner_id: int,
 ):
@@ -85,7 +85,7 @@ async def delete_site_banner(
 async def send_email_to_all_users(
     _: Annotated[
         LoginContext,
-        Depends(validate_user(require_verified=True, require_admin=True, require_tos=True)),
+        Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
     background_tasks: BackgroundTasks,
     email: EmailToUsers,
