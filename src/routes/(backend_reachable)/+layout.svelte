@@ -3,8 +3,7 @@ import "../../app.css";
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import { routing } from "$lib/utils/global_state.svelte";
 import { alerts, auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { deletLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+import { BackendCommError, delet } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
 import {
 	Alert,
@@ -48,11 +47,16 @@ let { data, children }: Props = $props();
 async function logout(): Promise<void> {
 	//send post request and wait for response
 	try {
-		await deletLoggedIn<string>("users/logout");
+		await delet<string>("users/logout", {}, {}, {}, window.fetch, true);
 		auth.logout();
 	} catch (err: unknown) {
 		let errorMsg: string;
 		if (err instanceof BackendCommError) {
+			if (err.status === 401) {
+				//ignore 401 error because we want to logout anyway
+				auth.logout();
+				return;
+			}
 			errorMsg = err.message;
 		} else {
 			errorMsg = "Unknown error";

@@ -19,44 +19,45 @@ export class BackendCommError extends Error {
 async function response_parser<ResponseType>(
 	fetch_method: () => Promise<Response>,
 ): Promise<ResponseType> {
+	let response: Response;
 	try {
-		const response = await fetch_method();
-		const contentType = response.headers.get("content-type");
-		let is_json = false;
-		if (contentType?.includes("application/json")) {
-			is_json = true;
-		}
-		if (!response.ok) {
-			let detail = "Unknown backend communication error";
-			if (is_json) {
-				const json_response: HTTPErrorObject = await response.json();
-				if (typeof json_response.detail === "string") {
-					detail = json_response.detail;
-				} else {
-					detail = "";
-					for (let i = 0; i < json_response.detail.length; i++) {
-						detail += `${json_response.detail[i].loc}: ${json_response.detail[i].msg}`;
-						if (i + 1 < json_response.detail.length) {
-							detail += "; ";
-						}
-					}
-				}
-			}
-			throw new BackendCommError(response.status, detail);
-		}
-		if (!is_json) {
-			throw new BackendCommError(
-				response.status,
-				"Backend returned non-json value",
-			);
-		}
-		return await response.json();
+		response = await fetch_method();
 	} catch (err: unknown) {
 		if (err instanceof TypeError) {
 			throw new BackendCommError(500, err.message);
 		}
 		throw new BackendCommError(500, "Unknown error");
 	}
+	const contentType = response.headers.get("content-type");
+	let is_json = false;
+	if (contentType?.includes("application/json")) {
+		is_json = true;
+	}
+	if (!response.ok) {
+		let detail = "Unknown backend communication error";
+		if (is_json) {
+			const json_response: HTTPErrorObject = await response.json();
+			if (typeof json_response.detail === "string") {
+				detail = json_response.detail;
+			} else {
+				detail = "";
+				for (let i = 0; i < json_response.detail.length; i++) {
+					detail += `${json_response.detail[i].loc}: ${json_response.detail[i].msg}`;
+					if (i + 1 < json_response.detail.length) {
+						detail += "; ";
+					}
+				}
+			}
+		}
+		throw new BackendCommError(response.status, detail);
+	}
+	if (!is_json) {
+		throw new BackendCommError(
+			response.status,
+			"Backend returned non-json value",
+		);
+	}
+	return await response.json();
 }
 
 export async function get<ResponseType>(

@@ -9,10 +9,11 @@ type User = components["schemas"]["User"];
 
 export const load: LayoutLoad = async ({ fetch, depends }) => {
 	depends("app:user_info");
-	await auth.awaitLoggedIn;
+	if (auth.awaitLoggedIn != null) {
+		await auth.awaitLoggedIn;
+	}
 	const user_info_from_check = auth.getUserDataFromCheck();
 	if (user_info_from_check != null) {
-		console.log(user_info_from_check);
 		return { user_info: user_info_from_check };
 	}
 	if (auth.loggedIn) {

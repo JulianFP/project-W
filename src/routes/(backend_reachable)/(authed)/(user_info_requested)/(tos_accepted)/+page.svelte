@@ -517,7 +517,7 @@ cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
               </TableBodyCell>
               <TableBodyCell class="pr-4 py-4 whitespace-nowrap font-medium text-center">
                 {#if (["success", "downloaded"].includes(job.step))}
-                  <Button class="!p-2 flex flex-col" size="xs" onclick={(e: MouseEvent) => {e.stopPropagation(); openDownloadModal(job_id, job.file_name);}}>
+                  <Button class="!p-2 flex flex-col" size="xs" color={job.step === "success" ? "primary" : "alternative"}  onclick={(e: MouseEvent) => {e.stopPropagation(); openDownloadModal(job_id, job.file_name);}}>
                     <DownloadSolid/>
                     Download
                   </Button>
