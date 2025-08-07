@@ -56,7 +56,7 @@ async def ldap_token_invalidation():
     )
     tokens_of_ldap_users = await dp.db.get_ldap_tokens()
     for token in tokens_of_ldap_users:
-        await ldap_deps.invalidate_token_if_ldap_user_lost_privileges(token)
+        await ldap_deps.invalidate_token_if_ldap_user_lost_privileges(ldap_deps.ldap_adapter, token)
     logger.info(
         f"Finished cleanup of LDAP tokens, successfully checked {len(tokens_of_ldap_users)}"
     )

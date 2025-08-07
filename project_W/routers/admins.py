@@ -66,7 +66,7 @@ async def add_site_banner(
     else:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Site banner creation failed with a database error",
+            detail="Site banner creation failed with a database error",
         )
 
 

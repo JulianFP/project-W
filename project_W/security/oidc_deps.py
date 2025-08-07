@@ -18,9 +18,9 @@ oauth = OAuth()
 
 oauth_iss_to_name = {}
 oauth_iss_to_nice_name = {}
-local_oidc_prov: dict[str, OidcProviderSettings] = (
-    {}
-)  # local copy of settings with normalized provider names
+local_oidc_prov: dict[
+    str, OidcProviderSettings
+] = {}  # local copy of settings with normalized provider names
 oauth_iss_to_config: dict[str, dict] = {}
 oauth_iss_to_ctx: dict[str, ssl.SSLContext] = {}
 
@@ -29,7 +29,7 @@ logger = get_logger("project-W")
 
 async def register_with_oidc_providers(config: Settings):
     oidc_prov = config.security.oidc_providers
-    if oidc_prov is {}:
+    if oidc_prov == {}:
         raise Exception("Tried to use oidc router even though oidc is disabled in config!")
     for name, idp in oidc_prov.items():
         logger.info(f"Trying to connect with OIDC provider {name}...")
@@ -137,7 +137,7 @@ async def validate_id_token(id_token: str, iss: str) -> bool:
     """
     Validates the id_token returned by the IdP and returns whether the user is an admin
     """
-    assert local_oidc_prov is not {}
+    assert local_oidc_prov != {}
     # get current oidc config name
     name = oauth_iss_to_name.get(iss)
     if name is None:

@@ -171,7 +171,6 @@ class CachingAdapter(ABC):
 
 
 class RedisAdapter(CachingAdapter):
-
     minimal_required_redis_version = [7, 2]
 
     __heartbeat_timeout = 60

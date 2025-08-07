@@ -190,9 +190,9 @@ async def job_info(
     Returns a list of job objects containing all information related to each of the specified jobs.
     Note that job infos will be returned in no specific order, please use the get route to get an ordering of jobs by id and only use this route to get additional information about these jobs.
     """
-    job_and_setting_infos: list[JobAndSettingsInDb] = (
-        await dp.db.get_job_infos_with_settings_of_user(login_context.user.id, job_ids)
-    )
+    job_and_setting_infos: list[
+        JobAndSettingsInDb
+    ] = await dp.db.get_job_infos_with_settings_of_user(login_context.user.id, job_ids)
     job_infos = []
     for job in job_and_setting_infos:
         data = job.model_dump()  # JobAndSettings

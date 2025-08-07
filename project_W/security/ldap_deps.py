@@ -23,9 +23,9 @@ logger = get_logger("project-W")
 
 class LdapAdapter:
     apools: dict[str, AIOConnectionPool] = {}
-    clients: dict[str, LDAPClient] = (
-        {}
-    )  # clients with everything preconfigured except credentials for performing binds
+    clients: dict[
+        str, LDAPClient
+    ] = {}  # clients with everything preconfigured except credentials for performing binds
     ldap_prov: dict[str, LdapProviderSettings]
 
     async def __exec_lambda(
@@ -133,7 +133,7 @@ class LdapAdapter:
 
     async def open(self, ldap_providers: dict[str, LdapProviderSettings]):
         self.ldap_prov = ldap_providers
-        if self.ldap_prov is {}:
+        if self.ldap_prov == {}:
             raise Exception("Tried to use ldap router even though ldap is disabled in config!")
         for name, idp in self.ldap_prov.items():
             if not (idp.user_query or idp.admin_query):
@@ -213,7 +213,9 @@ class LdapAdapter:
 ldap_adapter: LdapAdapter
 
 
-async def invalidate_token_if_ldap_user_lost_privileges(token: LdapTokenInfoInternal):
+async def invalidate_token_if_ldap_user_lost_privileges(
+    ldap_adapter: LdapAdapter, token: LdapTokenInfoInternal
+):
     try:
         ldap_user = await ldap_adapter.query_user_with_uid(token.provider_name, token.uid)
         if not ldap_user.is_admin and token.admin_privileges:

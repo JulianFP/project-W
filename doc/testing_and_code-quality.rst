@@ -52,11 +52,9 @@ We aim to have a consistent code styling to increase readability, maintainabilit
 Python
 ``````
 
-For python I use pre-commits own `check-python <https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/check_ast.py>`_, `check-builtin-literals <https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/check_builtin_literals.py>`_, `check-docstring-first <https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/check_docstring_first.py>`_ hooks as well as hooks for black and isort.
+For python I use various hooks from pre-commit itself like `check-python <https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/check_ast.py>`_, `check-builtin-literals <https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/check_builtin_literals.py>`_, `check-docstring-first <https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/check_docstring_first.py>`_ as well as ruff for both linting and formatting and codespell for spotting spelling mistakes.
 
-`black <https://github.com/psf/black>`_ is the most important one of these, it is a strict, opinionated code formatter. I set it up with the ``--line-length 100`` option to increase the allowed line length as I found the 79 character limit defined by `PEP8 <https://peps.python.org/pep-0008/>`_ to be too restrictive for this project. The point of this is to increase code readability, and having simple and straight forward if statements or prints to be stretched over multiple lines hurts this cause. I found 100 characters per line to be a good sweet spot. Other than that our code should be PEP8 compliant.
-
-`isort <https://github.com/PyCQA/isort>`_ is responsible for sorting import statements. I set it up with ``--profile black`` to make it compatible with the black formatter.
+`ruff <https://github.com/astral-sh/ruff>`_ is the most important one of these, it is both a code linter and formatter and acts as a drop-in replacement for Flake8, isort and black. I set it up with the ``--line-length 100`` option to increase the allowed line length as I found the 79 character limit defined by `PEP8 <https://peps.python.org/pep-0008/>`_ to be too restrictive for this project. The point of this is to increase code readability, and having simple and straight forward if statements or prints to be stretched over multiple lines hurts this cause. I found 100 characters per line to be a good sweet spot. Other than that our code should be PEP8 compliant.
 
 Javascript/Typescript
 `````````````````````

@@ -39,15 +39,20 @@ let
       check-docstring-first.enable = true;
       check-builtin-literals.enable = true;
       check-python.enable = true;
-      black = {
+      python-debug-statements.enable = true;
+      ruff.enable = true;
+      ruff-format = {
         enable = true;
-        settings.flags = "--line-length 100";
-      };
-      isort = {
-        enable = true;
-        settings.profile = "black";
+        args = [
+          "--line-length"
+          "100"
+        ];
       };
       nixfmt-rfc-style.enable = true;
+      cspell = {
+        enable = true;
+        args = [ "-w" ];
+      };
     };
   };
 in
