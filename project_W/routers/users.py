@@ -86,7 +86,7 @@ async def get_new_api_token(
     # check if current user is from a provider which allows creation of api tokens
     disabled_exc = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Creation of api tokens is disabled for your account type. Login using a different provider or ask the administrator to enable this.",
+        detail="Creation of api tokens is disabled for your account type. Login using a different provider or ask the administrator to enable this.",
     )
     if (
         login_context.user.user_type == UserTypeEnum.OIDC

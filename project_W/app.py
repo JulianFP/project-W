@@ -8,7 +8,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import project_W.dependencies as dp
 
-from ._version import __commit_id__, __version__
+from ._version import __version__
 from .caching import RedisAdapter
 from .database import PostgresAdapter
 from .models.base import LocalAccountOperationModeEnum

@@ -3,6 +3,15 @@
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
+import os
+import json
+import sys
+from pathlib import Path
+
+import project_W.dependencies as dp
+from project_W.models.settings import Settings
+from project_W.app import app
+from project_W.routers import ldap, local_account, oidc
 
 # -- Project information -----------------------------------------------------
 
@@ -53,11 +62,6 @@ html_css_files = [
 
 # -- API autodoc setup -------------------------------------------------------
 
-import json
-from pathlib import Path
-
-import project_W.dependencies as dp
-from project_W.models.settings import Settings
 
 config_dict = {
     "client_url": "http://localhost:5173/#",
@@ -78,8 +82,6 @@ config_dict = {
     },
 }
 dp.config = Settings.model_validate(config_dict)
-from project_W.app import app
-from project_W.routers import ldap, local_account, oidc
 
 app.include_router(oidc.router, prefix="/api")
 app.include_router(ldap.router, prefix="/api")
@@ -88,13 +90,10 @@ app.include_router(local_account.router, prefix="/api")
 openapi_file = Path(__file__).parent / ".sphinx-openapi.json"
 openapi_file.write_text(json.dumps(app.openapi()))
 
-import os
 
 # -- Config file autodoc setup -----------------------------------------------
-import sys
 
 sys.path.append(os.path.abspath("."))
-import runner_settings
 
 autodoc_pydantic_model_show_field_summary = False
 autodoc_pydantic_model_show_config_summary = False

@@ -6,7 +6,6 @@ from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBea
 from pydantic import SecretStr
 
 import project_W.dependencies as dp
-from project_W.models.response_data import User
 
 from ..logger import get_logger
 from ..models.internal import (

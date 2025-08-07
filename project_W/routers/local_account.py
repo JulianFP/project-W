@@ -381,7 +381,7 @@ async def change_user_email(
         account_activation_token,
         dp.config.client_url,
     )
-    return f"Successfully requested email address change. An email confirmation email will be sent to you shortly. Please click on the link in that email to complete the email changing process."
+    return "Successfully requested email address change. An email confirmation email will be sent to you shortly. Please click on the link in that email to complete the email changing process."
 
 
 @router.post(

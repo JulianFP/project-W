@@ -1942,7 +1942,7 @@ class PostgresAdapter(DatabaseAdapter):
                         return None
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
-                    f"""
+                    """
                         SELECT lo_creat(-1)
                     """
                 )
@@ -1951,7 +1951,7 @@ class PostgresAdapter(DatabaseAdapter):
                 offset = 0
                 while chunk := await audio_file.read(self.__file_chunk_size_in_bytes):
                     await cur.execute(
-                        f"""
+                        """
                             SELECT lo_put(%s, %s, %s)
                         """,
                         (oid, offset, ciphertext_generator(chunk)),
@@ -2123,7 +2123,7 @@ class PostgresAdapter(DatabaseAdapter):
                 offset = 0
             async with conn.cursor(row_factory=scalar_row) as cur:
                 await cur.execute(
-                    f"""
+                    """
                         SELECT lo_get(%s, %s, %s)
                     """,
                     (audio_oid, offset, self.__file_chunk_size_in_bytes),
@@ -2132,7 +2132,7 @@ class PostgresAdapter(DatabaseAdapter):
                     yield plaintext_generator(chunk)
                     offset += self.__file_chunk_size_in_bytes
                     await cur.execute(
-                        f"""
+                        """
                             SELECT lo_get(%s, %s, %s)
                         """,
                         (audio_oid, offset, self.__file_chunk_size_in_bytes),
@@ -2219,7 +2219,7 @@ class PostgresAdapter(DatabaseAdapter):
                     (job_id,),
                 )
                 await cur.execute(
-                    f"""
+                    """
                         SELECT lo_unlink(%s)
                     """,
                     (audio_oid,),
@@ -2287,7 +2287,7 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 if audio_oid is not None:
                     await cur.execute(
-                        f"""
+                        """
                             SELECT lo_unlink(%s)
                         """,
                         (audio_oid,),
@@ -2348,7 +2348,7 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 if audio_oid is not None:
                     await cur.execute(
-                        f"""
+                        """
                             SELECT lo_unlink(%s)
                         """,
                         (audio_oid,),

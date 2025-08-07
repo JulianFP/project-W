@@ -34,7 +34,7 @@ def test_about(get_client):
     assert (
         version_splitted[0] != "0" or version_splitted[1] != "0"
     )  # make sure that version is larger than 0.0.x
-    assert type(content.get("git_hash")) == str
+    assert type(content.get("git_hash")) is str
 
 
 @pytest.mark.parametrize(
@@ -108,8 +108,8 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert response.status_code == codes.OK
         job_info = response.json()
         assert job_info[0].get("file_name") == "dummy-file"
-        assert type(job_info[0].get("settings")) == dict
-        assert type(job_info[0].get("creation_timestamp")) == str
+        assert type(job_info[0].get("settings")) is dict
+        assert type(job_info[0].get("creation_timestamp")) is str
         assert 0 <= job_info[0].get("progress") <= 100
 
         helper_functions.wait_for_job_assignment(job_id, client)
@@ -127,14 +127,14 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert (
             runner_version_splitted[0] != "0" or runner_version_splitted[1] != "0"
         )  # make sure that version is larger than 0.0.x
-        assert type(job_info[0].get("runner_git_hash")) == str
+        assert type(job_info[0].get("runner_git_hash")) is str
 
         helper_functions.wait_for_job_completion(job_id, client)
         response = client.get("/api/jobs/info", params={"job_ids": job_id})
         assert response.status_code == codes.OK
         job_info = response.json()
         assert job_info[0].get("progress") == 100
-        assert type(job_info[0].get("finish_timestamp")) == str
+        assert type(job_info[0].get("finish_timestamp")) is str
         assert job_info[0].get("runner_id") == runner_id
         assert job_info[0].get("runner_name") == runner_name
         assert (
@@ -145,7 +145,7 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert (
             runner_version_splitted[0] != "0" or runner_version_splitted[1] != "0"
         )  # make sure that version is larger than 0.0.x
-        assert type(job_info[0].get("runner_git_hash")) == str
+        assert type(job_info[0].get("runner_git_hash")) is str
 
         response = client.get(
             "/api/jobs/download_transcript",

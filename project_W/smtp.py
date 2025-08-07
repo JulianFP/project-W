@@ -57,10 +57,10 @@ class SmtpClient:
         msg = EmailMessage()
         msg["Subject"] = msg_subject
         msg["From"] = self.smtp_settings.sender_email.root
-        if type(receiver) == EmailValidated:
+        if isinstance(receiver, EmailValidated):
             msg["To"] = receiver.root
             receiver_logs = receiver.root
-        elif type(receiver) == list:
+        elif type(receiver) is list:
             msg["Bcc"] = map(lambda email: email.root, receiver)
             receiver_logs = f"{len(receiver)} addresses"
         else:
