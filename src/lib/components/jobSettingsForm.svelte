@@ -340,7 +340,7 @@ function onTranslationChange() {
   </div>
 
   {#if diarization}
-    <div class="flex gap-4">
+    <div class="flex gap-4 items-end">
       <div class="w-full">
         <div class="flex gap-2 items-center mb-1.5">
           <Label for="diarization_min_speakers">Min speakers</Label>
@@ -379,7 +379,7 @@ function onTranslationChange() {
       {#if alignment}
         <div class="flex flex-col gap-4">
           <Heading tag="h6">Advanced alignment settings</Heading>
-          <div class="flex gap-4">
+          <div class="flex gap-4 items-end">
             <div class="w-full flex gap-2 items-center">
               <Checkbox id="alignment_processing_highlight_words" bind:checked={alignment_processing_highlight_words}>
                 Highlight words
@@ -395,7 +395,7 @@ function onTranslationChange() {
               <Tooltip placement="bottom" class="max-w-lg">Whether the .json output should contain timestamps for each character of the transcript, not only for each word, i.e. you will know when each letter was spoken.</Tooltip>
             </div>
           </div>
-          <div class="flex gap-4">
+          <div class="flex gap-4 items-end">
             <div class="w-full">
               <div class="flex gap-2 items-center mb-1.5">
                 <Label for="alignment_processing_max_line_width">Max line width</Label>
@@ -490,7 +490,7 @@ function onTranslationChange() {
           </div>
           <RangeWithField id="asr_length_penalty" required min="0.0" max="1.0" step="0.001" bind:value={asr_length_penalty}/>
         </div>
-        <div class="flex gap-4">
+        <div class="flex gap-4 items-end">
           <div class="w-full">
             <div class="flex gap-2 items-center mb-1.5">
               <Label for="asr_temperature">Temperature</Label>

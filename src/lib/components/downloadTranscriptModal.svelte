@@ -92,6 +92,7 @@ async function downloadTranscript(): Promise<void> {
 			"",
 		)}.${format_ending}`;
 		element.click();
+		open = false;
 	} catch (err: unknown) {
 		if (err instanceof BackendCommError) {
 			errorMsg = err.message;
@@ -101,7 +102,6 @@ async function downloadTranscript(): Promise<void> {
 		error = true;
 	}
 
-	open = false;
 	waiting = false;
 	await post_action();
 }
