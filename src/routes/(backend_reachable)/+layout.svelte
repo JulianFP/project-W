@@ -19,7 +19,6 @@ import {
 	FooterLink,
 	FooterLinkGroup,
 	NavBrand,
-	NavHamburger,
 	Navbar,
 } from "flowbite-svelte";
 import {
@@ -69,7 +68,6 @@ async function logout(): Promise<void> {
 <div class={`flex flex-col gap-8 ${routing.location.startsWith("#/auth") ? "min-h-[min(calc(100vh+180px),max(100vh,1250px))]" : "min-h-screen"}`}>
   <header>
     <Navbar class="px-2 sm:px-4 py-1.5 bg-slate-300 dark:bg-slate-900">
-      <NavHamburger />
       <NavBrand href="#/">
         <!-- self-center: x/&y centering for flex item, whitespace-nowrap: text should not wrap, text-xl/font-semibold: font size/type-->
         <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Project</span>
