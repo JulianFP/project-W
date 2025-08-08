@@ -40,14 +40,11 @@ let
       check-builtin-literals.enable = true;
       check-python.enable = true;
       python-debug-statements.enable = true;
-      ruff.enable = true;
-      ruff-format = {
+      ruff = {
         enable = true;
-        args = [
-          "--line-length"
-          "100"
-        ];
+        excludes = [ "doc/conf.py" ];
       };
+      ruff-format.enable = true;
       nixfmt-rfc-style.enable = true;
       cspell = {
         enable = true;
