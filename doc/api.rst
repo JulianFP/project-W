@@ -4,7 +4,7 @@ API
 This page is of interest to developers of Project-W, but also to people who want to write custom clients for it (like bash or python scripts or anything else). If the latter is the case then focus on the client-facing routes and ignore the runner-facing ones.
 
 .. note::
-   If you want to develop a client that is intended to replace the current frontend (not just as an addition) then make sure that is has an ``/local/activate``, an ``/auth/local/reset-password`` and an ``/auth/oidc-accept`` route! The backend expects that the client has these since it puts them into the emails it sends to the users and forwards the user the the last one for the OIDC login flow. The first two routes should accept a ``token`` as a query string that contains the activation/password reset token.
+   If you want to develop a client that is intended to replace the current frontend (not just as an addition) then make sure that is has an ``/local/activate`` and an ``/auth/local/reset-password`` route! The backend expects that the client has these since it puts them into the emails it sends to the users and forwards. They should accept a ``token`` as a query string that contains the activation/password reset token.
 
 .. _general-label:
 
@@ -22,6 +22,8 @@ The REST API of the backend is divided into these sections:
 7. /api/admins/*
 
 The section 1 to 5 as well as info routes that are in none of these sections should be of interest to you if you want to write your own client. We will call them client-facing routes from now on. The sixth section should be used by runners only (runner-facing), and the seventh is only for administration purposes.
+
+Some of these routes are protected by an auth token. This token can either be provided through a cookie called ``token`` or as an http bearer token. Use the method that is more convenient for your application. You can generate an auth token from the official frontend under the Security tab.
 
 We made the following design decision regarding when to use GET, POST or PUT routes:
 

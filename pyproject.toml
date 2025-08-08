@@ -100,3 +100,7 @@ packages = [
 version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
 version_file = "project_W/_version.py"
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["doc/conf.py"]

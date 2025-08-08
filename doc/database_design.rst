@@ -3,7 +3,7 @@ PostgreSQL database design
 
 The PostgreSQL database schema is carefully designed to closely reflect Project-W's actual data relations and only make wanted database states possible, prohibiting unwanted states (even if the database is being modified directly and not through Project-W software).
 
-For this I created and maintained an ER model that served as the basis for the current database design:
+For this I created and maintain an ER model that serves as the basis for the current database design:
 
 .. image:: ./database_er_model.png
    :width: 800

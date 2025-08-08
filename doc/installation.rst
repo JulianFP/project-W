@@ -4,7 +4,7 @@ Installation
 The following installation guides are for Linux only. Theoretically all the components of this software should be possible to deploy onto other operating systems as well however this is not tested and not supported. You will have to be on your own for that.
 
 .. note::
-   The config files shown here are for a setup with local Project-W accounts only. If you want to setup LDAP and/or OIDC, please refer to TODO for more advanced example configs.
+   The config files shown here are for a setup with local Project-W accounts only. If you want to setup LDAP and/or OIDC, please refer to :doc:`example_configs` for more advanced example configs.
 
 .. important::
    If you plan to host the backend public to the internet: Make sure to only serve the backend over https regardless of your installation method! Without ssl encryption sensitive information like passwords, tokens for the clients and runners or user data will be transmitted in clear text!
@@ -42,9 +42,12 @@ This will setup the backend/frontend without a reverse proxy or any additional c
 3. To run the backend you need a config.yml file that configures it. You can start off with the following example (don't forget to replace the <placeholders>!) and modify it to your needs if necessary. Put this config file into ./project-W-data. Refer to :doc:`example_configs` for more advanced example configs and to :ref:`description_backend_config-label` for more information about all the configuration options.
 
    .. warning::
+
       Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
-   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+      Please also make sure to not loose your secret_key as it is used for encrypting contents of the database. Refer to :doc:`database_encryption` for more information on that.
+
+   In this setup, the secret_key and the smtp password are being read from the environment variables 'PROJECT_W_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
    .. code-block:: yaml
 
@@ -191,7 +194,9 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
    .. warning::
       Please make sure to store the secrets that are read from an environment variable here in a secret way on your server! Some of these secrets would allow a bad actor to gain full access to Project-W including access to all user data!
 
-   In this setup, the session secret key and the smtp password are being read from the environment variables 'PROJECT_W_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
+      Please also make sure to not loose your secret_key as it is used for encrypting contents of the database. Refer to :doc:`database_encryption` for more information on that.
+
+   In this setup, the secret_key and the smtp password are being read from the environment variables 'PROJECT_W_SECRET_KEY' and 'PROJECT_W_SMTP_PASSWORD'. If you want you can also choose to set them here directly in the config, but if you do so please take appropriate measures to keep this config file secret!
 
    .. code-block:: yaml
 

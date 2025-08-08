@@ -16,6 +16,7 @@ project W
    config
    connect_runner_backend
    communicating_with_your_users
+   database_encryption
 
 .. toctree::
    :maxdepth: 2
