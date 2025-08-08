@@ -53,6 +53,7 @@ class JobInDb(JobBase):
     user_id: int
     job_settings_id: int | None = None
     audio_oid: int | None = None
+    nonce: str | None = None
 
 
 class JobAndSettingsInDb(JobInDb):

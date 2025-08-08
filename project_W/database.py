@@ -18,6 +18,7 @@ from psycopg_pool.pool_async import AsyncConnectionPool
 from pydantic import SecretStr, ValidationError
 
 import project_W.dependencies as dp
+from project_W.models.settings import SecretKeyValidated
 
 from ._version import version, version_tuple
 from .logger import get_logger
@@ -59,10 +60,15 @@ class DatabaseAdapter(ABC):
     def __init__(self, connection_string: str) -> None:
         pass
 
-    def _encrypt(self) -> tuple[str, Callable[[bytes], bytes]]:
+    def _encrypt(
+        self, secret_key: SecretKeyValidated | None = None
+    ) -> tuple[str, Callable[[bytes], bytes]]:
+        if secret_key is None:
+            secret_key = dp.config.security.secret_key
         nonce_rfc7539 = get_random_bytes(12)
-        secret_key = dp.config.security.secret_key.root.get_secret_value()
-        cipher = ChaCha20.new(key=bytes.fromhex(secret_key), nonce=nonce_rfc7539)
+        cipher = ChaCha20.new(
+            key=bytes.fromhex(secret_key.root.get_secret_value()), nonce=nonce_rfc7539
+        )
         nonce_str = b64encode(nonce_rfc7539).decode("utf-8")
 
         def ciphertext_generator(plaintext: bytes):
@@ -70,9 +76,14 @@ class DatabaseAdapter(ABC):
 
         return (nonce_str, ciphertext_generator)
 
-    def _decrypt(self, nonce: str) -> Callable[[bytes], bytes]:
-        secret_key = dp.config.security.secret_key.root.get_secret_value()
-        cipher = ChaCha20.new(key=bytes.fromhex(secret_key), nonce=b64decode(nonce))
+    def _decrypt(
+        self, nonce: str, secret_key: SecretKeyValidated | None = None
+    ) -> Callable[[bytes], bytes]:
+        if secret_key is None:
+            secret_key = dp.config.security.secret_key
+        cipher = ChaCha20.new(
+            key=bytes.fromhex(secret_key.root.get_secret_value()), nonce=b64decode(nonce)
+        )
 
         def plaintext_generator(ciphertext: bytes):
             return cipher.decrypt(ciphertext)
@@ -692,6 +703,20 @@ class DatabaseAdapter(ABC):
         """
         pass
 
+    @abstractmethod
+    async def rotate_secret_key(self, new_secret_key: SecretKeyValidated):
+        """
+        Re-encrypts all encrypted database contents with the new secret key
+        """
+        pass
+
+    @abstractmethod
+    async def delete_encrypted_content(self):
+        """
+        Deletes all encrypted content from the database
+        """
+        pass
+
 
 class PostgresAdapter(DatabaseAdapter):
     apool: AsyncConnectionPool
@@ -855,37 +880,6 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-    async def __create_tokens_tables(self, cur):
-        self.logger.info("Creating tokens table...")
-        await cur.execute(
-            f"""
-            CREATE TABLE {self.schema}.oidc_refresh_tokens (
-                id int GENERATED ALWAYS AS IDENTITY,
-                encrypted_token bytea NOT NULL,
-                nonce text NOT NULL CHECK(length(nonce) = 16),
-                PRIMARY KEY (id)
-            )
-            """
-        )
-        await cur.execute(
-            f"""
-            CREATE TABLE {self.schema}.tokens (
-                id int GENERATED ALWAYS AS IDENTITY,
-                token_hash text UNIQUE CHECK(length(token_hash) = 43),
-                user_id int NOT NULL,
-                name text NOT NULL,
-                explicit boolean NOT NULL DEFAULT false,
-                admin_privileges boolean NOT NULL DEFAULT false,
-                expires_at timestamptz,
-                last_usage timestamptz NOT NULL DEFAULT NOW(),
-                oidc_refresh_token_id int,
-                PRIMARY KEY (id),
-                FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE,
-                FOREIGN KEY (oidc_refresh_token_id) REFERENCES {self.schema}.oidc_refresh_tokens (id) ON DELETE CASCADE
-            )
-        """
-        )
-
     async def __create_all_tables(self, conn: AsyncConnection):
         """
         All tables (except for the jobs table, see its creation function) need to created at the same time because of foreign key constraints
@@ -950,7 +944,35 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            await self.__create_tokens_tables(cur)
+            self.logger.info("Creating tokens table...")
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.oidc_refresh_tokens (
+                    id int GENERATED ALWAYS AS IDENTITY,
+                    encrypted_token bytea NOT NULL,
+                    nonce text NOT NULL CHECK(length(nonce) = 16),
+                    PRIMARY KEY (id)
+                )
+                """
+            )
+            await cur.execute(
+                f"""
+                CREATE TABLE {self.schema}.tokens (
+                    id int GENERATED ALWAYS AS IDENTITY,
+                    token_hash text UNIQUE CHECK(length(token_hash) = 43),
+                    user_id int NOT NULL,
+                    name text NOT NULL,
+                    explicit boolean NOT NULL DEFAULT false,
+                    admin_privileges boolean NOT NULL DEFAULT false,
+                    expires_at timestamptz,
+                    last_usage timestamptz NOT NULL DEFAULT NOW(),
+                    oidc_refresh_token_id int,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY (user_id) REFERENCES {self.schema}.users (id) ON DELETE CASCADE,
+                    FOREIGN KEY (oidc_refresh_token_id) REFERENCES {self.schema}.oidc_refresh_tokens (id) ON DELETE CASCADE
+                )
+            """
+            )
 
             self.logger.info("Creating local_accounts table...")
             # according to https://www.rfc-editor.org/errata/eid1003 the upper limit for mail address forward paths is 256 octets (2 of which are angle brackets and thus not part of the address itself). When using UTF-8 this might translate in even less characters, but is still a good upper limit
@@ -1163,24 +1185,8 @@ class PostgresAdapter(DatabaseAdapter):
                 if parsed_version_tuple > parsed_db_version_tuple:
                     # TODO: Add database migration code here once it becomes necessary after a future update
                     if parsed_db_version_tuple < parse_version_tuple((0, 4, 0)):  # in version 0.3.x
-                        # update version tuple if this application is newer than previous one after database migration has completed
-                        self.logger.info(
-                            f"Application has been updated from {db_version} to {version}. Migrating database to new version..."
-                        )
-                        await cur.execute(
-                            f"""
-                            DROP FUNCTION {self.schema}.rotatesecret() CASCADE
-                            """
-                        )
-                        await cur.execute(
-                            f"""
-                            DROP TABLE {self.schema}.token_secrets
-                            """
-                        )
-                        await self.__create_tokens_tables(cur)
-                    else:
                         raise Exception(
-                            f"No database migration code available for version {db_version}"
+                            "No database migration code available for database coming from Project-W versions lower than 0.4.0"
                         )
                     await cur.execute(
                         f"""
@@ -2761,4 +2767,142 @@ class PostgresAdapter(DatabaseAdapter):
                     AND id = %s
                     """,
                     (id,),
+                )
+
+    async def rotate_secret_key(self, new_secret_key: SecretKeyValidated):
+        async with self.apool.connection() as conn:
+            # re-encrypt audio files
+            async with conn.cursor(row_factory=class_row(JobInDb)) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT *
+                    FROM {self.schema}.jobs
+                    WHERE audio_oid IS NOT NULL
+                    """
+                )
+                audio_files = await cur.fetchall()
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                for file in audio_files:
+                    if file.nonce is None or file.audio_oid is None:
+                        raise Exception("Invalid job in database!")
+                    plaintext_generator = self._decrypt(file.nonce)
+                    new_nonce, ciphertext_generator = self._encrypt(new_secret_key)
+                    await cur.execute(
+                        """
+                            SELECT lo_creat(-1)
+                        """
+                    )
+                    new_oid = await cur.fetchone()
+                    offset = 0
+                    await cur.execute(
+                        """
+                            SELECT lo_get(%s, %s, %s)
+                        """,
+                        (file.audio_oid, offset, self.__file_chunk_size_in_bytes),
+                    )
+                    while chunk := await cur.fetchone():
+                        decrypted_chunk = plaintext_generator(chunk)
+                        await cur.execute(
+                            """
+                                SELECT lo_put(%s, %s, %s)
+                            """,
+                            (new_oid, offset, ciphertext_generator(decrypted_chunk)),
+                        )
+                        offset += self.__file_chunk_size_in_bytes
+                        await cur.execute(
+                            """
+                                SELECT lo_get(%s, %s, %s)
+                            """,
+                            (file.audio_oid, offset, self.__file_chunk_size_in_bytes),
+                        )
+                    await cur.execute(
+                        f"""
+                            UPDATE {self.schema}.jobs
+                            SET (audio_oid, nonce) = (%s, %s)
+                            WHERE id = %s
+                        """,
+                        (new_oid, new_nonce, file.id),
+                    )
+
+            # re-encrypt transcripts
+            async with conn.cursor(row_factory=dict_row) as cur:
+                await cur.execute(
+                    f"""
+                    SELECT *
+                    FROM {self.schema}.transcripts
+                    """
+                )
+                transcripts = await cur.fetchall()
+                for transcript in transcripts:
+                    txt_plaintext_generator = self._decrypt(transcript["as_txt_nonce"])
+                    new_txt_nonce, txt_ciphertext_generator = self._encrypt(new_secret_key)
+                    srt_plaintext_generator = self._decrypt(transcript["as_srt_nonce"])
+                    new_srt_nonce, srt_ciphertext_generator = self._encrypt(new_secret_key)
+                    tsv_plaintext_generator = self._decrypt(transcript["as_tsv_nonce"])
+                    new_tsv_nonce, tsv_ciphertext_generator = self._encrypt(new_secret_key)
+                    vtt_plaintext_generator = self._decrypt(transcript["as_vtt_nonce"])
+                    new_vtt_nonce, vtt_ciphertext_generator = self._encrypt(new_secret_key)
+                    json_plaintext_generator = self._decrypt(transcript["as_json_nonce"])
+                    new_json_nonce, json_ciphertext_generator = self._encrypt(new_secret_key)
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.transcripts
+                        SET (as_txt, as_txt_nonce, as_srt, as_srt_nonce, as_tsv, as_tsv_nonce, as_vtt, as_vtt_nonce, as_json, as_json_nonce) = (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        WHERE job_id = %s
+                    """,
+                        (
+                            txt_ciphertext_generator(txt_plaintext_generator(transcript["as_txt"])),
+                            new_txt_nonce,
+                            srt_ciphertext_generator(srt_plaintext_generator(transcript["as_srt"])),
+                            new_srt_nonce,
+                            tsv_ciphertext_generator(tsv_plaintext_generator(transcript["as_tsv"])),
+                            new_tsv_nonce,
+                            vtt_ciphertext_generator(vtt_plaintext_generator(transcript["as_vtt"])),
+                            new_vtt_nonce,
+                            json_ciphertext_generator(
+                                json_plaintext_generator(transcript["as_json"])
+                            ),
+                            new_json_nonce,
+                            transcript["job_id"],
+                        ),
+                    )
+
+                # re-encrypt oidc refresh tokens
+                await cur.execute(
+                    f"""
+                    SELECT *
+                    FROM {self.schema}.oidc_refresh_tokens
+                    """
+                )
+                oidc_tokens = await cur.fetchall()
+                for token in oidc_tokens:
+                    plaintext_generator = self._decrypt(token["nonce"])
+                    new_nonce, ciphertext_generator = self._encrypt(new_secret_key)
+                    await cur.execute(
+                        f"""
+                        UPDATE {self.schema}.oidc_refresh_tokens
+                        SET (encrypted_token, nonce) = (%s, %s)
+                        WHERE id = %s
+                    """,
+                        (
+                            ciphertext_generator(plaintext_generator(token["encrypted_token"])),
+                            new_nonce,
+                            token["id"],
+                        ),
+                    )
+
+    async def delete_encrypted_content(self):
+        async with self.apool.connection() as conn:
+            async with conn.cursor(row_factory=scalar_row) as cur:
+                await cur.execute(  # also deletes transcripts
+                    f"""
+                    DELETE
+                    FROM {self.schema}.jobs
+                    """
+                )
+                await cur.execute(
+                    f"""
+                    DELETE
+                    FROM {self.schema}.oidc_refresh_tokens
+                    """
                 )
