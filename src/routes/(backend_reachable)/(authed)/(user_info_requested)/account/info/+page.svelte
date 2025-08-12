@@ -31,7 +31,7 @@ async function deleteUser() {
 		alerts.push({ msg: "User was deleted successfully!", color: "green" });
 		auth.logout();
 	} catch (err: unknown) {
-		let errorMsg = "Error occured during user deletion: ";
+		let errorMsg = "Error occurred during user deletion: ";
 		if (err instanceof BackendCommError) {
 			errorMsg += err.message;
 		} else {

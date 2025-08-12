@@ -92,7 +92,7 @@ async function fetch_token_infos() {
 		} else {
 			error(
 				400,
-				"Unknown error occured while querying all token infos from the backend",
+				"Unknown error occurred while querying all token infos from the backend",
 			);
 		}
 	}
@@ -217,7 +217,7 @@ async function invalidateToken(id: number): Promise<void> {
 			color: "green",
 		});
 	} catch (err: unknown) {
-		let errorMsg = "Error occured while trying to invalidate api token: ";
+		let errorMsg = "Error occurred while trying to invalidate api token: ";
 		if (err instanceof BackendCommError) {
 			errorMsg += err.message;
 		} else {

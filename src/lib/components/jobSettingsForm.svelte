@@ -87,7 +87,7 @@ async function queryDefaultValues(): Promise<
 			"jobs/default_settings",
 		);
 	} catch (err: unknown) {
-		let errorMsg = "Error occured while fetching default account settings: ";
+		let errorMsg = "Error occurred while fetching default account settings: ";
 		let errorCode = 400;
 		if (err instanceof BackendCommError) {
 			errorMsg += err.message;
