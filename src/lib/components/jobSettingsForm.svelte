@@ -536,7 +536,7 @@ function onTranslationChange() {
           <div class="flex gap-2 items-center mb-1.5">
             <Label for="asr_suppressed_tokens">Suppressed tokens</Label>
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
-            <Tooltip placement="bottom" class="max-w-lg">Comma-separated list of token ids to suppress during sampling; '-1' will suppress most special characters except common punctuations.</Tooltip>
+            <Tooltip placement="bottom" class="max-w-lg">Comma-separated list of token ids to suppress during sampling; '-1' will suppress most special characters except common punctuation.</Tooltip>
           </div>
           <Input id="asr_suppressed_tokens" type="text" bind:value={asr_suppressed_tokens}/>
         </div>

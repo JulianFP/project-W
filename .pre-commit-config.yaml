@@ -17,4 +17,4 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        args: [-w ]
+        args: [-w, --ignore-words-list=delet, --exclude-file=src/lib/utils/schema.d.ts ]

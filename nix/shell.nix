@@ -14,15 +14,7 @@ let
       check-symlinks.enable = true;
       biome = {
         enable = true;
-        entry = "${pkgs.biome}/bin/biome check --write";
-        types_or = [
-          "javascript"
-          "jsx"
-          "ts"
-          "tsx"
-          "json"
-          "svelte"
-        ];
+        types_or = [ ];
       };
       nixfmt-rfc-style.enable = true;
       cspell = {
