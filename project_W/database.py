@@ -2413,12 +2413,18 @@ class PostgresAdapter(DatabaseAdapter):
                 )
 
                 self.logger.info("Cleaning up expired auth tokens...")
+                # don't delete most recently used token so that it can still be used for user cleanup
                 await cur.execute(
                     f"""
                     DELETE
-                    FROM {self.schema}.tokens
+                    FROM {self.schema}.tokens token
                     WHERE expires_at IS NOT NULL
                     AND expires_at < NOW()
+                    AND last_usage NOT IN (
+                        SELECT max(last_usage)
+                        FROM {self.schema}.tokens
+                        WHERE user_id = token.user_id
+                    )
                     """
                 )
                 await cur.execute(

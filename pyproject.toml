@@ -4,8 +4,8 @@
 [build-system]
 requires = [
     "setuptools >=61",
-    #use current main branch of setuptools_scm to get PR https://github.com/pypa/setuptools-scm/pull/1154 until next stable release
-    "setuptools_scm @ git+https://github.com/pypa/setuptools-scm",
+    #we need larger than 9 to get PR https://github.com/pypa/setuptools-scm/pull/1154
+    "setuptools_scm >= 9",
 ]
 build-backend = "setuptools.build_meta"
 
