@@ -31,7 +31,7 @@ One runner cannot do more than one job at a time. If you want to increase the th
 
 The communication between runner and backend always goes from the runner to the backend, never the other way around (i.e. the runner will always initialize the communication). The backend is the http-server, while the runner is the http-client. The runner uses the asyncio and `httpx <https://www.python-httpx.org/>`_ libraries for this. It has two major advantages:
 
-- The runner doesn't need a publicly reachable IP-address and no special firewall settings or similar (it can run behind a nat and a company firewall if you wan't). It just needs to be able to reach the backend.
+- The runner doesn't need a publicly reachable IP-address and no special firewall settings or similar (it can run behind a nat and a company firewall if you want). It just needs to be able to reach the backend.
 - The runner doesn't need a certificate or key-pair for encryption. As long as the backend has an ssl certificate, the communication between backend and runner will be automatically https encrypted
 
 Each runner send a heartbeat to the backend periodically (currently every 15 seconds). If the backend assigned a job to this runner, it will notify it through the heartbeats response. After that the runner will download the job from the backend and process it. During processing it will send the current progress status to the backend in its heartbeats. After finishing it will upload the transcript to the backend.

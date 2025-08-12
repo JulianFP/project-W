@@ -198,7 +198,7 @@ class DatabaseAdapter(ABC):
         nonce: str | None = None,
     ):
         """
-        Add hash of new token to databasse
+        Add hash of new token to database
         """
         pass
 
