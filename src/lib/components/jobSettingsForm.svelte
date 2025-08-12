@@ -257,7 +257,7 @@ const supportedAlignmentLangs = [
 	"vi",
 	"ko",
 	"ur",
-	"te",
+	"te", // codespell:ignore te
 	"hi",
 	"ca",
 	"ml",

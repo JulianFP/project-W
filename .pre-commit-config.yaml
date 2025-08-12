@@ -17,4 +17,4 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        args: [-w, --ignore-words-list=delet, --exclude-file=src/lib/utils/schema.d.ts ]
+        args: [-w, --ignore-words-list=delet, "--skip=src/lib/utils/schema.d.ts,pnpm-lock.yaml,package.json" ]
