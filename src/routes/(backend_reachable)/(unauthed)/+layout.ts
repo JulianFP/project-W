@@ -20,7 +20,7 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		} else {
 			error(
 				400,
-				"Unknown error occured while getting auth settings from backend",
+				"Unknown error occurred while getting auth settings from backend",
 			);
 		}
 	}

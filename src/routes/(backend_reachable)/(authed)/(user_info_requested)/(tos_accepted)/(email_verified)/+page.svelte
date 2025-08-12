@@ -208,7 +208,7 @@ async function fetch_jobs() {
 		}
 		updateHeaderCheckbox();
 	} catch (err: unknown) {
-		let errorMsg = "Error occured while fetching jobs from backend: ";
+		let errorMsg = "Error occurred while fetching jobs from backend: ";
 		if (err instanceof BackendCommError) {
 			errorMsg += err.message;
 		} else {
@@ -231,7 +231,7 @@ async function update_jobs(job_ids: number[]) {
 			process_job(job);
 		}
 	} catch (err: unknown) {
-		let errorMsg = "Error occured while updating job: ";
+		let errorMsg = "Error occurred while updating job: ";
 		if (err instanceof BackendCommError) {
 			errorMsg += err.message;
 		} else {
@@ -258,7 +258,7 @@ async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
 		await postLoggedIn("jobs/abort", jobIdsToAbort);
 	} catch (err: unknown) {
-		let errorMsg = `Error occured while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
+		let errorMsg = `Error occurred while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;
 		else errorMsg += "Unknown error";
 		alerts.push({ msg: errorMsg, color: "red" });
@@ -276,7 +276,7 @@ async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
 	try {
 		await deletLoggedIn("jobs/delete", jobIdsToAbort);
 	} catch (err: unknown) {
-		let errorMsg = `Error occured while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
+		let errorMsg = `Error occurred while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
 		if (err instanceof BackendCommError) errorMsg += err.message;
 		else errorMsg += "Unknown error";
 		alerts.push({ msg: errorMsg, color: "red" });

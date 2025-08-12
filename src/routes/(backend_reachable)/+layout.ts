@@ -13,7 +13,7 @@ export const load: LayoutLoad = async ({ fetch }) => {
 		if (err instanceof BackendCommError) {
 			error(err.status, err.message);
 		} else {
-			error(400, "Unknown error occured while getting about info from backend");
+			error(400, "Unknown error occurred while getting about info from backend");
 		}
 	}
 };
