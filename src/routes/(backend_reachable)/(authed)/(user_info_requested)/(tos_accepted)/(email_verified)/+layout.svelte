@@ -1,12 +1,12 @@
 <script lang="ts">
+import { Heading, Helper, P } from "flowbite-svelte";
+import { MailBoxSolid } from "flowbite-svelte-icons";
+import type { Snippet } from "svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
 import { alerts } from "$lib/utils/global_state.svelte";
 import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
-import { Heading, Helper, P } from "flowbite-svelte";
-import { MailBoxSolid } from "flowbite-svelte-icons";
-import type { Snippet } from "svelte";
 
 type Data = {
 	user_info: components["schemas"]["User"];

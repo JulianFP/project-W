@@ -1,5 +1,4 @@
-import { auth } from "./global_state.svelte";
-import { routing } from "./global_state.svelte";
+import { auth, routing } from "./global_state.svelte";
 import { BackendCommError, delet, get, post } from "./httpRequests.svelte";
 
 async function login_forwarder<ResponseType>(

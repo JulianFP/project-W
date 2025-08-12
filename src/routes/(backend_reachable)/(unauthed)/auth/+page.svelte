@@ -1,8 +1,8 @@
 <script lang="ts">
+import { Hr, P } from "flowbite-svelte";
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import Button from "$lib/components/button.svelte";
 import type { components } from "$lib/utils/schema";
-import { Hr, P } from "flowbite-svelte";
 
 type Data = {
 	auth_settings: components["schemas"]["AuthSettings"];

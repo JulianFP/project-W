@@ -1,12 +1,12 @@
 <script lang="ts">
+import { Checkbox, Heading, Helper, P } from "flowbite-svelte";
+import type { Snippet } from "svelte";
 import { invalidate } from "$app/navigation";
 import CenterPage from "$lib/components/centerPage.svelte";
 import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
 import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
-import { Checkbox, Heading, Helper, P } from "flowbite-svelte";
-import type { Snippet } from "svelte";
 
 type Data = {
 	about: components["schemas"]["AboutResponse"];

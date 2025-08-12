@@ -1,5 +1,4 @@
 <script lang="ts">
-import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 import {
 	Badge,
 	Checkbox,
@@ -10,6 +9,7 @@ import {
 } from "flowbite-svelte";
 import { FileMusicSolid, QuestionCircleOutline } from "flowbite-svelte-icons";
 import { SvelteMap } from "svelte/reactivity";
+import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 
 import { alerts } from "$lib/utils/global_state.svelte";
 import { BackendCommError } from "$lib/utils/httpRequests.svelte";

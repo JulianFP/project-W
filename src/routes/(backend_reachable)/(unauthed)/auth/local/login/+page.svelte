@@ -1,16 +1,14 @@
 <script lang="ts">
 import { A, Helper } from "flowbite-svelte";
-
+import { AngleRightOutline } from "flowbite-svelte-icons";
 import Button from "$lib/components/button.svelte";
 import EmailField from "$lib/components/emailField.svelte";
 import FormPage from "$lib/components/formPage.svelte";
 import PasswordField from "$lib/components/passwordField.svelte";
 import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
-
 import { auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
-import { AngleRightOutline } from "flowbite-svelte-icons";
 
 type Data = {
 	auth_settings: components["schemas"]["AuthSettings"];

@@ -1,16 +1,14 @@
 <script lang="ts">
 import { Helper } from "flowbite-svelte";
-
+import { UserAddSolid } from "flowbite-svelte-icons";
 import Button from "$lib/components/button.svelte";
 import EmailField from "$lib/components/emailField.svelte";
 import FormPage from "$lib/components/formPage.svelte";
 import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
-
 import { auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
-import { UserAddSolid } from "flowbite-svelte-icons";
 
 let email: string = $state("");
 let password: string = $state("");

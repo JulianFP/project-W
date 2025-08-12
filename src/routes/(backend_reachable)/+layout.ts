@@ -1,6 +1,6 @@
+import { error } from "@sveltejs/kit";
 import { BackendCommError, get } from "$lib/utils/httpRequests.svelte";
 import type { components } from "$lib/utils/schema";
-import { error } from "@sveltejs/kit";
 import type { LayoutLoad } from "./$types";
 
 type AboutResponse = components["schemas"]["AboutResponse"];

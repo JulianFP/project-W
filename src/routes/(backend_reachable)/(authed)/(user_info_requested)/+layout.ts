@@ -1,8 +1,8 @@
+import { error } from "@sveltejs/kit";
 import { auth } from "$lib/utils/global_state.svelte";
 import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
-import { error } from "@sveltejs/kit";
 import type { LayoutLoad } from "./$types";
 
 type User = components["schemas"]["User"];

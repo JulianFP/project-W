@@ -1,7 +1,6 @@
 <script lang="ts">
-import { auth, routing } from "$lib/utils/global_state.svelte";
-
 import WaitingForGoto from "$lib/components/waitingForGoto.svelte";
+import { auth, routing } from "$lib/utils/global_state.svelte";
 
 $effect(() => {
 	if (!auth.loggedIn && auth.loggedInSettled) {

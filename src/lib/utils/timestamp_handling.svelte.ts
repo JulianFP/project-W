@@ -1,5 +1,5 @@
 export function timeAgo(date: Date): [string, number | null] {
-	const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+	const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
 
 	let interval = Math.floor(seconds / 31536000);
 	if (interval > 1) {

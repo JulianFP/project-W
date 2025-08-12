@@ -1,6 +1,6 @@
 <script>
-import { page } from "$app/state";
 import { Heading, P } from "flowbite-svelte";
+import { page } from "$app/state";
 </script>
 
 <div class="flex flex-col gap-4 m-4">

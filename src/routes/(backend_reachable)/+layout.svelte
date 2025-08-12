@@ -1,10 +1,5 @@
 <script lang="ts">
 import "../../app.css";
-import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-import { routing } from "$lib/utils/global_state.svelte";
-import { alerts, auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError, delet } from "$lib/utils/httpRequests.svelte";
-import type { components } from "$lib/utils/schema";
 import {
 	Alert,
 	Avatar,
@@ -30,6 +25,10 @@ import {
 	UserEditSolid,
 } from "flowbite-svelte-icons";
 import type { Snippet } from "svelte";
+import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+import { alerts, auth, routing } from "$lib/utils/global_state.svelte";
+import { BackendCommError, delet } from "$lib/utils/httpRequests.svelte";
+import type { components } from "$lib/utils/schema";
 
 let dropDownOpen = $state(false);
 

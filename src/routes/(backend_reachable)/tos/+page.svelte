@@ -1,6 +1,6 @@
 <script lang="ts">
-import CenterPage from "$lib/components/centerPage.svelte";
 import { Heading, P } from "flowbite-svelte";
+import CenterPage from "$lib/components/centerPage.svelte";
 
 import type { components } from "$lib/utils/schema";
 
