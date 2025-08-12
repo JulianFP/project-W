@@ -112,7 +112,7 @@ async function submitJob(): Promise<void> {
 				}
 			}
 		} catch (err: unknown) {
-			let errorMsg = "Error occurred while trying to submit job settings: ";
+			let errorMsg = "Error occured while trying to submit job settings: ";
 			if (err instanceof BackendCommError) {
 				errorMsg += err.message;
 			} else {

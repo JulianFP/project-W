@@ -24,7 +24,7 @@ async function activate(): Promise<void> {
 			errorMsg = err.message;
 		}
 		alerts.push({
-			msg: `Error occurred during account activation: ${errorMsg}`,
+			msg: `Error occured during account activation: ${errorMsg}`,
 			color: "red",
 		});
 	}

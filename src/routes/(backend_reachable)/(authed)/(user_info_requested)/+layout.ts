@@ -26,7 +26,7 @@ export const load: LayoutLoad = async ({ fetch, depends }) => {
 			} else {
 				error(
 					400,
-					"Unknown error occurred while querying user info from backend",
+					"Unknown error occured while querying user info from backend",
 				);
 			}
 		}
