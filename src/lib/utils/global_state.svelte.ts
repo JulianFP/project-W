@@ -1,37 +1,58 @@
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
+import { BackendCommError, get } from "./httpRequests.svelte";
+import type { components } from "./schema";
+
+type User = components["schemas"]["User"];
 
 class AuthManager {
-	#authHeader = $state<Record<string, string>>({});
-	loggedIn = $derived<boolean>("Authorization" in this.#authHeader);
+	//set logged in by default so that it tries to use authenticated route first before failing and logging out
+	#userDataFromCheck: User | null = null;
+	loggedIn = $state<boolean>(false);
+	loggedInSettled = $state<boolean>(false);
+	awaitLoggedIn: Promise<void> | null = null;
 
-	updateTokenFromStorage() {
+	async checkLoggedIn(): Promise<void> {
 		try {
-			//put this in try block because this will throw if executed on the server-side (which is being tested during build)
-			const returnVal: string | null = localStorage.getItem("authHeader");
-			if (returnVal)
-				this.#authHeader = { Authorization: `Bearer ${returnVal}` };
+			const user_info = await get<User>(
+				"users/info",
+				{},
+				{},
+				window.fetch,
+				true,
+			);
+			this.#userDataFromCheck = user_info;
+			this.loggedIn = true;
 		} catch (err: unknown) {
-			return;
+			if (err instanceof BackendCommError && err.status === 401) {
+				this.loggedIn = false;
+			}
 		}
+		this.loggedInSettled = true;
 	}
 
 	constructor() {
-		this.updateTokenFromStorage();
+		this.awaitLoggedIn = this.checkLoggedIn();
 	}
 
-	setToken(token: string) {
-		this.#authHeader = { Authorization: `Bearer ${token}` };
-		localStorage.setItem("authHeader", token);
+	login() {
+		this.loggedIn = true;
 	}
 
-	forgetToken() {
-		this.#authHeader = {};
-		localStorage.removeItem("authHeader");
+	logout(detail: string | null = null) {
+		if (detail != null) {
+			alerts.push({
+				msg: `You have been logged out: ${detail}`,
+				color: "red",
+			});
+		}
+		this.loggedIn = false;
 	}
 
-	getAuthHeader() {
-		return this.#authHeader;
+	getUserDataFromCheck(): User | null {
+		const userData = this.#userDataFromCheck;
+		this.#userDataFromCheck = null;
+		return userData;
 	}
 }
 

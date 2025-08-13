@@ -1,7 +1,8 @@
 <script lang="ts">
 import { ButtonGroup, Helper, Label, Modal, P } from "flowbite-svelte";
 
-import { BackendCommError, getLoggedIn } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import type { components } from "$lib/utils/schema";
 import Button from "./button.svelte";
 import WaitingSubmitButton from "./waitingSubmitButton.svelte";
@@ -89,8 +90,9 @@ async function downloadTranscript(): Promise<void> {
 		element.download = `${job_file_name.replace(
 			/\.[^/.]+$/,
 			"",
-		)}_transcribed.${format_ending}`;
+		)}.${format_ending}`;
 		element.click();
+		open = false;
 	} catch (err: unknown) {
 		if (err instanceof BackendCommError) {
 			errorMsg = err.message;
@@ -100,7 +102,6 @@ async function downloadTranscript(): Promise<void> {
 		error = true;
 	}
 
-	open = false;
 	waiting = false;
 	await post_action();
 }

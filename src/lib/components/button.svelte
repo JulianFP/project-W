@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Button } from "flowbite-svelte";
 import type { ButtonProps } from "flowbite-svelte";
+import { Button } from "flowbite-svelte";
 
 const props: ButtonProps = $props();
 const { class: string, disabled, color, ...rest } = props;

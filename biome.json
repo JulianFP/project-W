@@ -1,7 +1,7 @@
 {
 	"overrides": [
 		{
-			"include": ["*.svelte", "*.vue"],
+			"includes": ["**/*.svelte", "**/*.astro", "**/*.vue"],
 			"linter": {
 				"rules": {
 					"style": {
@@ -9,7 +9,8 @@
 						"useImportType": "off"
 					},
 					"correctness": {
-						"noSelfAssign": "off"
+						"noUnusedVariables": "off",
+						"noUnusedImports": "off"
 					}
 				}
 			}

@@ -3,7 +3,8 @@ import { Helper, Input, Label, Span } from "flowbite-svelte";
 import { CloseOutline, PenSolid } from "flowbite-svelte-icons";
 
 import { alerts } from "$lib/utils/global_state.svelte";
-import { BackendCommError, postLoggedIn } from "$lib/utils/httpRequests.svelte";
+import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 import Button from "./button.svelte";
 import ConfirmPasswordModal from "./confirmPasswordModal.svelte";
 

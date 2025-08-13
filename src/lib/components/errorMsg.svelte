@@ -1,5 +1,6 @@
 <script lang="ts">
 import { P } from "flowbite-svelte";
+
 interface Props {
 	children?: import("svelte").Snippet;
 }

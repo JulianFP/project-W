@@ -1,6 +1,4 @@
 import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-import { alerts, auth } from "./global_state.svelte";
-import { routing } from "./global_state.svelte";
 import type { components } from "./schema";
 
 type ValidationError = components["schemas"]["ValidationError"];
@@ -19,8 +17,17 @@ export class BackendCommError extends Error {
 }
 
 async function response_parser<ResponseType>(
-	response: Response,
+	fetch_method: () => Promise<Response>,
 ): Promise<ResponseType> {
+	let response: Response;
+	try {
+		response = await fetch_method();
+	} catch (err: unknown) {
+		if (err instanceof TypeError) {
+			throw new BackendCommError(500, err.message);
+		}
+		throw new BackendCommError(500, "Unknown error");
+	}
 	const contentType = response.headers.get("content-type");
 	let is_json = false;
 	if (contentType?.includes("application/json")) {
@@ -50,45 +57,7 @@ async function response_parser<ResponseType>(
 			"Backend returned non-json value",
 		);
 	}
-	const result: ResponseType = await response.json();
-	return result;
-}
-
-async function loggedInWrapper<ResponseType>(
-	query_method: () => Promise<ResponseType>,
-	depth = 0,
-): Promise<ResponseType> {
-	if (auth.loggedIn) {
-		try {
-			return await query_method();
-		} catch (error: unknown) {
-			if (error instanceof BackendCommError && error.status === 401) {
-				//update and try again (maybe the user logged in in a different tab?)
-				if (depth < 0) {
-					auth.updateTokenFromStorage();
-					return await loggedInWrapper(query_method, depth + 1);
-				}
-				auth.forgetToken();
-				alerts.push({
-					msg: `You have been logged out: ${error.message}`,
-					color: "red",
-				});
-				await routing.dest_forward();
-			}
-			throw error;
-		}
-	} else if (depth < 0) {
-		auth.updateTokenFromStorage();
-		return await loggedInWrapper(query_method, depth + 1);
-	} else {
-		auth.forgetToken();
-		alerts.push({
-			msg: "You are not logged in anymore",
-			color: "red",
-		});
-		await routing.dest_forward();
-		throw new BackendCommError(401, "Not logged in");
-	}
+	return await response.json();
 }
 
 export async function get<ResponseType>(
@@ -96,27 +65,20 @@ export async function get<ResponseType>(
 	args: Record<string, string> | string[][] = {},
 	headers: Record<string, string> = {},
 	fetch = window.fetch,
+	include_credentials = false,
 ): Promise<ResponseType> {
 	const argsObj: URLSearchParams = new URLSearchParams(args);
-	const response: Response = await fetch(
-		`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
-		{
-			method: "GET",
-			headers: headers,
-		},
-	);
-	return await response_parser<ResponseType>(response);
-}
-
-export async function getLoggedIn<ResponseType>(
-	route: string,
-	args: Record<string, string> | string[][] = {},
-	fetch = window.fetch,
-): Promise<ResponseType> {
-	const query_method = async () => {
-		return await get<ResponseType>(route, args, auth.getAuthHeader(), fetch);
+	const fetch_method = () => {
+		return fetch(
+			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
+			{
+				method: "GET",
+				headers: headers,
+				credentials: include_credentials ? "include" : "omit",
+			},
+		);
 	};
-	return loggedInWrapper<ResponseType>(query_method);
+	return await response_parser<ResponseType>(fetch_method);
 }
 
 export async function post<ResponseType>(
@@ -126,56 +88,43 @@ export async function post<ResponseType>(
 	args: Record<string, string> | string[][] = {},
 	headers: Record<string, string> = {},
 	fetch = window.fetch,
+	include_credentials = false,
 ): Promise<ResponseType> {
-	let response: Response;
+	let fetch_method: () => Promise<Response>;
 	const argsObj: URLSearchParams = new URLSearchParams(args);
 	if (body_as_form_url_encoded) {
 		const formData = new URLSearchParams(body);
-		response = await fetch(
-			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/x-www-form-urlencoded",
-					...headers,
+		fetch_method = () => {
+			return fetch(
+				`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/x-www-form-urlencoded",
+						...headers,
+					},
+					body: formData,
+					credentials: include_credentials ? "include" : "omit",
 				},
-				body: formData,
-			},
-		);
+			);
+		};
 	} else {
-		response = await fetch(
-			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					...headers,
+		fetch_method = () => {
+			return fetch(
+				`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						...headers,
+					},
+					body: JSON.stringify(body),
+					credentials: include_credentials ? "include" : "omit",
 				},
-				body: JSON.stringify(body),
-			},
-		);
+			);
+		};
 	}
-	return await response_parser<ResponseType>(response);
-}
-
-export async function postLoggedIn<ResponseType>(
-	route: string,
-	body = {},
-	body_as_form_url_encoded = false,
-	args: Record<string, string> | string[][] = {},
-	fetch = window.fetch,
-): Promise<ResponseType> {
-	const query_method = async () => {
-		return await post<ResponseType>(
-			route,
-			body,
-			body_as_form_url_encoded,
-			args,
-			auth.getAuthHeader(),
-			fetch,
-		);
-	};
-	return await loggedInWrapper<ResponseType>(query_method);
+	return await response_parser<ResponseType>(fetch_method);
 }
 
 export async function delet<ResponseType>(
@@ -184,36 +133,22 @@ export async function delet<ResponseType>(
 	args: Record<string, string> | string[][] = {},
 	headers: Record<string, string> = {},
 	fetch = window.fetch,
+	include_credentials = false,
 ): Promise<ResponseType> {
 	const argsObj: URLSearchParams = new URLSearchParams(args);
-	const response: Response = await fetch(
-		`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
-		{
-			method: "DELETE",
-			headers: {
-				"Content-Type": "application/json",
-				...headers,
+	const fetch_method = () => {
+		return fetch(
+			`${PUBLIC_BACKEND_BASE_URL}/api/${route}?${argsObj.toString()}`,
+			{
+				method: "DELETE",
+				headers: {
+					"Content-Type": "application/json",
+					...headers,
+				},
+				body: JSON.stringify(body),
+				credentials: include_credentials ? "include" : "omit",
 			},
-			body: JSON.stringify(body),
-		},
-	);
-	return await response_parser<ResponseType>(response);
-}
-
-export async function deletLoggedIn<ResponseType>(
-	route: string,
-	body = {},
-	args: Record<string, string> | string[][] = {},
-	fetch = window.fetch,
-): Promise<ResponseType> {
-	const query_method = async () => {
-		return await delet<ResponseType>(
-			route,
-			body,
-			args,
-			auth.getAuthHeader(),
-			fetch,
 		);
 	};
-	return loggedInWrapper<ResponseType>(query_method);
+	return await response_parser<ResponseType>(fetch_method);
 }
