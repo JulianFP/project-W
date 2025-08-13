@@ -77,7 +77,6 @@ pkgs.mkShell {
     with pkgs;
     [
       (python313.withPackages myPythonPackages)
-      (poetry.override { python3 = python313; })
     ]
     ++ pre-commit-check.enabledPackages;
 
