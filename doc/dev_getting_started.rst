@@ -134,7 +134,7 @@ Now you can access the website over the url `http://localhost:5173` in your brow
 
 The development build variables are declared in the file `.env.development`. We currently just have one variable: `VITE_BACKEND_BASE_URL`. It defines the url of the backend that the frontend should use. If it is not defined then the frontend will assume that the backend is hosted on the same origin than the frontend. The default value is set to the port under which the development server of the backend runs per default (on the same machine). You can also set/overwrite this by setting an environment variable in your terminal.
 
-If you want to compile the project into raw HTML, CSS and Javscript files  then run
+If you want to compile the project into raw HTML, CSS and Javascript files  then run
 
    .. code-block:: console
 

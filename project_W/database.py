@@ -93,14 +93,14 @@ class DatabaseAdapter(ABC):
     @abstractmethod
     async def open(self):
         """
-        This method should initiate the databse connection(s), make sure the schema, tables and metadata exist and are valid by creating them if missing or migrating them from an older version. All of that should be part of a single transaction. This method will be called before any other of this class.
+        This method should initiate the database connection(s), make sure the schema, tables and metadata exist and are valid by creating them if missing or migrating them from an older version. All of that should be part of a single transaction. This method will be called before any other of this class.
         """
         pass
 
     @abstractmethod
     async def close(self):
         """
-        This method should close all transactions and connections and do anything else that needs to be done before the application can savely shutdown. This method will be called last after any other of this class.
+        This method should close all transactions and connections and do anything else that needs to be done before the application can safely shutdown. This method will be called last after any other of this class.
         """
         pass
 

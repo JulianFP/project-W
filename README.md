@@ -18,7 +18,7 @@ This is where Project W comes in: It is designed so that everything can be hoste
 
 ## Why are there three repositories?
 
-Project W consists of three components: The frontend/client, the backend, and the runner. We decided to host them on different git repositories to seperate them better.
+Project W consists of three components: The frontend/client, the backend, and the runner. We decided to host them on different git repositories to separate them better.
 
 ![UML-diagram](https://github.com/JulianFP/project-W/assets/70963316/717c278c-e985-47d4-9b97-3b861dbe99ca)
 

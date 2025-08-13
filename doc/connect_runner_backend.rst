@@ -114,7 +114,7 @@ Add an `admin_query` section to your LDAP provider config:
         password: <service account bind password>
       username_attributes:
          <list of ldap attributes that can be used as a username during login>
-      uid_attribute: <ldap attribute contaning unique user identifier>
+      uid_attribute: <ldap attribute containing unique user identifier>
       mail_attribute: <ldap attribute which contains users mail address>
       user_query:
         base_dn: <base dn under which normal users can be found>
@@ -138,7 +138,7 @@ Alternatively if you want to setup a new ldap provider just for admin users then
          password: <service account bind password>
        username_attributes:
          <list of ldap attributes that can be used as a username during login>
-       uid_attribute: <ldap attribute contaning unique user identifier>
+       uid_attribute: <ldap attribute containing unique user identifier>
        mail_attribute: <ldap attribute which contains users mail address>
        user_query:
          base_dn: <base dn under which normal users can be found>
@@ -151,7 +151,7 @@ Alternatively if you want to setup a new ldap provider just for admin users then
          password: <service account bind password>
        username_attributes:
          <list of ldap attributes that can be used as a username during login>
-       uid_attribute: <ldap attribute contaning unique user identifier>
+       uid_attribute: <ldap attribute containing unique user identifier>
        mail_attribute: <ldap attribute which contains users mail address>
        admin_query:
          base_dn: <base dn under which admin users can be found>

@@ -81,7 +81,7 @@ async def get_new_api_token(
     name: str,
 ) -> str:
     """
-    Create a new API token. The main difference between API tokens and regular auth tokens is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfuly response contains the newly created token.
+    Create a new API token. The main difference between API tokens and regular auth tokens is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfully response contains the newly created token.
     """
     # check if current user is from a provider which allows creation of api tokens
     disabled_exc = HTTPException(

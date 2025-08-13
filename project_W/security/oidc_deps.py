@@ -64,7 +64,7 @@ async def register_with_oidc_providers(config: Settings):
                 oidc_config = (await client.get(metadata_uri)).raise_for_status().json()
             except (HTTPError, HTTPStatusError, JSONDecodeError) as e:
                 raise Exception(
-                    f"Error occured while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
+                    f"Error occurred while trying to connect to the metadata uri of the oidc provider '{name}': {type(e).__name__}"
                 )
             issuer = oidc_config["issuer"]
             oauth_iss_to_nice_name[issuer] = name

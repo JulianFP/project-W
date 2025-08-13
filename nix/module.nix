@@ -57,7 +57,7 @@ in
           JWT_SECRET_KEY=<your jwt secret key>
           SMTP_PASSWORD=<password of your user at your smtp server>
           ```
-          This file should be accessable by the user [user](${cfg_str}.user) and by this user only!
+          This file should be accessible by the user [user](${cfg_str}.user) and by this user only!
         '';
       };
     };

@@ -72,7 +72,7 @@ This config adds two separate terms of services. The user has to explicitly acce
 
 The version field can't be omitted and is important when updating the terms of services: If you increase the version integer all users will have to re-read and re-accept this term of service. Always increase the version if you make significant changes to the terms of services.
 
-Never change the keys of these attributes sets (here 0 and 1) since they are being used to identify each term of service. If you want to remove a term of service then never re-use that same key for a different term of service in the future as the users will still have accepted the term of service with that key even if it has been removed from the config. The name and tos_html of the term of service however can be changed as much as you want (just consider to increase the version field alongside it).
+Never change the keys of these attributes sets (here 0 and 1) since they are being used to identify each term of service. If you want to remove a term of service then never reuse that same key for a different term of service in the future as the users will still have accepted the term of service with that key even if it has been removed from the config. The name and tos_html of the term of service however can be changed as much as you want (just consider to increase the version field alongside it).
 
 Basic OIDC login with Google
 ----------------------------

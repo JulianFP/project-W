@@ -280,7 +280,7 @@ class RedisAdapter(CachingAdapter):
                 return OnlineRunner.model_validate(runner_dict)
             except ValidationError:
                 self.logger.error(
-                    f"Validation error occured while reading from redis! The following data was read instead of an OnlineRunner object: {runner_dict}. Continuing..."
+                    f"Validation error occurred while reading from redis! The following data was read instead of an OnlineRunner object: {runner_dict}. Continuing..."
                 )
                 return None
 
@@ -466,7 +466,7 @@ class RedisAdapter(CachingAdapter):
                 return InProcessJob.model_validate(job_dict)
             except ValidationError:
                 self.logger.error(
-                    f"Validation error occured while reading from redis! The following data was read instead of an InProcessJob object: {job_dict}. Continuing..."
+                    f"Validation error occurred while reading from redis! The following data was read instead of an InProcessJob object: {job_dict}. Continuing..."
                 )
                 return None
 
