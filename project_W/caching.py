@@ -12,9 +12,9 @@ import project_W.dependencies as dp
 from project_W.models.request_data import RunnerRegisterRequest
 
 from .logger import get_logger
-from .models.internal import InProcessJob, OnlineRunner
+from .models.internal import InProcessJob, OnlineRunner, SSEEvent
 from .models.settings import RedisConnection
-from .utils import hash_runner_token
+from .utils import hash_token
 
 
 class CachingAdapter(ABC):
@@ -155,6 +155,13 @@ class CachingAdapter(ABC):
         pass
 
     @abstractmethod
+    async def send_event(self, user_id: int, event: SSEEvent, data: str):
+        """
+        Sends an SSE event to event_generator
+        """
+        pass
+
+    @abstractmethod
     async def event_generator(self, user_id: int) -> AsyncGenerator[str, None]:
         """
         This is a Generator method that returns events regarding jobs
@@ -164,7 +171,6 @@ class CachingAdapter(ABC):
 
 
 class RedisAdapter(CachingAdapter):
-
     minimal_required_redis_version = [7, 2]
 
     __heartbeat_timeout = 60
@@ -179,8 +185,8 @@ class RedisAdapter(CachingAdapter):
     def __get_job_key(self, job_id: int) -> str:
         return f"in_process_job:{str(job_id)}"
 
-    def __get_pubsub_channel(self, user_id: int) -> str:
-        return f"job_events:{str(user_id)}"
+    def __get_pubsub_channel(self, event: SSEEvent, user_id: int) -> str:
+        return f"{event.value}:{str(user_id)}"
 
     async def open(self, connection_obj: RedisConnection):
         # 3 retries on timeout
@@ -231,7 +237,7 @@ class RedisAdapter(CachingAdapter):
         self, runner_id: int, runner_data: RunnerRegisterRequest
     ) -> str:
         token = secrets.token_urlsafe()
-        token_hash = hash_runner_token(token)
+        token_hash = hash_token(token)
         async with self.client.pipeline(transaction=True) as pipe:
             key_name = self.__get_runner_key(runner_id)
             runner_dump = runner_data.model_dump(exclude_none=True)
@@ -274,7 +280,7 @@ class RedisAdapter(CachingAdapter):
                 return OnlineRunner.model_validate(runner_dict)
             except ValidationError:
                 self.logger.error(
-                    f"Validation error occured while reading from redis! The following data was read instead of an OnlineRunner object: {runner_dict}. Continuing..."
+                    f"Validation error occurred while reading from redis! The following data was read instead of an OnlineRunner object: {runner_dict}. Continuing..."
                 )
                 return None
 
@@ -298,7 +304,7 @@ class RedisAdapter(CachingAdapter):
             pipe.delete(self.__get_job_key(job_id))
             pipe.zrem(self.__job_queue_sorted_set_name, job_id)
             if user_id is not None:
-                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+                self.__send_event(pipe, user_id, SSEEvent.JOB_UPDATED, str(job_id))
             await pipe.execute()
             if user_id is None:
                 raise Exception(f"Redis didn't return a user_id for the job with id {job_id}!")
@@ -320,7 +326,7 @@ class RedisAdapter(CachingAdapter):
                     await pipe.execute()
                     await dp.db.finish_failed_job(job_id, "Job was aborted")
                 if user_id is not None:
-                    pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+                    self.__send_event(pipe, user_id, SSEEvent.JOB_UPDATED, str(job_id))
                 await pipe.execute()
                 if user_id is None:
                     raise Exception(f"Redis didn't return a user_id for the job with id {job_id}!")
@@ -380,7 +386,7 @@ class RedisAdapter(CachingAdapter):
                 "abort": 0,
             },
         )
-        pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+        self.__send_event(pipe, user_id, SSEEvent.JOB_UPDATED, str(job_id))
         await pipe.execute()
         await self.__reset_runner_expiration(
             pipe, runner_id
@@ -412,7 +418,7 @@ class RedisAdapter(CachingAdapter):
                     pipe.zrem(self.__job_queue_sorted_set_name, job_id)
                     await pipe.execute()
                     await dp.db.finish_failed_job(job_id, "Job was aborted")
-                    pipe.publish(self.__get_pubsub_channel(job.user_id), job_id)
+                    self.__send_event(pipe, job.user_id, SSEEvent.JOB_UPDATED, str(job_id))
                     await pipe.execute()
                     skip_job = True
             while skip_job:
@@ -436,11 +442,11 @@ class RedisAdapter(CachingAdapter):
                         pipe.zrem(self.__job_queue_sorted_set_name, job_id)
                         await pipe.execute()
                         await dp.db.finish_failed_job(job_id, "Job was aborted")
-                        pipe.publish(self.__get_pubsub_channel(job.user_id), job_id)
+                        self.__send_event(pipe, job.user_id, SSEEvent.JOB_UPDATED, str(job_id))
                         await pipe.execute()
                         skip_job = True
 
-            # query user id from database for event publish
+            # query user id from database for sending event
             user_id = await dp.db.get_user_id_of_job(job_id)
             if user_id is None:
                 raise Exception(
@@ -460,7 +466,7 @@ class RedisAdapter(CachingAdapter):
                 return InProcessJob.model_validate(job_dict)
             except ValidationError:
                 self.logger.error(
-                    f"Validation error occured while reading from redis! The following data was read instead of an InProcessJob object: {job_dict}. Continuing..."
+                    f"Validation error occurred while reading from redis! The following data was read instead of an InProcessJob object: {job_dict}. Continuing..."
                 )
                 return None
 
@@ -470,7 +476,7 @@ class RedisAdapter(CachingAdapter):
             (user_id,) = await pipe.execute()
             pipe.hset(self.__get_job_key(job_id), "abort", "1")
             if user_id is not None:
-                pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+                self.__send_event(pipe, user_id, SSEEvent.JOB_UPDATED, str(job_id))
             await pipe.execute()
             if user_id is None:
                 raise Exception(f"Redis didn't return a user_id for the job with id {job_id}!")
@@ -480,7 +486,7 @@ class RedisAdapter(CachingAdapter):
             pipe.hget(self.__get_job_key(job_id), "user_id")
             (user_id,) = await pipe.execute()
             pipe.hset(self.__get_job_key(job_id), "progress", str(progress))
-            pipe.publish(self.__get_pubsub_channel(user_id), job_id)
+            self.__send_event(pipe, user_id, SSEEvent.JOB_UPDATED, str(job_id))
             await pipe.execute()
 
     async def queue_contains_job(self, job_id: int) -> bool:
@@ -491,9 +497,20 @@ class RedisAdapter(CachingAdapter):
                 return False
             return True
 
+    def __send_event(self, pipe: Pipeline, user_id: int, event: SSEEvent, data: str):
+        pipe.publish(self.__get_pubsub_channel(event, user_id), data)
+
+    async def send_event(self, user_id: int, event: SSEEvent, data: str):
+        async with self.client.pipeline(transaction=True) as pipe:
+            self.__send_event(pipe, user_id, event, data)
+            await pipe.execute()
+
     async def event_generator(self, user_id: int) -> AsyncGenerator[str, None]:
         async with self.client.pubsub() as pubsub:
-            await pubsub.subscribe(self.__get_pubsub_channel(user_id))
+            for event in SSEEvent:
+                await pubsub.subscribe(self.__get_pubsub_channel(event, user_id))
             async for message in pubsub.listen():
-                data = message["data"]
-                yield f"event: job_updated\ndata: {data}\n\n"
+                if message["type"] == "message":
+                    event = message["channel"].split(":")[0]
+                    data = message["data"]
+                    yield f"event: {event}\ndata: {data}\n\n"

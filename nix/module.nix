@@ -52,12 +52,12 @@ in
         default = null;
         example = "/run/secrets/secretFile";
         description = ''
-          Path to file to load secrets from. All secrets should be written as environment variables (in NAME=VALUE declerations, one per line). The content of the file most likely should look something like this (assuming that you used the !ENV expression in the settings section for session_secret_key and smtp password):
+          Path to file to load secrets from. All secrets should be written as environment variables (in NAME=VALUE declarations, one per line). The content of the file most likely should look something like this (assuming that you used the !ENV expression in the settings section for session_secret_key and smtp password):
           ```
           JWT_SECRET_KEY=<your jwt secret key>
           SMTP_PASSWORD=<password of your user at your smtp server>
           ```
-          This file should be accessable by the user [user](${cfg_str}.user) and by this user only!
+          This file should be accessible by the user [user](${cfg_str}.user) and by this user only!
         '';
       };
     };

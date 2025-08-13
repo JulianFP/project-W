@@ -10,11 +10,7 @@ from .base import (
     UserInDb,
 )
 from .request_data import JobSettings, RunnerRegisterRequest
-from .response_data import TokenSecretInfo, UserTypeEnum
-
-
-class UserInDbAll(UserInDb, AdditionalUserInfo):
-    pass
+from .response_data import TokenInfo, User
 
 
 # user models for the database
@@ -57,6 +53,7 @@ class JobInDb(JobBase):
     user_id: int
     job_settings_id: int | None = None
     audio_oid: int | None = None
+    nonce: str | None = None
 
 
 class JobAndSettingsInDb(JobInDb):
@@ -67,31 +64,33 @@ class JobSettingsInDb(BaseModel):
     settings: JobSettings
 
 
+class TokenInfoInternal(TokenInfo):
+    user_id: int
+    oidc_refresh_token_id: int | None = None
+
+
+class LdapTokenInfoInternal(TokenInfoInternal):
+    provider_name: str
+    uid: str
+
+
+class OidcTokenInfoInternal(TokenInfoInternal):
+    iss: str
+    sub: str
+
+
+class LoginContext(BaseModel):
+    user: User
+    token: TokenInfoInternal
+
+
 class AccountActivationTokenData(BaseModel):
     old_email: EmailValidated
-    new_email: EmailValidated
+    new_email: EmailValidated | None = None
 
 
 class PasswordResetTokenData(BaseModel):
     email: EmailValidated
-
-
-class AuthTokenData(BaseModel):
-    user_type: UserTypeEnum
-    sub: str
-    email: EmailValidated
-    is_verified: bool
-
-
-class DecodedAuthTokenData(AuthTokenData):
-    token_id: int | None = None
-    is_admin: bool
-    iss: str
-
-
-class TokenSecret(TokenSecretInfo):
-    user_id: int
-    secret: str = Field(min_length=32, max_length=32)
 
 
 class LdapUserInfo(BaseModel):
@@ -130,3 +129,9 @@ class OnlineRunner(RunnerRegisterRequest):
     assigned_job_id: int | None = None
     in_process: bool = False
     session_token_hash: str = Field(min_length=43, max_length=43)
+
+
+class SSEEvent(str, Enum):
+    JOB_UPDATED = "job_updated"
+    JOB_CREATED = "job_created"
+    JOB_DELETED = "job_deleted"

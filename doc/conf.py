@@ -70,9 +70,7 @@ config_dict = {
         "connection_string": "redis://localhost:6379/project-W",
     },
     "security": {
-        "local_token": {
-            "session_secret_key": "f26a5feb0eb502fb2b4f872026ce7b5d3986dbfef77d72d3f29050df2f8b3bdb",
-        },
+        "secret_key": "f26a5feb0eb502fb2b4f872026ce7b5d3986dbfef77d72d3f29050df2f8b3bdb",
     },
     "smtp_server": {
         "hostname": "example.org",
@@ -96,7 +94,6 @@ import os
 import sys
 
 sys.path.append(os.path.abspath("."))
-import runner_settings
 
 autodoc_pydantic_model_show_field_summary = False
 autodoc_pydantic_model_show_config_summary = False

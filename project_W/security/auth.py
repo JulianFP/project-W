@@ -1,25 +1,23 @@
-import json
-from base64 import urlsafe_b64decode
+from datetime import datetime, timezone
 from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Response, status
+from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import SecretStr
 
 import project_W.dependencies as dp
-from project_W.models.response_data import User
 
 from ..logger import get_logger
-from ..models.internal import DecodedAuthTokenData, OnlineRunner
-from ..models.response_data import ErrorResponse, User, UserTypeEnum
-from ..utils import hash_runner_token
-from .ldap_deps import lookup_ldap_user_in_db_from_token
-from .local_account_deps import lookup_local_user_in_db_from_token
-from .local_token import jwt_issuer, validate_local_auth_token
-from .oidc_deps import (
-    lookup_oidc_user_in_db_from_api_token,
-    lookup_oidc_user_in_db_from_token,
-    validate_oidc_token,
+from ..models.internal import (
+    LdapUserInDb,
+    LocalUserInDbAll,
+    LoginContext,
+    OidcUserInDb,
+    OnlineRunner,
 )
+from ..models.response_data import ErrorResponse, User, UserTypeEnum
+from ..utils import hash_token
+from .oidc_deps import get_provider_name
 
 logger = get_logger("project-W")
 
@@ -32,7 +30,7 @@ auth_dependency_responses: dict[int | str, dict[str, Any]] = {
                 "type": "string",
             }
         },
-        "description": "Validation error of JWT token",
+        "description": "Validation error of auth token, or not authenticated",
     },
     403: {
         "model": ErrorResponse,
@@ -52,7 +50,7 @@ runner_dependency_responses: dict[int | str, dict[str, Any]] = {
                 "type": "string",
             }
         },
-        "description": "No runner with that token exists",
+        "description": "No runner with that token exists, nor not authenticated",
     },
 }
 online_runner_dependency_responses: dict[int | str, dict[str, Any]] = {
@@ -62,83 +60,125 @@ online_runner_dependency_responses: dict[int | str, dict[str, Any]] = {
     },
 }
 
-get_token = HTTPBearer(
+get_bearer = HTTPBearer(
     bearerFormat="Bearer",
-    scheme_name="JWT token (from local account, oidc or ldap auth) or runner token",
+    scheme_name="Auth & runner token",
     description="""
-    A valid JWT token returned by one of the following login routes:
+    A valid auth token returned by one of the following login routes:
     - local account: /local-account/login
     - oidc: /oidc/login/{idp_name}
     - ldap: /ldap/login/{idp_name}
     Which of these are available with what idp's depends on the server configuration
+    This is the same token as in the APIKeyCookie 'Auth token' authentication, but in an HTTPBearer format which might be nicer for scripting and so on using the long lived API tokens.
+    The runners will also put a runner token here, obtained from the /admins/create_runner route
+    """,
+    auto_error=False,
+)
+get_cookie = APIKeyCookie(
+    name="token",
+    scheme_name="Auth token",
+    description="""
+    A valid auth token returned by one of the following login routes:
+    - local account: /local-account/login
+    - oidc: /oidc/login/{idp_name}
+    - ldap: /ldap/login/{idp_name}
+    Which of these are available with what idp's depends on the server configuration
+    This is the same token as in the HTTPBearer 'Auth token' authentication, but in a cookie format which is nicer for inside the browser with temporary sessions.
     For the /runners/ routes you need to obtain a runner token from the /admins/create_runner route
     """,
+    auto_error=False,
 )
 
 
-def get_payload_from_token(token: str) -> dict:
-    payload = token.split(".")[1]
-    payload_padded = payload + "=" * divmod(len(payload), 4)[1]
-    payload_decoded = urlsafe_b64decode(payload_padded)
-    return json.loads(payload_decoded)
+admin_user_scope = "admin"
 
 
-def validate_user(require_verified: bool, require_admin: bool):
+def check_admin_privileges(scopes: list[str], is_admin: bool) -> bool:
+    # make sure that we only assign scopes that the user has permissions for (currently only is_admin, can be replaced with attribute set in the future)
+    admin_privileges = False
+    for scope in scopes:
+        if scope == admin_user_scope:
+            if not is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Your user isn't an admin",
+                )
+            admin_privileges = True
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="We don't support that token permission scope",
+            )
+    return admin_privileges
+
+
+def set_token_cookie(response: Response, token: SecretStr):
+    max_age_secs = dp.config.security.tokens.session_expiration_time_minutes * 60
+    response.set_cookie(key="token", value=token.get_secret_value(), max_age=max_age_secs)
+
+
+def unset_cookie(response: Response):
+    response.set_cookie(key="token", value="")
+
+
+def validate_user(
+    require_verified: bool,
+    require_admin: bool,
+    require_tos: bool,
+    no_provisioned_users: bool = False,
+):
     async def user_validation_dep(
-        token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)],
-    ) -> DecodedAuthTokenData:
-        # first check how this token was generated without verifying the signature
-        token_payload = get_payload_from_token(token.credentials)
-        iss = token_payload.get("iss")
-        if iss is None:
+        bearer_token: Annotated[HTTPAuthorizationCredentials | None, Depends(get_bearer)],
+        cookie_token: Annotated[str | None, Depends(get_cookie)],
+        response: Response,
+    ) -> LoginContext:
+        if bearer_token is not None:
+            token = bearer_token.credentials
+        elif cookie_token is not None:
+            token = cookie_token
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+            )
+
+        result = await dp.db.get_user_by_token(token)
+        if result is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate token",
-                # can't put scope here because if the issuer is unknown we also don't know which scope might be required
-                headers={"WWW-Authenticate": "Bearer"},
             )
-        if iss == jwt_issuer:
-            token_data = await validate_local_auth_token(
-                dp.config, token.credentials, token_payload
-            )
-        else:
-            token_data = await validate_oidc_token(token.credentials, iss)
+        (user, token_info) = result
 
-        if require_verified and not token_data.is_verified:
+        if isinstance(user, LocalUserInDbAll):
+            user_type = UserTypeEnum.LOCAL
+            provider_name = "project-W"
+            is_verified = user.is_verified
+        elif isinstance(user, OidcUserInDb):
+            user_type = UserTypeEnum.OIDC
+            provider_name = get_provider_name(user.iss)
+            is_verified = True
+        elif isinstance(user, LdapUserInDb):
+            user_type = UserTypeEnum.LDAP
+            provider_name = user.provider_name
+            is_verified = True
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Couldn't read user type from database!",
+            )
+
+        if require_verified and not is_verified:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Your email address needs to be verified to access this route. Please click on the link sent to '{token_data.email.root}' or request a new confirmation email.",
+                detail=f"Your email address needs to be verified to access this route. Please click on the link sent to '{user.email.root}' or request a new confirmation email.",
             )
 
-        if require_admin and not token_data.is_admin:
+        if require_admin and not token_info.admin_privileges:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not enough permissions",
-                headers={"WWW-Authenticate": "Bearer"},
             )
-
-        return token_data
-
-    return user_validation_dep
-
-
-def validate_user_and_get_from_db(require_verified: bool, require_admin: bool, require_tos: bool):
-    async def user_lookup_dep(
-        user_token_data: Annotated[
-            DecodedAuthTokenData, Depends(validate_user(require_verified, require_admin))
-        ],
-    ) -> User:
-        if user_token_data.user_type == UserTypeEnum.LOCAL:
-            user = await lookup_local_user_in_db_from_token(user_token_data)
-        elif user_token_data.user_type == UserTypeEnum.LDAP:
-            user = await lookup_ldap_user_in_db_from_token(user_token_data)
-        elif user_token_data.user_type == UserTypeEnum.OIDC:
-            if user_token_data.iss == jwt_issuer:
-                user = await lookup_oidc_user_in_db_from_api_token(user_token_data)
-            else:
-                user = await lookup_oidc_user_in_db_from_token(user_token_data)
-        else:
-            raise Exception("Invalid token type encountered!")
 
         if require_tos:
             for tos_id, tos in dp.config.terms_of_services.items():
@@ -149,14 +189,55 @@ def validate_user_and_get_from_db(require_verified: bool, require_admin: bool, r
                         detail="You need to agree to the newest version of the terms of services of this instance to access this route",
                     )
 
-        return user
+        if (
+            no_provisioned_users
+            and isinstance(user, LocalUserInDbAll)
+            and user.provision_number is not None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This route cannot be called by the current user because they have been provisioned through the admin config file. Please change any user attributes there instead.",
+            )
 
-    return user_lookup_dep
+        # rolling tokens (if not explicitly created): grant new token if this one is about to expire
+        if not token_info.explicit and token_info.expires_at is not None:
+            minutes_until_expiration = int(
+                (token_info.expires_at - datetime.now(timezone.utc)).total_seconds() // 60
+            )
+            if (
+                minutes_until_expiration
+                < dp.config.security.tokens.rolling_session_before_expiration_minutes
+            ):
+                new_token = await dp.db.rotate_user_token(
+                    token_info.id, dp.config.security.tokens.session_expiration_time_minutes
+                )
+                set_token_cookie(response, new_token)
+
+        return LoginContext(
+            user=User(
+                id=user.id,
+                user_type=user_type,
+                email=user.email,
+                provider_name=provider_name,
+                is_admin=token_info.admin_privileges,
+                is_verified=is_verified,
+                accepted_tos=user.accepted_tos,
+            ),
+            token=token_info,
+        )
+
+    return user_validation_dep
 
 
 async def validate_runner(
-    token: Annotated[HTTPAuthorizationCredentials, Depends(get_token)],
+    token: Annotated[HTTPAuthorizationCredentials | None, Depends(get_bearer)],
 ) -> int:
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
     if (runner_id := await dp.db.get_runner_by_token(token.credentials)) is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -175,7 +256,7 @@ async def validate_online_runner(
             detail="This runner is currently not registered as online!",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token_hash = hash_runner_token(session_token)
+    token_hash = hash_token(session_token)
     if online_runner.session_token_hash != token_hash:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

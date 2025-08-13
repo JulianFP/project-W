@@ -138,7 +138,7 @@ async def retrieve_job_audio(
     """
     The runner streams the audio binary data of the job it got assigned over this route.
     Additionally this route will mark the job a currently being processed by this runner.
-    Before callling this route the runner should have called retrieve_job_info first.
+    Before calling this route the runner should have called retrieve_job_info first.
     """
     if online_runner.assigned_job_id is None:
         raise HTTPException(

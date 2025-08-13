@@ -114,7 +114,7 @@ Add an `admin_query` section to your LDAP provider config:
         password: <service account bind password>
       username_attributes:
          <list of ldap attributes that can be used as a username during login>
-      uid_attribute: <ldap attribute contaning unique user identifier>
+      uid_attribute: <ldap attribute containing unique user identifier>
       mail_attribute: <ldap attribute which contains users mail address>
       user_query:
         base_dn: <base dn under which normal users can be found>
@@ -138,7 +138,7 @@ Alternatively if you want to setup a new ldap provider just for admin users then
          password: <service account bind password>
        username_attributes:
          <list of ldap attributes that can be used as a username during login>
-       uid_attribute: <ldap attribute contaning unique user identifier>
+       uid_attribute: <ldap attribute containing unique user identifier>
        mail_attribute: <ldap attribute which contains users mail address>
        user_query:
          base_dn: <base dn under which normal users can be found>
@@ -151,7 +151,7 @@ Alternatively if you want to setup a new ldap provider just for admin users then
          password: <service account bind password>
        username_attributes:
          <list of ldap attributes that can be used as a username during login>
-       uid_attribute: <ldap attribute contaning unique user identifier>
+       uid_attribute: <ldap attribute containing unique user identifier>
        mail_attribute: <ldap attribute which contains users mail address>
        admin_query:
          base_dn: <base dn under which admin users can be found>
@@ -172,7 +172,7 @@ The important part for requesting admin privileges is the `scope=admin` paramete
 Get a new runner token
 ----------------------
 
-To operate a runner you need a token for it. The runner uses it to authenticate with the backend. Without one, the runner won't even start. Please note that the runner token is different from the user access tokens (sometimes we also call them JWT tokens) that are being used to authenticate as a user after logging in. For the /api/runners/* routes you need a runner token, for all other authenticated routes you need a user token.
+To operate a runner you need a token for it. The runner uses it to authenticate with the backend. Without one, the runner won't even start. Please note that the runner token is different from the user access tokens (sometimes we also call them auth tokens) that are being used to authenticate as a user after logging in. For the /api/runners/* routes you need a runner token, for all other authenticated routes you need a user token.
 
 .. warning::
    Please make sure to save the runner token in a secret way! If it gets leaked, anyone could authenticate as that runner and accept and read users jobs in behalf of your runner! If you accidentally leaked a token, immediately revoke that token. Refer to :ref:`revoke_a_runner-label` for that.
@@ -185,13 +185,13 @@ Follow the following step-by-step guide to register a new runner. We assume that
 
    .. code-block:: console
 
-      JWT="<value of the obtained access token>"
+      TOKEN="<value of the obtained access token>"
 
 2. Create the new runner:
 
    .. code-block:: console
 
-      curl -X POST -H "Authorization: Bearer $JWT" https://<backend url>/api/admins/create_runner
+      curl -X POST -H "Authorization: Bearer $TOKEN" https://<backend url>/api/admins/create_runner
 
    This should return a json object containing the attributes ``id`` and ``token``. The latter is the runner token you need!
 
@@ -210,7 +210,7 @@ If a runner token got leaked or if you just don't use this runner anymore and wa
 
    .. code-block:: console
 
-      JWT="<value of the obtained access token>"
+      TOKEN="<value of the obtained access token>"
 
 3. Find out the ID of the runner you want to invalidate. You can find it in the logs of the runner or as a property of any job this runner has completed.
 
@@ -218,6 +218,6 @@ If a runner token got leaked or if you just don't use this runner anymore and wa
 
    .. code-block:: console
 
-      curl -X DELETE -H "Authorization: Bearer $JWT" "https://<backend url>/api/admins/invalidate_runner?runner_id=<id of the runner>"
+      curl -X DELETE -H "Authorization: Bearer $TOKEN" "https://<backend url>/api/admins/invalidate_runner?runner_id=<id of the runner>"
 
    The runner should now have been deleted from the database, any existing jobs that may have been assigned to that runner will have been re-assigned to a different runner and the token of that runner shouldn't work anymore.

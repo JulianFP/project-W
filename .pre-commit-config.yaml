@@ -10,13 +10,17 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
       - id: check-symlinks
-  - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 25.1.0
+      - id: debug-statements
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.8
     hooks:
-      - id: black
-        args: [ "--line-length", "100" ]
-  - repo: https://github.com/PyCQA/isort
-    rev: 6.0.1
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix, --show-fixes]
+      - id: ruff-format
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
     hooks:
-      - id: isort
-        args: [ "--profile", "black" ]
+      - id: codespell
+        args: [-w ]

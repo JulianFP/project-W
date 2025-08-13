@@ -8,7 +8,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import project_W.dependencies as dp
 
-from ._version import __git_hash__, __version__
+from ._version import __version__
 from .caching import RedisAdapter
 from .database import PostgresAdapter
 from .models.base import LocalAccountOperationModeEnum
@@ -148,8 +148,12 @@ app = FastAPI(
     contact=(
         {
             "name": dp.config.imprint.name,
-            "email": dp.config.imprint.email.root,
-            "url": f"{dp.config.client_url}/imprint",
+            "email": dp.config.imprint.email.root if dp.config.imprint.email is not None else None,
+            "url": (
+                dp.config.imprint.url
+                if dp.config.imprint.url is not None
+                else f"{dp.config.client_url}/imprint"
+            ),
         }
         if dp.config.imprint
         else None
@@ -159,7 +163,7 @@ app = FastAPI(
 # middleware required by authlib for oidc
 app.add_middleware(
     SessionMiddleware,
-    secret_key=dp.config.security.local_token.session_secret_key.root.get_secret_value(),
+    secret_key=dp.config.security.secret_key.root.get_secret_value(),
 )
 # middleware to guard against HTTP Host header attacks
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=dp.config.web_server.allowed_hosts)
@@ -184,7 +188,7 @@ async def about() -> AboutResponse:
         description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
         source_code="https://github.com/JulianFP/project-W",
         version=__version__,
-        git_hash=__git_hash__.removeprefix("g"),
+        git_hash=dp.git_hash,
         imprint=dp.config.imprint,
         terms_of_services=dp.config.terms_of_services,
         job_retention_in_days=dp.config.cleanup.finished_job_retention_in_days,

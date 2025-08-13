@@ -57,30 +57,45 @@ class LocalAccountSettings(LocalAccountSettingsBase):
     ] = {}
 
 
-class SessionTokenValidated(RootModel):
+class SecretKeyValidated(RootModel):
     root: SecretStr
 
     @model_validator(mode="after")
     def session_token_validation(self) -> Self:
         # enforce 256-Bit secret keys (32 Byte = 64 characters in hex, if second half is supplied by database then only first half of that is used)
-        if len(self.root.get_secret_value()) != 64:
+        as_bytes = bytes.fromhex(self.root.get_secret_value())
+        if len(as_bytes) != 32:
             raise ValueError(
-                "The session token has to be exactly 64 characters in length. Use the command `python -c 'import secrets; print(secrets.token_hex(32))'` to generate a valid session token!"
+                "The secret key has to be 256-bit encoded in hex (64 string characters). Use the command `python -c 'import secrets; print(secrets.token_hex(32))'` to generate a valid secret key!"
             )
         return self
 
 
-class LocalTokenSettings(BaseModel):
+class TokenSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    session_secret_key: SessionTokenValidated = Field(
-        description="The secret key used to generate JWT Tokens. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
-    )
     session_expiration_time_minutes: int = Field(
-        ge=5,
+        ge=15,
         default=60,
-        description="Time for which a users/clients JWT Tokens stay valid (in minutes). After this time the user will be logged out automatically and has to authenticate again using their username and password.",
+        description="Time for which auth tokens stay valid (not API tokens, they stay valid indefinitely). Project-W uses rolling tokens, so beginning from 10 minutes before expiration the auth token will be rotated automatically to prevent active users from being logged out. Inactive users however will be logged out after this period. Increase if you want to keep inactive users logged in for longer (on the prize of a higher risk of the auth token being stolen)",
         validate_default=True,
     )
+    rolling_session_before_expiration_minutes: int = Field(
+        ge=5,
+        default=10,
+        description="The amount of minutes before a token expires when a user should get a new auth token if the user is still active",
+        validate_default=True,
+    )
+
+    @model_validator(mode="after")
+    def rlling_session_before_session_significantly_smaller_than_session_exp(self) -> Self:
+        if (
+            self.rolling_session_before_expiration_minutes
+            > 0.4 * self.session_expiration_time_minutes
+        ):
+            raise ValueError(
+                "'rolling_session_before_expiration_minutes' is too large compared to 'session_expiration_time_minutes'!"
+            )
+        return self
 
 
 class ProviderSettings(ProviderSettingsBase):
@@ -229,8 +244,11 @@ class LdapProviderSettings(ProviderSettings):
 # modeling the config file (descriptions and examples are used for documentation)
 class SecuritySettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    secret_key: SecretKeyValidated = Field(
+        description="The secret key used to sign payloads in emails. Make sure to keep this secret since with this key an attacker could log in as any user. A new key can be generated with the following command: `python -c 'import secrets; print(secrets.token_hex(32))'`.",
+    )
     local_account: LocalAccountSettings = LocalAccountSettings()
-    local_token: LocalTokenSettings
+    tokens: TokenSettings = TokenSettings()
     oidc_providers: Annotated[
         dict[str, OidcProviderSettings],
         Field(
@@ -312,14 +330,33 @@ class ImprintSettings(BaseModel):
     name: str = Field(
         description="The name of the person/institution hosting this instance",
     )
-    email: EmailValidated = Field(
-        description="The contact email address of the person/institution hosting this instance",
-    )
-    additional_imprint_html: str | None = Field(
-        description="Content of the imprint in addition to the other fields",
+    email: EmailValidated | None = Field(
+        description="A contact email address of the person/institution hosting this instance",
         default=None,
         validate_default=True,
     )
+    url: HttpUrl | None = Field(
+        description="The URL to forward users to if they click on the imprint button on the frontend. Useful if you want to link to an imprint on a different website instead of having a dedicated imprint for Project-W. Mutually exclusive with the 'additional_imprint_html' option.",
+        default=None,
+        validate_default=True,
+    )
+    additional_imprint_html: str | None = Field(
+        description="Content of the imprint in addition to the name and email fields. Mutually exclusive with the 'url' option.",
+        default=None,
+        validate_default=True,
+    )
+
+    @model_validator(mode="after")
+    def exactly_one_of_url_additional_imprint_html(self) -> Self:
+        if self.url is None and self.additional_imprint_html is None:
+            raise ValueError(
+                "You need to define one of 'url' or 'additional_imprint_html' if you want to have an imprint"
+            )
+        elif self.url is not None and self.additional_imprint_html is not None:
+            raise ValueError(
+                "You cannot define both 'url' and 'additional_imprint_html' at the same time, these options are mutually exclusive"
+            )
+        return self
 
 
 class TosSettings(BaseModel):
@@ -417,7 +454,7 @@ class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     client_url: str = Field(
         pattern=r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?(\/#)?$",
-        description="URL under which the frontend is served. It is used for providing the user with clickable links inside of account-activation or password-reset emails. The URL should fullfill the following requirements:\n\n- It has to start with either 'http://' or 'https://'\n\n- It should contain the port number if it is not just 80 (default of http) or 443 (default of https)\n\n- It should contain the root path under which the frontend is served if its not just /\n- It should end with /# if the frontend uses hash based routing (which our frontend does!)",
+        description="URL under which the frontend is served. It is used for providing the user with clickable links inside of account-activation or password-reset emails. The URL should fulfill the following requirements:\n\n- It has to start with either 'http://' or 'https://'\n\n- It should contain the port number if it is not just 80 (default of http) or 443 (default of https)\n\n- It should contain the root path under which the frontend is served if its not just /\n- It should end with /# if the frontend uses hash based routing (which our frontend does!)",
         examples=[
             "https://example.com/#",
             "https://sub.example.org/apps/project-W/frontend/#",

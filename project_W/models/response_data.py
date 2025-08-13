@@ -1,7 +1,8 @@
+from datetime import datetime
 from enum import Enum
 from typing import Mapping
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .base import (
     AdditionalUserInfo,
@@ -55,10 +56,13 @@ class AboutResponse(BaseModel):
     site_banners: list[SiteBannerResponse]
 
 
-class TokenSecretInfo(BaseModel):
+class TokenInfo(BaseModel):
     id: int
-    name: str | None = Field(max_length=64)
-    temp_token_secret: bool
+    name: str
+    admin_privileges: bool
+    explicit: bool
+    expires_at: datetime | None = None
+    last_usage: datetime
 
 
 class RunnerCreatedInfo(BaseModel):

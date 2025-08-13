@@ -2,19 +2,24 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from starlette.status import HTTP_400_BAD_REQUEST
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_415_UNSUPPORTED_MEDIA_TYPE
 
 import project_W.dependencies as dp
-from project_W.models.internal import JobAndSettingsInDb, JobInDb, JobSortKey
+from project_W.models.internal import (
+    JobAndSettingsInDb,
+    JobInDb,
+    JobSortKey,
+    LoginContext,
+    SSEEvent,
+)
 
 from ..models.request_data import JobSettings, TranscriptTypeEnum
 from ..models.response_data import (
     ErrorResponse,
     JobInfo,
     JobStatus,
-    User,
 )
-from ..security.auth import auth_dependency_responses, validate_user_and_get_from_db
+from ..security.auth import auth_dependency_responses, validate_user
 
 
 async def job_status(job: JobInDb) -> JobStatus:
@@ -47,13 +52,9 @@ router = APIRouter(
 
 @router.post("/submit_settings")
 async def submit_settings(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     job_settings: JobSettings,
     is_new_default: bool = False,
@@ -61,24 +62,22 @@ async def submit_settings(
     """
     Submit a new job settings object to the backend. If is_new_default is set to True this set of job settings will become the new default for this account and if no job settings object is specified during job submission this set of settings will be used. If it is set to False then this set of settings will only be used if specified explicitly during job submission. Returns the id of the newly created job settings object which can then be used to reference these job settings during job submission.
     """
-    return await dp.db.add_new_job_settings(current_user.id, job_settings, is_new_default)
+    return await dp.db.add_new_job_settings(login_context.user.id, job_settings, is_new_default)
 
 
 @router.get("/default_settings")
 async def get_default_settings(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=False, require_admin=False, require_tos=False
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
 ) -> JobSettings:
     """
     Returns the default job settings of the current account. If no job settings id is explicitly specified during job submission then these job settings will be used for the job. These job settings where either set previously using the submit_settings route or are the application defaults.
     """
-    if (job_settings := await dp.db.get_default_job_settings_of_user(current_user.id)) is not None:
+    if (
+        job_settings := await dp.db.get_default_job_settings_of_user(login_context.user.id)
+    ) is not None:
         return job_settings
     else:
         return JobSettings()
@@ -90,17 +89,17 @@ async def get_default_settings(
         400: {
             "model": ErrorResponse,
             "description": "Not an audio file or provided job_settings_id was invalid",
-        }
+        },
+        415: {
+            "model": ErrorResponse,
+            "description": "The provided audio files has an invalid format",
+        },
     },
 )
 async def submit_job(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     audio_file: UploadFile,
     job_settings_id: int | None = None,
@@ -115,11 +114,13 @@ async def submit_job(
         "video",
     ]:
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
+            status_code=HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=f"The provided file is not an audio or video file but is of type {audio_file.content_type}",
         )
 
-    if (job_id := await dp.db.add_new_job(current_user.id, audio_file, job_settings_id)) is None:
+    if (
+        job_id := await dp.db.add_new_job(login_context.user.id, audio_file, job_settings_id)
+    ) is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"The provided job_settings_id of '{job_settings_id}' is invalid",
@@ -127,18 +128,15 @@ async def submit_job(
 
     await dp.ch.enqueue_new_job(job_id, job_id * -1)
     await dp.ch.assign_queue_job_to_runner_if_possible()
+    await dp.ch.send_event(login_context.user.id, SSEEvent.JOB_CREATED, str(job_id))
     return job_id
 
 
 @router.get("/count")
 async def job_count(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     exclude_finished: bool,
     exclude_downloaded: bool,
@@ -148,19 +146,15 @@ async def job_count(
     exclude_finished excludes finished jobs (both successful and aborted) while exclude_downloaded excludes finished jobs where the transcript was already downloaded at least ones.
     """
     return await dp.db.get_total_number_of_jobs_of_user(
-        current_user.id, exclude_finished, exclude_downloaded
+        login_context.user.id, exclude_finished, exclude_downloaded
     )
 
 
 @router.get("/get")
 async def get(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     start_index: int,
     end_index: int,
@@ -174,7 +168,7 @@ async def get(
     start_index and end_index specify which jobs to return from the sorted list, e.g. a start_index of 0 and end_index of 9 will return the first 10 jobs, while a start_index of 10 and and end_index of 19 will return the next 10 and so on.
     """
     return await dp.db.get_job_ids_of_user(
-        current_user.id,
+        login_context.user.id,
         start_index,
         end_index,
         sort_key,
@@ -186,13 +180,9 @@ async def get(
 
 @router.get("/info")
 async def job_info(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     job_ids: Annotated[list[int], Query()],
 ) -> list[JobInfo]:
@@ -200,9 +190,9 @@ async def job_info(
     Returns a list of job objects containing all information related to each of the specified jobs.
     Note that job infos will be returned in no specific order, please use the get route to get an ordering of jobs by id and only use this route to get additional information about these jobs.
     """
-    job_and_setting_infos: list[JobAndSettingsInDb] = (
-        await dp.db.get_job_infos_with_settings_of_user(current_user.id, job_ids)
-    )
+    job_and_setting_infos: list[
+        JobAndSettingsInDb
+    ] = await dp.db.get_job_infos_with_settings_of_user(login_context.user.id, job_ids)
     job_infos = []
     for job in job_and_setting_infos:
         data = job.model_dump()  # JobAndSettings
@@ -233,20 +223,16 @@ async def job_info(
     },
 )
 async def abort_jobs(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     job_ids: list[int],
 ) -> str:
     """
     Aborts a currently running job. This will put the job into a failed state with an error message saying that the job was aborted. Any processing of this job will be canceled.
     """
-    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
+    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(login_context.user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
         if jobStatus in [
@@ -270,6 +256,7 @@ async def abort_jobs(
             if jobStatus is JobStatus.PENDING_RUNNER:
                 await dp.ch.remove_job_from_queue(job.id)
             await dp.db.finish_failed_job(job.id, "Job was aborted")
+            await dp.ch.send_event(login_context.user.id, SSEEvent.JOB_UPDATED, str(job.id))
 
     return "Success"
 
@@ -284,20 +271,16 @@ async def abort_jobs(
     },
 )
 async def delete_jobs(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     job_ids: list[int],
 ) -> str:
     """
     Deletes a completed (aborted/successfully finished) job. To delete a currently running job please use the abort route first and then delete it using this route.
     """
-    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(current_user.id, job_ids)
+    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(login_context.user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
         if jobStatus not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:
@@ -306,7 +289,9 @@ async def delete_jobs(
                 detail=f"The job with id {job.id} is currently still running. Only finished jobs can be deleted!",
             )
 
-    await dp.db.delete_jobs_of_user(current_user.id, job_ids)
+    await dp.db.delete_jobs_of_user(login_context.user.id, job_ids)
+    for job_id in job_ids:
+        await dp.ch.send_event(login_context.user.id, SSEEvent.JOB_DELETED, str(job_id))
 
     return "Success"
 
@@ -321,13 +306,9 @@ async def delete_jobs(
     },
 )
 async def download_transcript(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     job_id: int,
     transcript_type: TranscriptTypeEnum,
@@ -338,7 +319,7 @@ async def download_transcript(
     """
     if (
         transcript := await dp.db.get_job_transcript_of_user_set_downloaded(
-            current_user.id, job_id, transcript_type
+            login_context.user.id, job_id, transcript_type
         )
     ) is None:
         raise HTTPException(
@@ -346,22 +327,21 @@ async def download_transcript(
             detail=f"No job with id {job_id} found or job isn't finished yet",
         )
     else:
+        await dp.ch.send_event(login_context.user.id, SSEEvent.JOB_UPDATED, str(job_id))
         return transcript
 
 
 @router.get("/events")
 async def events(
-    current_user: Annotated[
-        User,
-        Depends(
-            validate_user_and_get_from_db(
-                require_verified=True, require_admin=False, require_tos=True
-            )
-        ),
+    login_context: Annotated[
+        LoginContext,
+        Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
 ) -> StreamingResponse:
     """
-    This is a special route for subscribing to server-sent events (SSE).
-    Currently there is only one type of event called 'job_updated'. It returns the job id of a currently running job which attributes (e.g. processing step, progress, assigned runner, ...) have changed. This event can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs.
+    This is a special route for subscribing to server-sent events (SSE) which all contain an event field.
+    Currently there are three events: job_created, job_updated and job_deleted. As data they all return the job id of the job the event refers to (i.e. the id of the job that just got created, updated or deleted). This route can be used to only fetch job info using the info route when it actually has changed without having to periodically re-fetch the job info of all jobs. Refer to https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#listening_for_custom_events for more information about SSE.
     """
-    return StreamingResponse(dp.ch.event_generator(current_user.id), media_type="text/event-stream")
+    return StreamingResponse(
+        dp.ch.event_generator(login_context.user.id), media_type="text/event-stream"
+    )

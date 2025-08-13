@@ -57,10 +57,10 @@ class SmtpClient:
         msg = EmailMessage()
         msg["Subject"] = msg_subject
         msg["From"] = self.smtp_settings.sender_email.root
-        if type(receiver) == EmailValidated:
+        if isinstance(receiver, EmailValidated):
             msg["To"] = receiver.root
             receiver_logs = receiver.root
-        elif type(receiver) == list:
+        elif type(receiver) is list:
             msg["Bcc"] = map(lambda email: email.root, receiver)
             receiver_logs = f"{len(receiver)} addresses"
         else:
@@ -171,7 +171,7 @@ class SmtpClient:
         url = f"{client_url}/"
         msg_body = (
             f"We noticed that you haven't used the Project-W transcription service {url} for a while.\n"
-            f"If you want to keep using Project-W then please perform a login with your account within the next {days_until_deletion} days.\n"
+            f"If you want to keep using Project-W then please use your account within the next {days_until_deletion} days.\n"
             f"Otherwise your account including all it's data will be automatically deleted."
         )
         msg_subject = f"Project-W: {days_until_deletion} days account deletion warning"

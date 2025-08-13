@@ -16,7 +16,7 @@ Another important design decision is that all code was written from the ground u
 
 The backend also makes heavy use of `Pydantic <https://pydantic.dev>`_ for validating all input and output data of http requests as well as data coming from PostgreSQL and Redis. Pydantic also takes care of validating the contents of the yaml config file after it has been parsed by the pyaml-env library (which takes environment variables into account). Some Pydantic models are also shared between the runner and the backend.
 
-User authentication is done using the `Argon2 <https://pypi.org/project/argon2-cffi/>`_ hasher which is recommended by the OWASP. After initial authentication (using their password) users get a JWT Token which will be used for authentication in subsequent api calls. To validate these tokens I use `PyJWT <https://pypi.org/project/PyJWT/>`_. For communicating with OIDC identity providers and validating OIDC id_tokens I use the `authlib library <https://authlib.org/>`_.
+User authentication is done using the `Argon2 <https://pypi.org/project/argon2-cffi/>`_ hasher which is recommended by the OWASP. After initial authentication (using their password) users get a token which will be used for authentication in subsequent api calls. For communicating with OIDC identity providers and validating OIDC id_tokens I use the `authlib library <https://authlib.org/>`_.
 
 The whole ASGI application is then being served using `granian <https://pypi.org/project/granian/>`_. I chose granian over more standard alternatives like uvicorn because of it's performance and support for HTTP/2. The latter is especially useful for the use with server-sent events because for these the frontend may keep multiple connections to the backend open at the same time and the limit for concurrent HTTP connections is very low when using HTTP/1.1 (in Chrome it is 6 connections per browser instance, not even per browser tab). Granian is called from within Python so that it can be easily configured over the config file (e.g. SSL certificates, number of workers, ...).
 
@@ -31,7 +31,7 @@ One runner cannot do more than one job at a time. If you want to increase the th
 
 The communication between runner and backend always goes from the runner to the backend, never the other way around (i.e. the runner will always initialize the communication). The backend is the http-server, while the runner is the http-client. The runner uses the asyncio and `httpx <https://www.python-httpx.org/>`_ libraries for this. It has two major advantages:
 
-- The runner doesn't need a publicly reachable IP-address and no special firewall settings or similar (it can run behind a nat and a company firewall if you wan't). It just needs to be able to reach the backend.
+- The runner doesn't need a publicly reachable IP-address and no special firewall settings or similar (it can run behind a nat and a company firewall if you want). It just needs to be able to reach the backend.
 - The runner doesn't need a certificate or key-pair for encryption. As long as the backend has an ssl certificate, the communication between backend and runner will be automatically https encrypted
 
 Each runner send a heartbeat to the backend periodically (currently every 15 seconds). If the backend assigned a job to this runner, it will notify it through the heartbeats response. After that the runner will download the job from the backend and process it. During processing it will send the current progress status to the backend in its heartbeats. After finishing it will upload the transcript to the backend.
