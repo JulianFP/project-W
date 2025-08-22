@@ -415,13 +415,19 @@ function reloadSSEListeners() {
 	evtSource.addEventListener("job_updated", updateJobOnSSEEvent);
 }
 reloadSSEListeners();
-cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
-	for (const { name, value } of event.changed) {
-		if (name === "token" && value) {
-			reloadSSEListeners();
+if (window.cookieStore !== undefined) {
+	cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
+		for (const { name, value } of event.changed) {
+			if (name === "token" && value) {
+				reloadSSEListeners();
+			}
 		}
-	}
-});
+	});
+} else {
+	console.warn(
+		"Your browser doesn't seem to support the Cookie Store API. Automatic updates of the jobs table may be impacted by this. Consider updating your browser!",
+	);
+}
 </script>
 
 <CenterPage title="Your transcription jobs">

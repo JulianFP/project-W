@@ -75,7 +75,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Get New Api Token
-		 * @description Create a new API token. The main difference between API tokens and regular auth tokens is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfuly response contains the newly created token.
+		 * @description Create a new API token. The main difference between API tokens and regular auth tokens is that API tokens never expire. Only create them if necessary and only use a different token for each device/service so that it is easy to invalidate one of them if a device gets compromised. The provided name has the purpose of being able to identify which token belongs to which device/service.THe successfully response contains the newly created token.
 		 */
 		post: operations["get_new_api_token_api_users_get_new_api_token_post"];
 		delete?: never;
@@ -93,7 +93,7 @@ export interface paths {
 		};
 		/**
 		 * Get All Token Info
-		 * @description Get a list of all token id's and names currently in use by this account. Temporary tokens created by the login route all share the same id and this id is marked as such. All other id's/names refer to API tokens that the user explicitly created using the get_new_api_token route.
+		 * @description Get a list of all token id's and names currently in use by this account, sorted by last usage timestamp.
 		 */
 		get: operations["get_all_token_info_api_users_get_all_token_info_get"];
 		put?: never;
@@ -545,7 +545,7 @@ export interface paths {
 		 * Retrieve Job Audio
 		 * @description The runner streams the audio binary data of the job it got assigned over this route.
 		 *     Additionally this route will mark the job a currently being processed by this runner.
-		 *     Before callling this route the runner should have called retrieve_job_info first.
+		 *     Before calling this route the runner should have called retrieve_job_info first.
 		 */
 		post: operations["retrieve_job_audio_api_runners_retrieve_job_audio_post"];
 		delete?: never;
@@ -1455,8 +1455,8 @@ export interface components {
 		 */
 		LocalAccountOperationModeEnum:
 			| "disabled"
-			| "no-signup_hidden"
-			| "no-signup"
+			| "no_signup_hidden"
+			| "no_signup"
 			| "enabled";
 		/** LocalAccountSettingsBase */
 		LocalAccountSettingsBase: {
@@ -1650,8 +1650,6 @@ export interface components {
 			/** Provider Name */
 			provider_name: string;
 			user_type: components["schemas"]["UserTypeEnum"];
-			/** Is Admin */
-			is_admin: boolean;
 			/** Is Verified */
 			is_verified: boolean;
 		};
@@ -3935,7 +3933,7 @@ export const jobStatusValues: ReadonlyArray<
 ];
 export const localAccountOperationModeEnumValues: ReadonlyArray<
 	components["schemas"]["LocalAccountOperationModeEnum"]
-> = ["disabled", "no-signup_hidden", "no-signup", "enabled"];
+> = ["disabled", "no_signup_hidden", "no_signup", "enabled"];
 export const taskEnumValues: ReadonlyArray<components["schemas"]["TaskEnum"]> =
 	["transcribe", "translate"];
 export const transcriptTypeEnumValues: ReadonlyArray<
