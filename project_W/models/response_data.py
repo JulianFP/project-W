@@ -27,7 +27,6 @@ class UserTypeEnum(str, Enum):
 class User(UserInDb, AdditionalUserInfo):
     provider_name: str
     user_type: UserTypeEnum
-    is_admin: bool
     is_verified: bool
 
 

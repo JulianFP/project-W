@@ -219,7 +219,6 @@ def validate_user(
                 user_type=user_type,
                 email=user.email,
                 provider_name=provider_name,
-                is_admin=token_info.admin_privileges,
                 is_verified=is_verified,
                 accepted_tos=user.accepted_tos,
             ),

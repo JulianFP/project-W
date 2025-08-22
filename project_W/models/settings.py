@@ -22,7 +22,6 @@ from pydantic_core import Url
 from .base import (
     EmailValidated,
     LocalAccountSettingsBase,
-    PasswordValidated,
     ProviderSettingsBase,
 )
 
@@ -36,8 +35,9 @@ class ProvisionedUser(BaseModel):
             "user@example.org",
         ],
     )
-    password: PasswordValidated = Field(
-        description="The password of this user (for login). Please make sure that this password is secure, especially when provisioning admin users!"
+    password: SecretStr = Field(
+        min_length=12,
+        description="The password of this user (for login). Please make sure that this password is secure, especially when provisioning admin users!",
     )
     is_admin: bool = Field(
         default=False,

@@ -80,8 +80,8 @@ class InProcessJobBase(BaseModel):
 
 class LocalAccountOperationModeEnum(str, Enum):
     DISABLED = "disabled"
-    NO_SIGNUP_HIDDEN = "no-signup_hidden"
-    NO_SIGNUP = "no-signup"
+    NO_SIGNUP_HIDDEN = "no_signup_hidden"
+    NO_SIGNUP = "no_signup"
     ENABLED = "enabled"
 
 
