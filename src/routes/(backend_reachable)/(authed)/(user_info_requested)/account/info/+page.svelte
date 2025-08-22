@@ -91,9 +91,6 @@ async function getResendEmail() {
       </Alert>
     {/if}
   {/if}
-  <Alert class="border-t-4" color="gray">
-    {data.user_info.is_admin ? "This is an admin account." : "This is a non-admin account."}
-  </Alert>
 
   {#if data.user_info.user_type === "local"}
     <ChangeEmailField defaultValue={data.user_info.email}/>
