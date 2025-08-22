@@ -152,14 +152,14 @@ class DatabaseAdapter(ABC):
         self,
         provision_number: int,
         email: EmailValidated,
-        password: PasswordValidated,
+        password: SecretStr,
         is_admin: bool = False,
     ) -> int:
         """
         Provision a user from the config file. The password will be hashed in this function before writing it in the database.
         Returns the user id of the user
         """
-        hashed_password = self.hasher.hash(password.root.get_secret_value())
+        hashed_password = self.hasher.hash(password.get_secret_value())
         return await self._ensure_local_user_is_provisioned_hashed(
             provision_number, email, hashed_password, is_admin
         )
