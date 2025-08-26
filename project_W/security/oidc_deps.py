@@ -48,6 +48,7 @@ async def register_with_oidc_providers(config: Settings):
             base_url += "/"
         async with AsyncClient(verify=ctx) as client:
             metadata_uri = f"{base_url}.well-known/openid-configuration"
+            scopes = " ".join(["openid"] + idp.scopes)
             oauth.register(
                 norm_name,
                 client_id=idp.client_id,
@@ -55,9 +56,11 @@ async def register_with_oidc_providers(config: Settings):
                 server_metadata_url=metadata_uri,
                 code_challenge_method="S256" if idp.enable_pkce_s256_challenge else None,
                 client_kwargs={
-                    "scope": "openid email",
+                    "scope": scopes,
                     "verify": ctx,
+                    "token_endpoint_auth_method": idp.client_auth_method.value,
                 },
+                authorize_params=idp.additional_authorize_params,
             )
 
             try:
@@ -93,6 +96,7 @@ def get_provider_name(iss: str) -> str:
 
 
 def validate_oidc_attributes(provider_name: str, oidc_attrs: dict) -> bool:
+    claim_map = local_oidc_prov[provider_name].claim_map
     if not oidc_attrs.get("iss"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -103,12 +107,12 @@ def validate_oidc_attributes(provider_name: str, oidc_attrs: dict) -> bool:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get sub from the identity provider. Please make sure that the IdP supports the sub claim",
         )
-    if not EmailValidated.model_validate(oidc_attrs.get("email")):
+    if not EmailValidated.model_validate(oidc_attrs.get(claim_map.email)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get a valid email address from the identity provider. Please make sure that the IdP supports the email claim, that your account has an email address associated with it and that this email is valid",
         )
-    if not oidc_attrs.get("email_verified"):
+    if not oidc_attrs.get(claim_map.email_verified):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"The email address of this OIDC '{provider_name}' account is not verified",

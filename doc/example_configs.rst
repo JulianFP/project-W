@@ -74,10 +74,36 @@ The version field can't be omitted and is important when updating the terms of s
 
 Never change the keys of these attributes sets (here 0 and 1) since they are being used to identify each term of service. If you want to remove a term of service then never reuse that same key for a different term of service in the future as the users will still have accepted the term of service with that key even if it has been removed from the config. The name and tos_html of the term of service however can be changed as much as you want (just consider to increase the version field alongside it).
 
+Basic OIDC login with GitLab
+----------------------------
+
+With this config any user of gitlab.com or some other GitLab instance of your choice will be able to use Project-W, while none of them will have admin privileges. I choose GitLab as the first example because it is probably one of the easiest OIDC providers to setup with Project-W (at least of the public ones), making it easily adaptable to other OIDC providers as well.
+
+1. Login on your GitLab instance, click on your account profile icon and click on `Preferences`. Navigate to `Applications` and click `Add new application`
+
+2. Set a name, set `https://<backend domain>/api/oidc/auth/gitlab` as a redirect URI, and select the `openid` and `email` scopes.
+
+3. Click `Save application` and then from the overview that appears copy the `Application ID` and the `Secret` into your clipboard
+
+4. Add the following config snippet to your backend's config file and fill in the copied credentials (and change the base_url to your GitLab's url if you want to use a different GitLab instance):
+
+   .. code-block:: yaml
+
+      security:
+        oidc_providers:
+          GitLab:
+            icon_url: "https://gitlab.com/assets/logo-911de323fa0def29aaf817fca33916653fc92f3ff31647ac41d2c39bbe243edb.svg"
+            base_url: "https://gitlab.com"
+            client_id: "<the Application ID you copied>"
+            client_secret: "<the Secret you copied>"
+
+   .. note::
+      If you change the name of the provider in the config then you need to change it in the redirect URI as well, so changing the provider name will break the OIDC setup! The providers name in the redirect URI is the same is in the config, but in all lower case letters and with spaces striped from beginning and end. If you want to use spaces in the middle of the name (or any other special characters) then you need to escape them in the redirect URI.
+
 Basic OIDC login with Google
 ----------------------------
 
-With this config any Google user will be able to use Project-W, while none of them will have admin privileges. This guide should easily be adaptable to other OIDC providers as well.
+With this config any Google user will be able to use Project-W, while none of them will have admin privileges. This will be similar to the GitLab guide with some minor Google-specific fixes.
 
 1. Go to the `Google Cloud console <https://console.cloud.google.com>`_, login with a Google account of your choice and navigate to `APIs and services -> Credentials -> Create credentials -> OAuth client ID`
 
@@ -96,9 +122,12 @@ With this config any Google user will be able to use Project-W, while none of th
             base_url: "https://accounts.google.com"
             client_id: "<the Client ID you copied>"
             client_secret: "<the Client secret you copied>"
+            additional_authorize_params: #Google specific
+              access_type: "offline"
+              prompt: "consent"
 
    .. note::
-      If you change the name of the provider in the config then you need to change it in the redirect URI as well, so changing the provider name will break the OIDC setup! The providers name in the redirect URI is the same is in the config, but in all lower case letters and with spaces striped from beginning and end. If you want to use spaces in the middle of the name (or any other special characters) then you need to escape them in the redirect URI.
+      Even with the provided additional_authorize_params, Google seems to limit the amount of valid request tokens that can exist at the same time and thus automatically invalidate refresh tokens. This might compromise the validity of long lived API tokens issued by Google accounts!
 
 OIDC login restricted to a user group
 -------------------------------------

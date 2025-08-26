@@ -64,12 +64,12 @@ This will setup the backend/frontend without a reverse proxy or any additional c
         connection_string: 'redis://redis:6379/project-W'
       security:
         secret_key: !ENV ${SECRET_KEY}
-      local_account:
-        user_provisioning:
-          0:
-            email: <email of your admin user>
-            password: !ENV ${ADMIN_PASSWORD}
-            is_admin: true
+        local_account:
+          user_provisioning:
+            0:
+              email: <email of your admin user>
+              password: !ENV ${ADMIN_PASSWORD}
+              is_admin: true
       smtp_server:
         hostname: <your smtp servers domain>
         port: <smtp port of smtp server>
@@ -214,12 +214,12 @@ Follow this guide if you want to run this behind a Reverse Proxy which automatic
         connection_string: 'redis://redis:6379/project-W'
       security:
         secret_key: !ENV ${SECRET_KEY}
-      local_account:
-        user_provisioning:
-          0:
-            email: <email of your admin user>
-            password: !ENV ${ADMIN_PASSWORD}
-            is_admin: true
+        local_account:
+          user_provisioning:
+            0:
+              email: <email of your admin user>
+              password: !ENV ${ADMIN_PASSWORD}
+              is_admin: true
       smtp_server:
         hostname: <your smtp servers domain>
         port: <smtp port of smtp server>

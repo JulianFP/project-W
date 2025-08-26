@@ -10,7 +10,7 @@ RUN npm install -g pnpm
 
 COPY ./frontend .
 
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 RUN pnpm build
 
