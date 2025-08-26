@@ -13,13 +13,26 @@ on:
 
 jobs:
   docker-build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ "ubuntu-24.04", "ubuntu-24.04-arm" ] #run on both x86 and arm
+    runs-on: ${{matrix.os}}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout runner repository
+        uses: actions/checkout@v4
         with:
           path: runner
           fetch-depth: 0
-      - id: meta
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login with ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Metadata for runner docker container
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -28,7 +41,8 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-      - id: meta-dummy
+      - name: Metadata for dummy runner docker container
+        id: meta-dummy
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -37,28 +51,22 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - name: Build & Push Project-W runner docker image
+        uses: docker/build-push-action@v6
+        if: ${{ matrix.os == 'ubuntu-24.04' }} #currently only compatible with x86_64 due to cuda dependencies
         with:
           context: .
           file: ./runner/Dockerfile
-          #platforms: linux/amd64,linux/arm64 #currently only compatible with x86_64 due to cuda dependencies
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=ghcr.io/julianfp/project-w_runner:buildcache
           cache-to: type=registry,ref=ghcr.io/julianfp/project-w_runner:buildcache,mode=max
-      - uses: docker/build-push-action@v6
+      - name: Build & Push Project-W dummy runner docker image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./runner/Dockerfile.dummy
-          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-dummy.outputs.tags }}
           labels: ${{ steps.meta-dummy.outputs.labels }}
