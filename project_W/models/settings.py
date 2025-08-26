@@ -125,6 +125,25 @@ class OidcRoleSettings(BaseModel):
     )
 
 
+class OidcClaimMap(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: str = Field(
+        description="The name of the claim containing the email address",
+        default="email",
+        validate_default=True,
+    )
+    email_verified: str = Field(
+        description="The name of the claim that is only present if the user's email was verified",
+        default="email_verified",
+        validate_default=True,
+    )
+
+
+class OidcClientAuthMethod(str, Enum):
+    CLIENT_SECRET_POST = "client_secret_post"
+    CLIENT_SECRET_BASIC = "client_secret_basic"
+
+
 class OidcProviderSettings(ProviderSettings):
     model_config = ConfigDict(extra="forbid")
     base_url: HttpUrl = Field(
@@ -139,6 +158,26 @@ class OidcProviderSettings(ProviderSettings):
     )
     client_secret: SecretStr = Field(
         description="The client_secret string as returned by the identity provider after setting up this application"
+    )
+    client_auth_method: OidcClientAuthMethod = Field(
+        default=OidcClientAuthMethod.CLIENT_SECRET_BASIC,
+        validate_default=True,
+        description="The authentication method of the authorization request. Can be set to 'client_secret_basic' (default, Authorization header), or 'client_secret_post' (in the body of a POST)",
+    )
+    additional_authorize_params: dict[str, str] = Field(
+        default={},
+        validate_default=True,
+        description="Additional URI parameters to add to the authorization request (made to the authorization_endpoint in the OIDC discovery document). Useful if your IdP requires additional parameters to return all required data (e.g. Google requires additional parameters to reliably return refresh_tokens)",
+    )
+    scopes: list[str] = Field(
+        default=["email"],
+        validate_default=True,
+        description="Scopes that should be requested from the IdP (in addition to the 'openid' scope). Use this if your OIDC provider doesn't comply with https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims and needs a different scope than 'email'.",
+    )
+    claim_map: OidcClaimMap = Field(
+        default=OidcClaimMap(),
+        validate_default=True,
+        description="In addition to the 'sub' and 'iss' claims Project-W also needs to get a verified email address from the OIDC provider. By default it also needs the 'email' and 'email_verified' claims for this (as defined in https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims). With this settings you can change these values to something else if your OIDC provider returns the email address in a claim with a different name.",
     )
     enable_pkce_s256_challenge: bool = Field(
         default=True,

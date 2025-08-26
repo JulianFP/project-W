@@ -57,14 +57,20 @@ async def auth(
     Landing route: After authenticating on the login page of the identity provider the provider will redirect you to this route so that the backend can process the IdP's response. This route will then redirect you to the official client's page (as set by the instance's admin) so that the client can get and store the OIDC id_token.
     """
     idp_name = idp_name.lower()
+    provider_config = oidc.local_oidc_prov.get(idp_name)
+    if provider_config is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown IdP '{idp_name}'"
+        )
     try:
         oidc_response = await getattr(oidc.oauth, idp_name).authorize_access_token(request)
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to authorize IdP access token. Try again from the beginning of the login flow",
+            detail=f"Failed to authorize IdP access token: {e}. Try again from the beginning of the login flow",
         )
 
+    claim_map = provider_config.claim_map
     if not (userinfo := oidc_response.get("userinfo")):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -80,7 +86,7 @@ async def auth(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get sub from the identity provider. Please make sure that the IdP supports the sub claim",
         )
-    if not (email := EmailValidated.model_validate(userinfo.get("email"))):
+    if not (email := EmailValidated.model_validate(userinfo.get(claim_map.email))):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not get a valid email address from the identity provider. Please make sure that the IdP supports the email claim, that your account has an email address associated with it and that this email is valid",
