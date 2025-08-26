@@ -164,6 +164,7 @@ function onAction(params: { action: string; data: FormData }): boolean {
     <Dropzone
       multiple
       id="upload_files"
+      class="h-48"
       bind:files={files}
       ondrop={dropHandle}
       ondragover={(event) => {

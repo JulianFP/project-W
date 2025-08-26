@@ -464,7 +464,7 @@ function onTranslationChange() {
             <Badge rounded large class="p-1! font-semibold!" color="gray"><QuestionCircleOutline class="w-4 h-4"/></Badge>
             <Tooltip placement="bottom" class="max-w-lg">Optional text to provide as a prompt for the first window.</Tooltip>
           </div>
-          <Textarea id="asr_initial_prompt" bind:value={asr_initial_prompt} placeholder="Enter prompt here"/>
+          <Textarea id="asr_initial_prompt" class="w-full" bind:value={asr_initial_prompt} placeholder="Enter prompt here"/>
         </div>
         <div>
           <div class="flex gap-2 items-center mb-1.5">
