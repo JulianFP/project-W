@@ -36,7 +36,7 @@ class WhisperSettings(BaseModel):
     )
     model_prefetching: ModelPrefetchingEnum = Field(
         default=ModelPrefetchingEnum.ALL,
-        description="Which models to prefetch before connecting to the backend. It is recommended to leave this to 'all' in production since otherwise users might have to wait for the runner to fetch models first (which could very well fail, especially for the diarization model)",
+        description="Which models to prefetch before connecting to the backend. Can be set to 'all' (default), 'without_alignment' (prefetches everything but alignment models), 'without_alignment_and_diarization' (only prefetches whisper and vad models), and 'none' (doesn't prefetch any models). It is recommended to leave this to 'all' in production since otherwise users might have to wait for the runner to fetch models first (which could very well fail, especially for the diarization model)",
         validate_default=True,
     )
     hf_token: SecretStr = Field(
