@@ -147,7 +147,10 @@ jobs:
     #wait until testing has finished first so that we don't push a broken build
     #also then we can take advantage of the already cached build and don't need to build the image twice
     needs: build-and-test
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ "ubuntu-latest", "macos-15-xlarge" ] #run on both x86 and arm
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout backend repository
         uses: actions/checkout@v4
@@ -162,9 +165,6 @@ jobs:
           ref: ${{needs.build-and-test.outputs.frontend-branch-name}}
           path: frontend
           fetch-depth: 0
-
-      - name: Setup qemu
-        uses: docker/setup-qemu-action@v3
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -203,7 +203,6 @@ jobs:
         with:
           context: .
           file: ./backend/Dockerfile
-          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -215,7 +214,6 @@ jobs:
         with:
           context: .
           file: ./backend/Dockerfile.cron
-          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-cron.outputs.tags }}
           labels: ${{ steps.meta-cron.outputs.labels }}
