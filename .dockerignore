@@ -6,6 +6,5 @@ nix/
 README.md
 flake.*
 **.yml
-**.yaml
 **.sh
 **/__pycache__/
