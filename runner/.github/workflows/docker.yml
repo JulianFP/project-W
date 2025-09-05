@@ -1,0 +1,180 @@
+name: "Build & Push Docker image"
+on:
+  push:
+    branches:
+      - main
+      - dev
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+      - dev
+
+env:
+  RUNNER_IMAGE: 'ghcr.io/julianfp/project-w_runner'
+  DUMMY_RUNNER_IMAGE: 'ghcr.io/julianfp/project-w_runner_dummy'
+
+jobs:
+  docker-build:
+    strategy:
+      matrix:
+        os: [ "ubuntu-24.04", "ubuntu-24.04-arm" ] #run on both x86 and arm
+    runs-on: ${{matrix.os}}
+    steps:
+      - name: Prepare
+        run: |
+          if [ "${{ matrix.os }}" == "ubuntu-24.04-arm" ]; then
+            platform="linux/arm64"
+          else
+            platform="linux/amd64"
+          fi
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+      - name: Checkout runner repository
+        uses: actions/checkout@v4
+        with:
+          path: runner
+          fetch-depth: 0
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login with ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata for runner docker container
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.RUNNER_IMAGE }}
+
+      - name: Metadata for dummy runner docker container
+        id: meta-dummy
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DUMMY_RUNNER_IMAGE }}
+
+      - name: Build & Push Project-W runner docker image
+        id: build
+        uses: docker/build-push-action@v6
+        if: ${{ matrix.os == 'ubuntu-24.04' }} #currently only compatible with x86_64 due to cuda dependencies
+        with:
+          context: .
+          file: ./runner/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.RUNNER_IMAGE }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ env.RUNNER_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.RUNNER_IMAGE }}:buildcache,mode=max
+
+      - name: Build & Push Project-W dummy runner docker image
+        id: build-dummy
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./runner/Dockerfile.dummy
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.DUMMY_RUNNER_IMAGE }}
+          labels: ${{ steps.meta-dummy.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ env.DUMMY_RUNNER_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.DUMMY_RUNNER_IMAGE }}:buildcache,mode=max
+
+      - name: Export runner digest
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Export dummy runner digest
+        run: |
+          mkdir -p ${{ runner.temp }}/dummy-digests
+          digest="${{ steps.build-dummy.outputs.digest }}"
+          touch "${{ runner.temp }}/dummy-digests/${digest#sha256:}"
+
+      - name: Upload runner digest
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload dummy runner digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: dummy-digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/dummy-digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  docker-push:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: "ubuntu-24.04"
+    needs:
+      - docker-build
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Download dummy digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/dummy-digests
+          pattern: dummy-digests-*
+          merge-multiple: true
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login with ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata for runner docker container
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.RUNNER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Create manifest list and push runner
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.RUNNER_IMAGE }}@sha256:%s ' *)
+
+      - name: Metadata for dummy runner docker container
+        id: meta-dummy
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DUMMY_RUNNER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Create manifest list and push dummy runner
+        working-directory: ${{ runner.temp }}/dummy-digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.DUMMY_RUNNER_IMAGE }}@sha256:%s ' *)
