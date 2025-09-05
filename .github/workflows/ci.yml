@@ -207,7 +207,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.RUNNER_IMAGE }}:buildcache,mode=max
 
       - name: Build & Push Project-W dummy runner docker image
-        id: build-dummy
+        id: build-dummy-runner
         uses: docker/build-push-action@v6
         with:
           file: runner_dummy.Dockerfile
