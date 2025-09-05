@@ -17,7 +17,7 @@ RUN pip install whisperx
 
 COPY ./runner .
 
-RUN --mount=source=./runner/.git,target=.git,type=bind \
+RUN --mount=source=./.git,target=.git,type=bind \
     pip install --no-cache-dir -e .[not_dummy]
 
 CMD ["python", "-m", "project_W_runner"]

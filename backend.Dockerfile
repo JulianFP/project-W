@@ -12,7 +12,8 @@ COPY ./frontend .
 
 RUN pnpm install --frozen-lockfile
 
-RUN pnpm build
+RUN --mount=source=./.git,target=.git,type=bind \
+    pnpm build
 
 FROM python:${PYTHON_VERSION}-slim
 
@@ -25,7 +26,7 @@ WORKDIR /backend
 
 COPY ./backend .
 
-RUN --mount=source=./backend/.git,target=.git,type=bind \
+RUN --mount=source=./.git,target=.git,type=bind \
     pip install --no-cache-dir --upgrade -e .
 
 CMD ["python", "-m", "project_W", "--root_static_files", "/frontend"]

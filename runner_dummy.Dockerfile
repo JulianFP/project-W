@@ -7,7 +7,7 @@ WORKDIR /runner
 
 COPY ./runner .
 
-RUN --mount=source=./runner/.git,target=.git,type=bind \
+RUN --mount=source=./.git,target=.git,type=bind \
     pip install --no-cache-dir -e .
 
 CMD ["python", "-m", "project_W_runner", "--dummy"]
