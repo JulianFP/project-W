@@ -9,7 +9,7 @@ python3Packages.buildPythonPackage rec {
   version = "0.0.1";
   pyproject = true;
 
-  src = ../../.;
+  src = ../../runner;
 
   build-system = [ python3Packages.setuptools ];
 

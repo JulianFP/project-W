@@ -4,13 +4,9 @@
   inputs,
 }:
 let
-  dontCheckPythonPkg =
-    drv:
-    drv.overridePythonAttrs (old: {
-      doCheck = false;
-    });
-  myPythonPackages =
+  pythonPackages =
     ps: with ps; [
+      #--- backend ---
       #all required dependencies + this projects package itself (required for sphinx)
       click
       argon2-cffi
@@ -26,26 +22,40 @@ let
       pycryptodome
       aiosmtplib
       granian
-      uvicorn
       setproctitle
+      uvicorn
       python-multipart
       httpx
       platformdirs
       pyaml-env
+
+      #optional dependencies: development_mode
       watchfiles
+
+      #optional dependencies: docs
+      sphinx
+      sphinxcontrib-openapi
+      autodoc-pydantic
+      sphinx-mdinclude
+      sphinx-rtd-theme
 
       #for the tests: tests
       pytest
       pytest-timeout
       smtpdfix
 
-      #optional dependencies: docs
-      sphinx
-      sphinxcontrib-openapi
-      autodoc-pydantic
-      gitpython
-      sphinx-mdinclude
-      sphinx-rtd-theme
+      #--- runner ---
+      #all required dependencies + this projects package itself (required for sphinx)
+      #(dontCheckPythonPkg project-W-runner)
+      httpx
+      click
+      pydantic
+      platformdirs
+      pyaml-env
+
+      #optional dependencies: not_dummy (nixpkgs only has an old version of WhisperX)
+      #hf-xet
+      #whisperx
     ];
   pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
     src = ./.;
@@ -59,16 +69,21 @@ let
       check-builtin-literals.enable = true;
       check-python.enable = true;
       python-debug-statements.enable = true;
+      biome = {
+        enable = true;
+        files = "frontend/*";
+        types_or = [ ];
+      };
       ruff = {
         enable = true;
+        files = "backend*|runner*";
         excludes = [ "doc/conf.py" ];
       };
-      ruff-format.enable = true;
-      nixfmt-rfc-style.enable = true;
-      cspell = {
+      ruff-format = {
         enable = true;
-        args = [ "-w" ];
+        files = "backend*|runner*";
       };
+      nixfmt-rfc-style.enable = true;
     };
   };
 in
@@ -76,7 +91,9 @@ pkgs.mkShell {
   buildInputs =
     with pkgs;
     [
-      (python313.withPackages myPythonPackages)
+      (python312.withPackages pythonPackages)
+      nodejs_24
+      corepack_24
     ]
     ++ pre-commit-check.enabledPackages;
 
@@ -86,7 +103,8 @@ pkgs.mkShell {
         git update-index --skip-worktree "$localOverwriteFile"
         rm "$localOverwriteFile"
     fi
-    git update-index --skip-worktree "config.yml"
+    git update-index --skip-worktree "backend/config.yml"
+    git update-index --skip-worktree "runner/config.yml"
   ''
   + pre-commit-check.shellHook;
 }

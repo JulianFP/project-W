@@ -41,10 +41,6 @@ not_dummy = [
     "whisperx>=3.3.3",
     "hf_xet", #for faster huggingface model downloads at startup
 ]
-tests = [
-    "pytest",
-    "pytest-cov",
-]
 
 # Command line scripts installed as part of the installation
 [project.scripts]
@@ -65,12 +61,6 @@ packages = [
 version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
 write_to = "project_W_runner/_version.py"
-
-# The following is the configuration for the pytest test suite
-[tool.pytest.ini_options]
-testpaths = [
-    "tests",
-]
 
 [tool.ruff]
 line-length = 100

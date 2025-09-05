@@ -1,5 +1,5 @@
 # Ignore setuptools_scm generated version file
-project_W/_version.py
+*_version.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -141,9 +141,29 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-#ignore config files
-JWT_SECRET_KEY
-config.yml
+#for frontend
+node_modules
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+# OS
+.DS_Store
+Thumbs.db
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
 
-#docker data dir
-project-W-data
+#Github Actions
+backend-config*
+
+#ignore config files
+config.yml

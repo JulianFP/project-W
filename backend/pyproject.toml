@@ -15,7 +15,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "project_W"
 description = "Add short description here"
-readme = "README.md"
+readme = "../README.md"
 maintainers = [
     { name = "Julian Partanen", email = "your@email.com" },
     { name = "Markus Everling", email = "your@email.com"}
@@ -73,8 +73,6 @@ docs = [
     "sphinxcontrib-openapi",
     # for settings documentation (which are pydantic models)
     "autodoc_pydantic",
-    # for cloning the runner repo to generate docs for its code as well
-    "GitPython",
     #for including markdown files in sphinx documentation (like the README)
     "sphinx_mdinclude",
     #read the docs theme for sphinx
@@ -103,4 +101,3 @@ version_file = "project_W/_version.py"
 
 [tool.ruff]
 line-length = 100
-extend-exclude = ["doc/conf.py"]

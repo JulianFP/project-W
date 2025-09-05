@@ -4,21 +4,21 @@ on:
   # We run CI on pushes to the main branch
   push:
     branches:
-      - main
-      - dev
+      - "*"
     tags:
       - "v*"
   # and on all pull requests to the main branch
   pull_request:
     branches:
-      - main
-      - dev
+      - "*"
   # as well as upon manual triggers through the 'Actions' tab of the Github UI
   workflow_dispatch:
 
 env:
   BACKEND_IMAGE: 'ghcr.io/julianfp/project-w'
   CRON_IMAGE: 'ghcr.io/julianfp/project-w_cron'
+  RUNNER_IMAGE: 'ghcr.io/julianfp/project-w_runner'
+  DUMMY_RUNNER_IMAGE: 'ghcr.io/julianfp/project-w_runner_dummy'
 
 jobs:
   build-and-test:
@@ -30,10 +30,6 @@ jobs:
         postgres_version: [ "14", "17" ] #14 is minimal required version
         redis_version: [ "7.2", "8" ] #7.2 is minimal required version
         python_version: ["3.11", "3.13"] #3.11 is minimal required version
-
-    outputs:
-      frontend-branch-name: ${{ steps.branch-names.outputs.frontend-branch-name }}
-      runner-branch-name: ${{ steps.branch-names.outputs.runner-branch-name }}
 
     services:
       postgres:
@@ -51,44 +47,9 @@ jobs:
           - 6379:6379
 
     steps:
-      - name: Check which frontend & runner branches to use
-        id: branch-names
-        run: |
-          if git ls-remote --exit-code --heads https://github.com/julianfp/project-w-frontend ${{ github.ref_name }}; then
-            FRONTEND_BRANCH_NAME="${{ github.ref_name }}"
-          else
-            FRONTEND_BRANCH_NAME="main"
-          fi
-          echo "FRONTEND_BRANCH_NAME=${FRONTEND_BRANCH_NAME}" >> "$GITHUB_ENV"
-          echo "frontend-branch-name=${FRONTEND_BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --heads https://github.com/julianfp/project-w-runner ${{ github.ref_name }}; then
-            RUNNER_BRANCH_NAME="${{ github.ref_name }}"
-          else
-            RUNNER_BRANCH_NAME="main"
-          fi
-          echo "RUNNER_BRANCH_NAME=${RUNNER_BRANCH_NAME}" >> "$GITHUB_ENV"
-          echo "runner-branch-name=${RUNNER_BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout backend repository
         uses: actions/checkout@v4
         with:
-          path: backend
-          fetch-depth: 0
-
-      - name: Checkout frontend repository
-        uses: actions/checkout@v4
-        with:
-          repository: julianfp/project-w-frontend
-          ref: ${{ env.FRONTEND_BRANCH_NAME }}
-          path: frontend
-          fetch-depth: 0
-
-      - name: Checkout runner repository
-        uses: actions/checkout@v4
-        with:
-          repository: julianfp/project-w-runner
-          ref: ${{ env.RUNNER_BRANCH_NAME }}
-          path: runner
           fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python_version }}
@@ -98,7 +59,7 @@ jobs:
 
       - name: Install test requirements
         run: |
-          python -m pip install -r backend/tests/requirements.txt
+          python -m pip install -r tests/requirements.txt
 
       - name: Setup SSL certificates
         run: |
@@ -115,11 +76,10 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Project-W docker image
+      - name: Build Project-W backend docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./backend/Dockerfile
+          file: backend.Dockerfile
           tags: project-w:latest
 
           #pull frontend from branch with the same name as backend is currently on:
@@ -130,11 +90,10 @@ jobs:
           cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
 
-      - name: Build Project-W Runner docker image
+      - name: Build Project-W dummy runner docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./runner/Dockerfile.dummy
+          file: runner_dummy.Dockerfile
           tags: project-w_runner_dummy:latest
           push: false
           load: true
@@ -143,7 +102,7 @@ jobs:
 
       - name: Run test suite
         run: |
-          python -m pytest --timeout=45 backend/tests/
+          python -m pytest --timeout=45 tests/
 
   docker-build:
     #don't push docker image on a PR
@@ -164,18 +123,9 @@ jobs:
             platform="linux/amd64"
           fi
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
-      - name: Checkout backend repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          path: backend
-          fetch-depth: 0
-
-      - name: Checkout frontend repository
-        uses: actions/checkout@v4
-        with:
-          repository: julianfp/project-w-frontend
-          ref: ${{needs.build-and-test.outputs.frontend-branch-name}}
-          path: frontend
           fetch-depth: 0
 
       - name: Setup Docker Buildx
@@ -189,7 +139,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Metadata for backend docker container
-        id: meta
+        id: meta-backend
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.BACKEND_IMAGE }}
@@ -200,15 +150,28 @@ jobs:
         with:
           images: ${{ env.CRON_IMAGE }}
 
+      - name: Metadata for runner docker container
+        id: meta-runner
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.RUNNER_IMAGE }}
+
+      - name: Metadata for dummy runner docker container
+        id: meta-dummy-runner
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DUMMY_RUNNER_IMAGE }}
+
       - name: Build & Push Project-W backend docker image
         id: build-backend
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./backend/Dockerfile
+          file: backend.Dockerfile
           push: true
           tags: ${{ env.BACKEND_IMAGE }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
@@ -217,14 +180,51 @@ jobs:
         id: build-cron
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./backend/Dockerfile.cron
+          file: cron.Dockerfile
           push: true
           tags: ${{ env.CRON_IMAGE }}
           labels: ${{ steps.meta-cron.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.CRON_IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.CRON_IMAGE }}:buildcache,mode=max
+
+      - name: Build & Push Project-W runner docker image
+        id: build-runner
+        uses: docker/build-push-action@v6
+        if: ${{ matrix.os == 'ubuntu-24.04' }} #currently only compatible with x86_64 due to cuda dependencies
+        with:
+          file: runner.Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.RUNNER_IMAGE }}
+          labels: ${{ steps.meta-runner.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ env.RUNNER_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.RUNNER_IMAGE }}:buildcache,mode=max
+
+      - name: Build & Push Project-W dummy runner docker image
+        id: build-dummy
+        uses: docker/build-push-action@v6
+        with:
+          file: runner_dummy.Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.DUMMY_RUNNER_IMAGE }}
+          labels: ${{ steps.meta-dummy-runner.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ env.DUMMY_RUNNER_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.DUMMY_RUNNER_IMAGE }}:buildcache,mode=max
+
+      - name: Export runner digest
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
+        run: |
+          mkdir -p ${{ runner.temp }}/runner-digests
+          digest="${{ steps.build-runner.outputs.digest }}"
+          touch "${{ runner.temp }}/runner-digests/${digest#sha256:}"
+
+      - name: Export dummy runner digest
+        run: |
+          mkdir -p ${{ runner.temp }}/dummy-runner-digests
+          digest="${{ steps.build-dummy-runner.outputs.digest }}"
+          touch "${{ runner.temp }}/dummy-runner-digests/${digest#sha256:}"
 
       - name: Export backend digest
         run: |
@@ -254,6 +254,23 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      - name: Upload runner digest
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: runner-digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/runner-digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload dummy runner digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: dummy-runner-digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/dummy-runner-digests/*
+          if-no-files-found: error
+          retention-days: 1
+
   docker-push:
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: "ubuntu-24.04"
@@ -274,6 +291,20 @@ jobs:
           pattern: cron-digests-*
           merge-multiple: true
 
+      - name: Download runner digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/runner-digests
+          pattern: runner-digests-*
+          merge-multiple: true
+
+      - name: Download dummy runner digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/dummy-runner-digests
+          pattern: dummy-runner-digests-*
+          merge-multiple: true
+
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -285,7 +316,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Metadata for backend docker container
-        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.BACKEND_IMAGE }}
@@ -301,7 +331,6 @@ jobs:
             $(printf '${{ env.BACKEND_IMAGE }}@sha256:%s ' *)
 
       - name: Metadata for cron docker container
-        id: meta-cron
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.CRON_IMAGE }}
@@ -315,3 +344,33 @@ jobs:
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.CRON_IMAGE }}@sha256:%s ' *)
+
+      - name: Metadata for runner docker container
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.RUNNER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Create manifest list and push runner
+        working-directory: ${{ runner.temp }}/runner-digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.RUNNER_IMAGE }}@sha256:%s ' *)
+
+      - name: Metadata for dummy runner docker container
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DUMMY_RUNNER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Create manifest list and push dummy runner
+        working-directory: ${{ runner.temp }}/dummy-runner-digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.DUMMY_RUNNER_IMAGE }}@sha256:%s ' *)

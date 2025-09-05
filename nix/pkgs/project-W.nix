@@ -5,7 +5,7 @@ python3Packages.buildPythonPackage rec {
   version = "0.3.0";
   pyproject = true;
 
-  src = ../../.;
+  src = ../../backend;
 
   build-system = [ python3Packages.setuptools ];
 
