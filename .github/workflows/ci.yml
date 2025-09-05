@@ -80,6 +80,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: backend.Dockerfile
+          context: .
           tags: project-w:latest
 
           #pull frontend from branch with the same name as backend is currently on:
@@ -94,6 +95,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: runner_dummy.Dockerfile
+          context: .
           tags: project-w_runner_dummy:latest
           push: false
           load: true
@@ -169,6 +171,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: backend.Dockerfile
+          context: .
           push: true
           tags: ${{ env.BACKEND_IMAGE }}
           labels: ${{ steps.meta-backend.outputs.labels }}
@@ -181,6 +184,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: cron.Dockerfile
+          context: .
           push: true
           tags: ${{ env.CRON_IMAGE }}
           labels: ${{ steps.meta-cron.outputs.labels }}
@@ -194,6 +198,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-24.04' }} #currently only compatible with x86_64 due to cuda dependencies
         with:
           file: runner.Dockerfile
+          context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.RUNNER_IMAGE }}
           labels: ${{ steps.meta-runner.outputs.labels }}
@@ -206,6 +211,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: runner_dummy.Dockerfile
+          context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.DUMMY_RUNNER_IMAGE }}
           labels: ${{ steps.meta-dummy-runner.outputs.labels }}
