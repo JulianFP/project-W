@@ -71,7 +71,7 @@ let
       python-debug-statements.enable = true;
       biome = {
         enable = true;
-        files = "frontend/*";
+        files = "frontend*";
         types_or = [ ];
       };
       ruff = {
