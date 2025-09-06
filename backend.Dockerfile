@@ -1,6 +1,6 @@
 ARG PYTHON_VERSION=3.13
 
-FROM node:24-slim AS builder
+FROM node:24-slim AS frontend-builder
 
 WORKDIR /frontend-code
 
@@ -15,18 +15,39 @@ RUN pnpm install --frozen-lockfile
 RUN --mount=source=./.git,target=.git,type=bind \
     pnpm build
 
+FROM python:${PYTHON_VERSION}-slim AS backend-builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# gcc, libldap and libsas are required to compile bonsai (the ldap library we use) since it doesn't have any wheels on pypi
+RUN apt-get update && apt-get install -y --no-install-recommends git gcc libldap2-dev libsasl2-dev
+
+WORKDIR /app
+
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=backend/uv.lock,target=uv.lock \
+    --mount=type=bind,source=backend/pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-editable --compile-bytecode
+
+ADD ./backend /app
+
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=.git,target=/.git \
+    uv sync --locked --no-editable --compile-bytecode
+
 FROM python:${PYTHON_VERSION}-slim
 
 # gcc, libldap and libsas are required to compile bonsai (the ldap library we use) since it doesn't have any wheels on pypi
-RUN apt-get update && apt-get install -y --no-install-recommends git curl gcc libldap2-dev libsasl2-dev
+RUN apt-get update && apt-get install -y --no-install-recommends curl gcc libldap2-dev libsasl2-dev
 
-COPY --from=builder /frontend-code/build /frontend
+# Copy licensing information
+COPY ./README.md ./LICENSE.md ./COPYING.md /app/
 
-WORKDIR /backend
+# Copy the environment, but not the source code
+COPY --from=backend-builder --chown=app:app /app/.venv /app/.venv
 
-COPY ./backend .
+COPY --from=frontend-builder /frontend-code/build /app/frontend
 
-RUN --mount=source=./.git,target=.git,type=bind \
-    pip install --no-cache-dir --upgrade -e .
-
-CMD ["python", "-m", "project_W", "--root_static_files", "/frontend"]
+CMD ["/app/.venv/bin/project_W", "--root_static_files", "/app/frontend"]

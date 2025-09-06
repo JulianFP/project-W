@@ -1,7 +1,28 @@
-#bullseye required for
+#bullseye required for whisperx
+FROM python:3.12-slim-bullseye AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+RUN apt-get update && apt-get install -y --no-install-recommends git
+
+WORKDIR /app
+
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=runner/uv.lock,target=uv.lock \
+    --mount=type=bind,source=runner/pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-editable --compile-bytecode
+
+ADD ./runner /app
+
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=.git,target=/.git \
+    uv sync --locked --no-editable --compile-bytecode
+
 FROM python:3.12-slim-bullseye
 
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg git wget
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg wget
 
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-keyring_1.1-1_all.deb
 
@@ -9,15 +30,10 @@ RUN dpkg -i cuda-keyring_1.1-1_all.deb
 
 RUN apt-get update && apt-get install -y --no-install-recommends libcudnn8 libcudnn8-dev
 
-WORKDIR /runner
+# Copy licensing information
+COPY ./README.md ./LICENSE.md ./COPYING.md /app/
 
-# install whisper first, as it's a very large dependency (multiple GBs of data) which
-# we don't want to re-download every time we change the code.
-RUN pip install whisperx
+# Copy the environment, but not the source code
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
 
-COPY ./runner .
-
-RUN --mount=source=./.git,target=.git,type=bind \
-    pip install --no-cache-dir -e .[not_dummy]
-
-CMD ["python", "-m", "project_W_runner"]
+CMD ["/app/.venv/bin/project_W_runner"]

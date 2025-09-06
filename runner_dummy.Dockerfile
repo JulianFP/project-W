@@ -1,13 +1,31 @@
 #to use the same image as in normal runner
-FROM python:3.12-slim-bullseye
+FROM python:3.12-slim-bullseye AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN apt-get update && apt-get install -y --no-install-recommends git
 
-WORKDIR /runner
+WORKDIR /app
 
-COPY ./runner .
+# Install dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=runner/uv.lock,target=uv.lock \
+    --mount=type=bind,source=runner/pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-editable --compile-bytecode
 
-RUN --mount=source=./.git,target=.git,type=bind \
-    pip install --no-cache-dir -e .
+ADD ./runner /app
 
-CMD ["python", "-m", "project_W_runner", "--dummy"]
+# Sync the project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=.git,target=/.git \
+    uv sync --locked --no-editable --compile-bytecode
+
+FROM python:3.12-slim-bullseye
+
+# Copy licensing information
+COPY ./README.md ./LICENSE.md ./COPYING.md /app/
+
+# Copy the environment, but not the source code
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+
+CMD ["/app/.venv/bin/project_W_runner", "--dummy"]

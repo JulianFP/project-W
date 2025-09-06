@@ -3,7 +3,6 @@ doc/
 nix/
 .github/
 .gitignore
-README.md
 flake.*
 **.yml
 **.sh
