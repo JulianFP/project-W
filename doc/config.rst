@@ -67,11 +67,11 @@ Description of runner config options
 
 The following gives an overview over all config options available to you on the runner:
 
-.. autopydantic_model:: runner_settings.Settings
+.. autopydantic_model:: project_W_runner.models.settings.Settings
 
 Refer below to each of the fields and their subfields and subsubfields and so on:
 
-.. automodule:: runner_settings
+.. automodule:: project_W_runner.models.settings
    :members:
    :inherited-members: BaseModel, str
    :exclude-members: Settings

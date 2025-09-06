@@ -1,82 +1,36 @@
-# This section describes the requirements of the build/installation
-# process itself. Being able to do this was the original reason to
-# introduce pyproject.toml
 [build-system]
 requires = [
-    "setuptools >=61",
+    "setuptools>=80",
     #we need larger than 9 to get PR https://github.com/pypa/setuptools-scm/pull/1154
-    "setuptools_scm >=9",
+    "setuptools_scm>=9",
 ]
 build-backend = "setuptools.build_meta"
 
-# This section provides general project metadata that is used across
-# a variety of build tools. Notably, the version specified here is the
-# single source of truth for project_W's version
 [project]
 name = "project_W"
-description = "Add short description here"
-readme = "../README.md"
-maintainers = [
-    { name = "Julian Partanen", email = "your@email.com" },
-    { name = "Markus Everling", email = "your@email.com"}
-]
+description = "Add your description here"
 dynamic = ["version"]
 requires-python = ">=3.11"
 license = { text = "AGPLv3" }
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
-]
 dependencies = [
-    # click cli to pass some hosting options to application which shouldn't be part of config file,
-    "click",
-    # Argon2 for password hashing
-    "argon2-cffi",
-    # Fastapi and validation libraries
-    "fastapi",
-    "pydantic",
-    "email-validator",
-    # Postgres client library
-    "psycopg[binary,pool]",
-    # Redis client library
-    "redis[hiredis]",
-    # auth & security stuff
-    "authlib", #for OIDC
-    "bonsai", #for LDAP
-    "itsdangerous", #for tokens sent in emails (password reset, account activation)
-    "pycryptodome", #for database encryption
-    # async smtp library
-    "aiosmtplib",
-    # for deployment
-    "granian[pname]",
-    "uvicorn", # we still need this for its ProxyHeadersMiddleware
-    # for multipart streaming
-    "python-multipart",
-    # for making http requests to OIDC provider
-    "httpx",
-    # getting platform-independent directories for config and data (follows xdg standard on Linux)
-    "platformdirs",
-    # parsing config from yaml file and env vars
-    "pyaml_env",
-]
-
-[project.optional-dependencies]
-development_mode = [
-    # granian extra packages
-    "granian[pname,reload]",
-]
-docs = [
-    #sphinx documentation engine
-    "sphinx",
-    #for including FastAPI's OpenAPI docs
-    "sphinxcontrib-openapi",
-    # for settings documentation (which are pydantic models)
-    "autodoc_pydantic",
-    #for including markdown files in sphinx documentation (like the README)
-    "sphinx_mdinclude",
-    #read the docs theme for sphinx
-    "sphinx_rtd_theme",
+    "aiosmtplib>=4.0.2",
+    "argon2-cffi>=25.1.0",
+    "authlib>=1.6.3",
+    "bonsai>=1.5.4",
+    "click>=8.2.1",
+    "email-validator>=2.3.0",
+    "fastapi>=0.116.1",
+    "granian[pname]>=2.5.2",
+    "httpx>=0.28.1",
+    "itsdangerous>=2.2.0",
+    "platformdirs>=4.4.0",
+    "psycopg[binary,pool]>=3.2.9",
+    "pyaml-env>=1.2.2",
+    "pycryptodome>=3.23.0",
+    "pydantic>=2.11.7",
+    "python-multipart>=0.0.20",
+    "redis[hiredis]>=6.4.0",
+    "uvicorn>=0.35.0",
 ]
 
 # Command line scripts installed as part of the installation
@@ -95,9 +49,15 @@ packages = [
 # the version control system. For more information see its documentation:
 # https://github.com/pypa/setuptools_scm
 [tool.setuptools_scm]
+root = ".."
 version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
 version_file = "project_W/_version.py"
 
 [tool.ruff]
 line-length = 100
+
+[dependency-groups]
+dev = [
+    "granian[pname,reload]>=2.5.2",
+]

@@ -1,66 +1,48 @@
-# This section describes the requirements of the build/installation
-# process itself. Being able to do this was the original reason to
-# introduce pyproject.toml
 [build-system]
 requires = [
-    "setuptools >=61",
+    "setuptools>=80",
     #we need larger than 9 to get PR https://github.com/pypa/setuptools-scm/pull/1154
-    "setuptools_scm >=9",
+    "setuptools_scm>=9",
 ]
-build-backend = "setuptools.build_meta"
 
-# This section provides general project metadata that is used across
-# a variety of build tools. Notably, the version specified here is the
-# single source of truth for project_W_runner's version
+build-backend = "setuptools.build_meta"
 [project]
 name = "project_W_runner"
-description = "Add short description here"
-readme = "README.md"
+description = "Add your description here"
 maintainers = [
     { name = "Julian Partanen", email = "your@email.com"},
     { name = "Markus Everling", email = "your@email.com" },
 ]
 dynamic = ["version"]
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 license = { text = "AGPLv3" }
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
-]
 dependencies = [
-    "httpx",
-    "click",
-    "pydantic",
-    "platformdirs",
-    "pyaml_env",
+    "click>=8.2.1",
+    "httpx>=0.28.1",
+    "platformdirs>=4.4.0",
+    "pyaml-env>=1.2.2",
+    "pydantic>=2.11.7",
 ]
 
-[project.optional-dependencies]
-not_dummy = [
-    "whisperx>=3.3.3",
-    "hf_xet", #for faster huggingface model downloads at startup
-]
-
-# Command line scripts installed as part of the installation
 [project.scripts]
 project_W_runner = "project_W_runner.__main__:main"
 
-# The following section contains setuptools-specific configuration
-# options. For a full reference of available options, check the overview
-# at https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+[project.optional-dependencies]
+not-dummy = [
+    "hf-xet>=1.1.9",
+    "whisperx>=3.4.2",
+]
+
 [tool.setuptools]
 packages = [
     "project_W_runner",
 ]
 
-# Configure setuptools_scm, which extracts the version number from
-# the version control system. For more information see its documentation:
-# https://github.com/pypa/setuptools_scm
 [tool.setuptools_scm]
+root = ".."
 version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
-write_to = "project_W_runner/_version.py"
+version_file = "project_W_runner/_version.py"
 
 [tool.ruff]
 line-length = 100
