@@ -18,11 +18,11 @@ from psycopg_pool.pool_async import AsyncConnectionPool
 from pydantic import SecretStr, ValidationError
 
 import project_W.dependencies as dp
-from project_W.models.settings import SecretKeyValidated
 
 from ._version import version, version_tuple
 from .logger import get_logger
 from .models.base import EmailValidated, PasswordValidated
+from .models.settings import SecretKeyValidated
 from .models.internal import (
     JobAndSettingsInDb,
     JobInDb,

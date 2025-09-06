@@ -8,9 +8,9 @@ from granian.server import Server
 from itsdangerous import URLSafeTimedSerializer
 
 import project_W.dependencies as dp
-from project_W.models.settings import SecretKeyValidated
 
 from ._version import __commit_id__, __version__
+from .models.settings import SecretKeyValidated
 from .config import load_config
 from .logger import get_logger
 from .cli_tasks import (

@@ -3,8 +3,8 @@ from typing import Annotated, Sequence
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 import project_W.dependencies as dp
-from project_W.models.internal import LoginContext
 
+from ..models.internal import LoginContext
 from ..models.response_data import ErrorResponse, TokenInfo, User, UserTypeEnum
 from ..security.auth import (
     auth_dependency_responses,

@@ -8,9 +8,8 @@ from aiosmtplib import (
     SMTPServerDisconnected,
 )
 
-from project_W.models.base import EmailValidated
-
 from .logger import get_logger
+from .models.base import EmailValidated
 from .models.settings import SMTPSecureEnum, SMTPServerSettings
 
 

@@ -15,13 +15,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from itsdangerous import BadSignature, SignatureExpired
 from pydantic import SecretStr, ValidationError
 
-from project_W.models.base import (
+from project_W import dependencies as dp
+
+from ..models.base import (
     EmailValidated,
     LocalAccountOperationModeEnum,
     PasswordValidated,
 )
-
-from .. import dependencies as dp
 from ..models.internal import (
     AccountActivationTokenData,
     LoginContext,

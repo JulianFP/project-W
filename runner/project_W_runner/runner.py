@@ -10,10 +10,9 @@ import certifi
 import httpx
 from pydantic import ValidationError
 
-from project_W_runner.models.base import JobSettingsBase
-
 from ._version import __version__
 from .logger import get_logger
+from .models.base import JobSettingsBase
 from .models.internal import (
     BackendError,
     JobData,

@@ -5,14 +5,14 @@ from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_415_UNSUPPORTED_MEDIA_TYPE
 
 import project_W.dependencies as dp
-from project_W.models.internal import (
+
+from ..models.internal import (
     JobAndSettingsInDb,
     JobInDb,
     JobSortKey,
     LoginContext,
     SSEEvent,
 )
-
 from ..models.request_data import JobSettings, TranscriptTypeEnum
 from ..models.response_data import (
     ErrorResponse,

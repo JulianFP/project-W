@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 import project_W.dependencies as dp
-from project_W.models.request_data import EmailToUsers, SiteBanner
 
+from ..models.request_data import EmailToUsers, SiteBanner
 from ..models.internal import LoginContext
 from ..models.response_data import RunnerCreatedInfo
 from ..security.auth import auth_dependency_responses, validate_user

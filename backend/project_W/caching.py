@@ -9,11 +9,11 @@ from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 
 import project_W.dependencies as dp
-from project_W.models.request_data import RunnerRegisterRequest
 
 from .logger import get_logger
 from .models.internal import InProcessJob, OnlineRunner, SSEEvent
 from .models.settings import RedisConnection
+from .models.request_data import RunnerRegisterRequest
 from .utils import hash_token
 
 
