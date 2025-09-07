@@ -12,7 +12,7 @@ COPY ./frontend .
 
 RUN pnpm install --frozen-lockfile
 
-RUN --mount=source=./.git,target=.git,type=bind \
+RUN --mount=source=.git,target=/.git,type=bind \
     pnpm build
 
 FROM python:${PYTHON_VERSION}-slim AS backend-builder
@@ -39,8 +39,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:${PYTHON_VERSION}-slim
 
-# gcc, libldap and libsas are required to compile bonsai (the ldap library we use) since it doesn't have any wheels on pypi
-RUN apt-get update && apt-get install -y --no-install-recommends curl gcc libldap2-dev libsasl2-dev
+# curl to be able to perform health check
+RUN apt-get update && apt-get install -y --no-install-recommends curl
 
 # Copy licensing information
 COPY ./README.md ./LICENSE.md ./COPYING.md /app/

@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "project_W_runner"
-description = "Add your description here"
+description = "The runner of Project-W, a self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI"
 maintainers = [
     { name = "Julian Partanen", email = "julian@partanengroup.de"},
 ]

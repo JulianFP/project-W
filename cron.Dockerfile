@@ -1,4 +1,6 @@
-FROM python:${PYTHON_VERSION}-slim AS backend-builder
+ARG PYTHON_VERSION=3.13
+
+FROM python:${PYTHON_VERSION}-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -22,14 +24,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:${PYTHON_VERSION}-slim
 
-# gcc, libldap and libsas are required to compile bonsai (the ldap library we use) since it doesn't have any wheels on pypi
-RUN apt-get update && apt-get install -y --no-install-recommends curl gcc libldap2-dev libsasl2-dev
+RUN apt-get update && apt-get install -y --no-install-recommends cron
 
 # Copy licensing information
 COPY ./README.md ./LICENSE.md ./COPYING.md /app/
 
 # Copy the environment, but not the source code
-COPY --from=backend-builder --chown=app:app /app/.venv /app/.venv
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
 
 RUN crontab -l | { cat; echo '0 0 * * * export $(/usr/bin/cat /proc/1/environ | /usr/bin/xargs --null) && /app/.venv/bin/project_W --run_periodic_tasks > /proc/1/fd/1 2>&1'; } | crontab -
 
