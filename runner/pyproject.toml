@@ -4,14 +4,13 @@ requires = [
     #we need larger than 9 to get PR https://github.com/pypa/setuptools-scm/pull/1154
     "setuptools_scm>=9",
 ]
-
 build-backend = "setuptools.build_meta"
+
 [project]
 name = "project_W_runner"
 description = "Add your description here"
 maintainers = [
-    { name = "Julian Partanen", email = "your@email.com"},
-    { name = "Markus Everling", email = "your@email.com" },
+    { name = "Julian Partanen", email = "julian@partanengroup.de"},
 ]
 dynamic = ["version"]
 requires-python = ">=3.11,<3.13"
@@ -33,10 +32,12 @@ not-dummy = [
     "whisperx>=3.4.2",
 ]
 
-[tool.setuptools]
-packages = [
-    "project_W_runner",
-]
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["project_W_runner*"]
 
 [tool.setuptools_scm]
 root = ".."

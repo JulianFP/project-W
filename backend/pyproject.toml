@@ -9,6 +9,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "project_W"
 description = "Add your description here"
+maintainers = [
+    { name = "Julian Partanen", email = "julian@partanengroup.de"},
+]
 dynamic = ["version"]
 requires-python = ">=3.11"
 license = { text = "AGPLv3" }
@@ -33,21 +36,16 @@ dependencies = [
     "uvicorn>=0.35.0",
 ]
 
-# Command line scripts installed as part of the installation
 [project.scripts]
 project_W = "project_W.__main__:main"
 
-# The following section contains setuptools-specific configuration
-# options. For a full reference of available options, check the overview
-# at https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
-[tool.setuptools]
-packages = [
-    "project_W",
-]
+[tool.uv]
+package = true
 
-# Configure setuptools_scm, which extracts the version number from
-# the version control system. For more information see its documentation:
-# https://github.com/pypa/setuptools_scm
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["project_W*"]
+
 [tool.setuptools_scm]
 root = ".."
 version_scheme = "python-simplified-semver"
