@@ -2,17 +2,17 @@ ARG PYTHON_VERSION=3.13
 
 FROM node:24-slim AS frontend-builder
 
-WORKDIR /frontend-code
+WORKDIR /app/frontend
 
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates
 
 RUN npm install -g pnpm
 
-COPY ./frontend .
+COPY . /app
 
 RUN pnpm install --frozen-lockfile
 
-RUN --mount=source=.git,target=/.git,type=bind \
+RUN --mount=source=.git,target=/app/.git,type=bind \
     pnpm build
 
 FROM python:${PYTHON_VERSION}-slim AS backend-builder
@@ -26,24 +26,16 @@ WORKDIR /app
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=backend/uv.lock,target=uv.lock \
-    --mount=type=bind,source=backend/pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-editable --compile-bytecode
+    --mount=type=bind,source=backend/uv.lock,target=backend/uv.lock \
+    --mount=type=bind,source=backend/pyproject.toml,target=backend/pyproject.toml \
+    uv sync --locked --no-install-project --no-editable --compile-bytecode --project backend
 
-ADD ./backend /app
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=.git,target=/.git \
-    ls -alh
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=.git,target=/.git \
-    git status
+ADD . /app
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=.git,target=/.git \
-    uv sync --locked --no-editable --compile-bytecode
+    --mount=type=bind,source=.git,target=.git \
+    uv sync --locked --no-editable --compile-bytecode --project backend
 
 FROM python:${PYTHON_VERSION}-slim
 
@@ -54,8 +46,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl
 COPY ./README.md ./LICENSE.md ./COPYING.md /app/
 
 # Copy the environment, but not the source code
-COPY --from=backend-builder --chown=app:app /app/.venv /app/.venv
+COPY --from=backend-builder --chown=app:app /app/backend/.venv /app/backend/.venv
 
-COPY --from=frontend-builder /frontend-code/build /app/frontend
+COPY --from=frontend-builder /app/frontend/build /app/frontend
 
-CMD ["/app/.venv/bin/project_W", "--root_static_files", "/app/frontend"]
+CMD ["/app/backend/.venv/bin/project_W", "--root_static_files", "/app/frontend"]
