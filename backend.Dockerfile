@@ -32,6 +32,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 ADD ./backend /app
 
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=.git,target=/.git \
+    ls -alh
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=.git,target=/.git \
+    git status
+
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=.git,target=/.git \
