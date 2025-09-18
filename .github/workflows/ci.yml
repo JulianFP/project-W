@@ -138,6 +138,9 @@ jobs:
             container: "runner"
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Reclaim disk space for build
+        uses: jlumbroso/free-disk-space@main
+
       - name: Prepare
         run: |
           if [ "${{ matrix.os }}" == "ubuntu-24.04-arm" ]; then
