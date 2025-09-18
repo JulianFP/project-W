@@ -14,11 +14,17 @@ on:
   # as well as upon manual triggers through the 'Actions' tab of the Github UI
   workflow_dispatch:
 
+#define yaml anchors because GitHub Actions env values cannot be put into matrix expression
+#yaml anchors can't be put inline of a string though, so also define env vars for images
 env:
-  BACKEND_IMAGE: 'ghcr.io/julianfp/project-w'
-  CRON_IMAGE: 'ghcr.io/julianfp/project-w_cron'
-  RUNNER_IMAGE: 'ghcr.io/julianfp/project-w_runner'
-  DUMMY_RUNNER_IMAGE: 'ghcr.io/julianfp/project-w_runner_dummy'
+  BACKEND_IMAGE: &backend_image "ghcr.io/julianfp/project-w"
+  BACKEND_DOCKERFILE: &backend_dockerfile "backend.Dockerfile"
+  CRON_IMAGE: &cron_image "ghcr.io/julianfp/project-w_cron"
+  CRON_DOCKERFILE: &cron_dockerfile "cron.Dockerfile"
+  RUNNER_IMAGE: &runner_image "ghcr.io/julianfp/project-w_runner"
+  RUNNER_DOCKERFILE: &runner_dockerfile "runner.Dockerfile"
+  DUMMY_RUNNER_IMAGE: &dummy-runner_image "ghcr.io/julianfp/project-w_runner_dummy"
+  DUMMY_RUNNER_DOCKERFILE: &dummy-runner_dockerfile "runner_dummy.Dockerfile"
 
 jobs:
   build-and-test:
@@ -65,7 +71,7 @@ jobs:
       - name: Build Project-W backend docker image
         uses: docker/build-push-action@v6
         with:
-          file: backend.Dockerfile
+          file: *backend_dockerfile
           context: .
           tags: project-w:latest
 
@@ -80,7 +86,7 @@ jobs:
       - name: Build Project-W dummy runner docker image
         uses: docker/build-push-action@v6
         with:
-          file: runner_dummy.Dockerfile
+          file: *dummy-runner_dockerfile
           context: .
           tags: project-w_runner_dummy:latest
           push: false
@@ -105,7 +111,7 @@ jobs:
           uv run --project tests pytest --timeout=45 tests/
 
   docker-build:
-    #don't push docker image on a PR
+    #don't build&push docker image on a PR
     if: ${{ github.event_name != 'pull_request' }}
     #wait until testing has finished first so that we don't push a broken build
     #also then we can take advantage of the already cached build and don't need to build the image twice
@@ -113,6 +119,23 @@ jobs:
     strategy:
       matrix:
         os: [ "ubuntu-24.04", "ubuntu-24.04-arm" ] #run on both x86 and arm
+        container: [ "backend", "cron", "runner", "dummy-runner" ]
+        include:
+          - container: "backend"
+            image: *backend_image
+            dockerfile: *backend_dockerfile
+          - container: "cron"
+            image: *cron_image
+            dockerfile: *cron_dockerfile
+          - container: "runner"
+            image: *runner_image
+            dockerfile: *runner_dockerfile
+          - container: "dummy-runner"
+            image: *dummy-runner_image
+            dockerfile: *dummy-runner_dockerfile
+        exclude:
+          - os: "ubuntu-24.04-arm"
+            container: "runner"
     runs-on: ${{ matrix.os }}
     steps:
       - name: Prepare
@@ -139,140 +162,36 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Metadata for backend docker container
-        id: meta-backend
+      - name: Metadata for ${{ matrix.container }} docker container
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.BACKEND_IMAGE }}
+          images: ${{ matrix.image }}
 
-      - name: Metadata for cron docker container
-        id: meta-cron
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.CRON_IMAGE }}
-
-      - name: Metadata for runner docker container
-        id: meta-runner
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.RUNNER_IMAGE }}
-
-      - name: Metadata for dummy runner docker container
-        id: meta-dummy-runner
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.DUMMY_RUNNER_IMAGE }}
-
-      - name: Build Project-W backend docker image
-        id: build-backend
+      - name: Build ${{ matrix.container }} docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
-          file: backend.Dockerfile
+          file: ${{ matrix.dockerfile }}
           context: .
           push: true
-          tags: ${{ env.BACKEND_IMAGE }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
+          tags: ${{ matrix.image }}
+          labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ matrix.image }}:buildcache,mode=max
 
-      - name: Build Project-W cron docker image
-        id: build-cron
-        uses: docker/build-push-action@v6
-        with:
-          file: cron.Dockerfile
-          context: .
-          push: true
-          tags: ${{ env.CRON_IMAGE }}
-          labels: ${{ steps.meta-cron.outputs.labels }}
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=registry,ref=${{ env.CRON_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.CRON_IMAGE }}:buildcache,mode=max
-
-      - name: Build Project-W runner docker image
-        id: build-runner
-        uses: docker/build-push-action@v6
-        if: ${{ matrix.os == 'ubuntu-24.04' }} #currently only compatible with x86_64 due to cuda dependencies
-        with:
-          file: runner.Dockerfile
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.RUNNER_IMAGE }}
-          labels: ${{ steps.meta-runner.outputs.labels }}
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=registry,ref=${{ env.RUNNER_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.RUNNER_IMAGE }}:buildcache,mode=max
-
-      - name: Build Project-W dummy runner docker image
-        id: build-dummy-runner
-        uses: docker/build-push-action@v6
-        with:
-          file: runner_dummy.Dockerfile
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.DUMMY_RUNNER_IMAGE }}
-          labels: ${{ steps.meta-dummy-runner.outputs.labels }}
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=registry,ref=${{ env.DUMMY_RUNNER_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.DUMMY_RUNNER_IMAGE }}:buildcache,mode=max
-
-      - name: Export runner digest
-        if: ${{ matrix.os == 'ubuntu-24.04' }}
+      - name: Export ${{ matrix.container }} digest
         run: |
-          mkdir -p ${{ runner.temp }}/runner-digests
-          digest="${{ steps.build-runner.outputs.digest }}"
-          touch "${{ runner.temp }}/runner-digests/${digest#sha256:}"
+          mkdir -p ${{ runner.temp }}/${{ matrix.container }}-digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/${{ matrix.container }}-digests/${digest#sha256:}"
 
-      - name: Export dummy runner digest
-        run: |
-          mkdir -p ${{ runner.temp }}/dummy-runner-digests
-          digest="${{ steps.build-dummy-runner.outputs.digest }}"
-          touch "${{ runner.temp }}/dummy-runner-digests/${digest#sha256:}"
-
-      - name: Export backend digest
-        run: |
-          mkdir -p ${{ runner.temp }}/backend-digests
-          digest="${{ steps.build-backend.outputs.digest }}"
-          touch "${{ runner.temp }}/backend-digests/${digest#sha256:}"
-
-      - name: Export cron digest
-        run: |
-          mkdir -p ${{ runner.temp }}/cron-digests
-          digest="${{ steps.build-cron.outputs.digest }}"
-          touch "${{ runner.temp }}/cron-digests/${digest#sha256:}"
-
-      - name: Upload backend digest
+      - name: Upload ${{ matrix.container }} digest
         uses: actions/upload-artifact@v4
         with:
-          name: backend-digests-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/backend-digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload cron digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: cron-digests-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/cron-digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload runner digest
-        if: ${{ matrix.os == 'ubuntu-24.04' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: runner-digests-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/runner-digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload dummy runner digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-runner-digests-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/dummy-runner-digests/*
+          name: ${{ matrix.container }}-digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/${{ matrix.container }}-digests/*
           if-no-files-found: error
           retention-days: 1
 
