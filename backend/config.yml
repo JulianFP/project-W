@@ -7,8 +7,7 @@ postgres_connection_string: "postgresql://postgres@%2Fvar%2Frun%2Fpostgresql/pos
 redis_connection:
   unix_socket_path: "/var/run/redis-project-W/redis.sock"
 security:
-  local_token:
-    session_secret_key: f26a5feb0eb502fb2b4f872026ce7b5d3986dbfef77d72d3f29050df2f8b3bdb
+  secret_key: f26a5feb0eb502fb2b4f872026ce7b5d3986dbfef77d72d3f29050df2f8b3bdb
   local_account:
     user_provisioning:
       0:
