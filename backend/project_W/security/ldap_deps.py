@@ -5,10 +5,10 @@ from bonsai import AuthenticationError, ConnectionError, LDAPClient, TimeoutErro
 from bonsai.asyncio import AIOConnectionPool, AIOLDAPConnection
 from fastapi import HTTPException, status
 from pydantic import ValidationError
+from project_W_lib.logger import get_logger
 
 import project_W.dependencies as dp
 
-from ..logger import get_logger
 from ..models.base import EmailValidated
 from ..models.internal import LdapTokenInfoInternal, LdapUserInfo
 from ..models.settings import LdapProviderSettings

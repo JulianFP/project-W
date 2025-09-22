@@ -16,11 +16,12 @@ from psycopg.rows import class_row, dict_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 from pydantic import SecretStr, ValidationError
+from project_W_lib.logger import get_logger
+from project_W_lib.models.runner_request_data import Transcript
 
 import project_W.dependencies as dp
 
 from ._version import version, version_tuple
-from .logger import get_logger
 from .models.base import EmailValidated, PasswordValidated
 from .models.settings import SecretKeyValidated
 from .models.internal import (
@@ -40,7 +41,7 @@ from .models.internal import (
     RunnerInDb,
     TokenInfoInternal,
 )
-from .models.request_data import JobSettings, Transcript, TranscriptTypeEnum
+from .models.request_data import JobSettings, TranscriptTypeEnum
 from .models.response_data import RunnerCreatedInfo, SiteBannerResponse
 from .utils import hash_token, minutes_from_now_to_datetime, parse_version_tuple
 

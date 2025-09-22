@@ -2,11 +2,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
+from project_W_lib.models.generic_response_data import ErrorResponse
 
 import project_W.dependencies as dp
 import project_W.security.ldap_deps as ldap
 
-from ..models.response_data import ErrorResponse
 from ..security.auth import check_admin_privileges, set_token_cookie
 
 router = APIRouter(

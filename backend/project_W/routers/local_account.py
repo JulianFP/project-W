@@ -14,6 +14,7 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordRequestForm
 from itsdangerous import BadSignature, SignatureExpired
 from pydantic import SecretStr, ValidationError
+from project_W_lib.models.generic_response_data import ErrorResponse
 
 from project_W import dependencies as dp
 
@@ -28,7 +29,7 @@ from ..models.internal import (
     PasswordResetTokenData,
 )
 from ..models.request_data import PasswordResetData, SignupData
-from ..models.response_data import ErrorResponse, UserTypeEnum
+from ..models.response_data import UserTypeEnum
 from ..security.auth import (
     auth_dependency_responses,
     check_admin_privileges,

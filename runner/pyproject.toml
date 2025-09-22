@@ -14,12 +14,11 @@ maintainers = [
 ]
 dynamic = ["version"]
 requires-python = ">=3.11,<3.13"
-license = { text = "AGPLv3" }
+license = "AGPL-3.0-only"
 dependencies = [
     "click>=8.2.1",
     "httpx>=0.28.1",
-    "platformdirs>=4.4.0",
-    "pyaml-env>=1.2.2",
+    "project-w-lib",
     "pydantic>=2.11.7",
 ]
 
@@ -35,6 +34,9 @@ not-dummy = [
 [tool.uv]
 package = true
 
+[tool.uv.sources]
+project-w-lib = { path = "../lib", editable = true }
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["project_W_runner*"]
@@ -44,6 +46,10 @@ root = ".."
 version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
 version_file = "project_W_runner/_version.py"
+
+[tool.pyright]
+include = ["."]
+extraPaths = ["../lib"]
 
 [tool.ruff]
 line-length = 100

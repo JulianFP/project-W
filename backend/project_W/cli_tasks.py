@@ -1,10 +1,11 @@
 import asyncio
 
+from project_W_lib.logger import get_logger
+
 import project_W.dependencies as dp
 
 from .models.settings import SecretKeyValidated
 from .database import PostgresAdapter
-from .logger import get_logger
 from .security import ldap_deps, oidc_deps
 from .smtp import SmtpClient
 

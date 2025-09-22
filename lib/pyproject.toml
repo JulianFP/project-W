@@ -1,0 +1,14 @@
+[project]
+name = "project_W_lib"
+version = "0.1.0"
+description = "Library for code that is shared between backend and runner"
+maintainers = [
+    { name = "Julian Partanen", email = "julian@partanengroup.de"},
+]
+requires-python = ">=3.11"
+license = "AGPL-3.0-only"
+dependencies = [
+    "platformdirs>=4.4.0",
+    "pyaml-env>=1.2.2",
+    "pydantic>=2.11.9",
+]

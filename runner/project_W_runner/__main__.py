@@ -4,13 +4,15 @@ import platform
 from pathlib import Path
 
 import click
+from project_W_lib.config import load_config
+from project_W_lib.logger import get_logger
 
 from ._version import __commit_id__, __version__
-from .config import load_config
-from .logger import get_logger
+from .models.settings import Settings
 from .runner import Runner
 
-logger = get_logger("project-W-runner")
+program_name = "project-W-runner"
+logger = get_logger(program_name)
 
 
 @click.command()
@@ -43,7 +45,11 @@ def main(custom_config_path: Path | None, dummy: bool):
     logger.info(f"Application was built from git hash {git_hash}")
     logger.info(f"Python version: {platform.python_version()}")
 
-    config = load_config([custom_config_path]) if custom_config_path else load_config()
+    config = (
+        load_config(program_name, Settings, [custom_config_path])
+        if custom_config_path
+        else load_config(program_name, Settings)
+    )
 
     # set env vars first before importing Runner and prefetch code because that would trigger the code that reads the env var
     os.environ["PYANNOTE_CACHE"] = str(config.whisper_settings.model_cache_dir)

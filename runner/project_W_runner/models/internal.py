@@ -1,9 +1,8 @@
 from httpx import HTTPError, Response
 from pydantic import BaseModel, Field, ValidationError
-
-from .base import JobSettingsBase
-from .request_data import Transcript
-from .response_data import ErrorResponse
+from project_W_lib.models.job_settings import JobSettingsBase
+from project_W_lib.models.runner_request_data import Transcript
+from project_W_lib.models.generic_response_data import ErrorResponse
 
 
 class ResponseNotJson(Exception):

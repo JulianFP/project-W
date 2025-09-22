@@ -7,14 +7,13 @@ import torch
 import whisperx
 from whisperx import alignment, asr, diarize, utils
 from whisperx.vads import pyannote
-
-from .logger import get_logger
-from .models.base import (
+from project_W_lib.models.job_settings import (
     AlignmentProcessingSettings,
     JobModelEnum,
     JobSettingsBase,
     supported_alignment_languages,
 )
+from project_W_lib.logger import get_logger
 from .models.settings import ModelPrefetchingEnum, WhisperSettings
 
 logger = get_logger("project-W-runner")

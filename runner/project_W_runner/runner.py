@@ -9,26 +9,26 @@ from typing import Any, Callable, TypeVar
 import certifi
 import httpx
 from pydantic import ValidationError
-
-from ._version import __version__
-from .logger import get_logger
-from .models.base import JobSettingsBase
-from .models.internal import (
-    BackendError,
-    JobData,
-    ResponseNotJson,
-    ShutdownSignal,
-)
-from .models.request_data import (
+from project_W_lib.models.job_settings import JobSettingsBase
+from project_W_lib.models.runner_request_data import (
     HeartbeatRequest,
     RunnerRegisterRequest,
     RunnerSubmitResultRequest,
     Transcript,
 )
-from .models.response_data import (
+from project_W_lib.models.runner_response_data import (
     HeartbeatResponse,
     RegisteredResponse,
     RunnerJobInfoResponse,
+)
+from project_W_lib.logger import get_logger
+
+from ._version import __version__
+from .models.internal import (
+    BackendError,
+    JobData,
+    ResponseNotJson,
+    ShutdownSignal,
 )
 from .models.settings import Settings, WhisperSettings
 

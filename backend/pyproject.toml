@@ -14,7 +14,7 @@ maintainers = [
 ]
 dynamic = ["version"]
 requires-python = ">=3.11"
-license = { text = "AGPLv3" }
+license = "AGPL-3.0-only"
 dependencies = [
     "aiosmtplib>=4.0.2",
     "argon2-cffi>=25.1.0",
@@ -26,9 +26,8 @@ dependencies = [
     "granian[pname]>=2.5.2",
     "httpx>=0.28.1",
     "itsdangerous>=2.2.0",
-    "platformdirs>=4.4.0",
+    "project-w-lib",
     "psycopg[binary,pool]>=3.2.9",
-    "pyaml-env>=1.2.2",
     "pycryptodome>=3.23.0",
     "pydantic>=2.11.7",
     "python-multipart>=0.0.20",
@@ -42,6 +41,9 @@ project_W = "project_W.__main__:main"
 [tool.uv]
 package = true
 
+[tool.uv.sources]
+project-w-lib = { path = "../lib", editable = true }
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["project_W*"]
@@ -51,6 +53,10 @@ root = ".."
 version_scheme = "python-simplified-semver"
 local_scheme = "node-and-date"
 version_file = "project_W/_version.py"
+
+[tool.pyright]
+include = ["."]
+extraPaths = ["../lib"]
 
 [tool.ruff]
 line-length = 100

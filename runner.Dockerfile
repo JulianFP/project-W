@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git
 
 WORKDIR /app
 
+COPY lib ./lib/
+
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=runner/uv.lock,target=runner/uv.lock \

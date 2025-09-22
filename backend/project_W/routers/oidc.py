@@ -3,12 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import SecretStr
+from project_W_lib.models.generic_response_data import ErrorResponse
 
 import project_W.dependencies as dp
 import project_W.security.oidc_deps as oidc
 
 from ..models.base import EmailValidated
-from ..models.response_data import ErrorResponse
 from ..security.auth import set_token_cookie
 
 router = APIRouter(

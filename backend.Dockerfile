@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git gcc libldap
 
 WORKDIR /app
 
+COPY lib ./lib/
+
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=backend/uv.lock,target=backend/uv.lock \

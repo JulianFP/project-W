@@ -26,7 +26,9 @@ class RunnerSubmitResultRequest(BaseModel):
     @model_validator(mode="after")
     def either_error_or_transcript(self) -> Self:
         if self.error_msg is None and self.transcript is None:
-            raise ValueError("Either `error_msg` or `transcript` must be set for job submission")
+            raise ValueError(
+                "Either `error_msg` or `transcript` must be set for job submission"
+            )
         return self
 
 

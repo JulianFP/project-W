@@ -1,6 +1,7 @@
 from enum import Enum
 
 from pydantic import BaseModel, Field
+from project_W_lib.models.runner_request_data import RunnerRegisterRequest
 
 from .base import (
     AdditionalUserInfo,
@@ -9,7 +10,7 @@ from .base import (
     JobBase,
     UserInDb,
 )
-from .request_data import JobSettings, RunnerRegisterRequest
+from .request_data import JobSettings
 from .response_data import TokenInfo, User
 
 

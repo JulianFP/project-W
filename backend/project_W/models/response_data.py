@@ -8,7 +8,6 @@ from .base import (
     AdditionalUserInfo,
     InProcessJobBase,
     JobBase,
-    JobSettingsBase,
     LocalAccountSettingsBase,
     ProviderSettingsBase,
     UserInDb,
@@ -28,16 +27,6 @@ class User(UserInDb, AdditionalUserInfo):
     provider_name: str
     user_type: UserTypeEnum
     is_verified: bool
-
-
-# error response, is also being used when HTTPException is raised
-class ErrorResponse(BaseModel):
-    detail: str
-
-    class Config:
-        json_schema_extra = {
-            "example": {"detail": "error message"},
-        }
 
 
 class SiteBannerResponse(SiteBanner):
@@ -67,21 +56,6 @@ class TokenInfo(BaseModel):
 class RunnerCreatedInfo(BaseModel):
     id: int
     token: str
-
-
-class RegisteredResponse(BaseModel):
-    id: int
-    session_token: str
-
-
-class HeartbeatResponse(BaseModel):
-    abort: bool = False
-    job_assigned: bool = False
-
-
-class RunnerJobInfoResponse(BaseModel):
-    id: int
-    settings: JobSettingsBase
 
 
 class JobStatus(str, Enum):

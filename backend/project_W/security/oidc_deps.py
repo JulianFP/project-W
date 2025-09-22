@@ -6,10 +6,10 @@ from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, status
 from httpx import AsyncClient, HTTPError, HTTPStatusError
 from pydantic import SecretStr
+from project_W_lib.logger import get_logger
 
 import project_W.dependencies as dp
 
-from ..logger import get_logger
 from ..models.base import EmailValidated
 from ..models.internal import OidcTokenInfoInternal
 from ..models.settings import OidcProviderSettings, OidcRoleSettings, Settings

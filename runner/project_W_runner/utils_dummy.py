@@ -2,8 +2,8 @@ import os
 import time
 from io import StringIO
 from typing import Callable
+from project_W_lib.models.job_settings import JobSettingsBase
 
-from .models.base import JobSettingsBase
 from .models.settings import WhisperSettings
 
 

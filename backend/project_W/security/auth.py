@@ -4,10 +4,11 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException, Response, status
 from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
+from project_W_lib.logger import get_logger
+from project_W_lib.models.generic_response_data import ErrorResponse
 
 import project_W.dependencies as dp
 
-from ..logger import get_logger
 from ..models.internal import (
     LdapUserInDb,
     LocalUserInDbAll,
@@ -15,7 +16,7 @@ from ..models.internal import (
     OidcUserInDb,
     OnlineRunner,
 )
-from ..models.response_data import ErrorResponse, User, UserTypeEnum
+from ..models.response_data import User, UserTypeEnum
 from ..utils import hash_token
 from .oidc_deps import get_provider_name
 

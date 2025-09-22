@@ -1,16 +1,6 @@
 from pydantic import BaseModel
 
-from .base import JobSettingsBase
-
-
-# error response, is also being used when HTTPException is raised
-class ErrorResponse(BaseModel):
-    detail: str
-
-    class Config:
-        json_schema_extra = {
-            "example": {"detail": "error message"},
-        }
+from .job_settings import JobSettingsBase
 
 
 class RegisteredResponse(BaseModel):

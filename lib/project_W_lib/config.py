@@ -1,21 +1,22 @@
 from pathlib import Path
+from typing import TypeVar
 
 from platformdirs import site_config_path, user_config_path
 from pyaml_env import parse_config
 from pydantic import ValidationError
 
 from .logger import get_logger
-from .models.settings import Settings
 
-program_name = "project-W-runner"
-logger = get_logger(program_name)
+logger = get_logger("project-W-lib")
+
+PydanticModel = TypeVar("PydanticModel", covariant=True)
 
 
 class FindConfigFileException(Exception):
     pass
 
 
-def find_config_file(additional_paths: list[Path] = []) -> Path:
+def find_config_file(program_name: str, additional_paths: list[Path] = []) -> Path:
     default_search_dirs = [
         user_config_path(appname=program_name),
         site_config_path(appname=program_name),
@@ -34,12 +35,12 @@ def find_config_file(additional_paths: list[Path] = []) -> Path:
     )
 
 
-def load_config(additional_paths: list[Path] = []) -> Settings:
-    config_path = find_config_file(additional_paths)
+def load_config(program_name: str, settings_model: type[PydanticModel], additional_paths: list[Path] = []) -> PydanticModel:
+    config_path = find_config_file(program_name, additional_paths)
     config = parse_config(config_path)
 
     try:
-        parsed_config = Settings(**config)
+        parsed_config = settings_model(**config)
     except ValidationError as e:
         logger.critical(
             f"The following errors occurred during validation of the config file '{str(config_path)}'. Please adjust your config file according to the documentation and try again"

@@ -6,18 +6,21 @@ from granian.constants import Interfaces
 from granian.log import LogLevels
 from granian.server import Server
 from itsdangerous import URLSafeTimedSerializer
+from project_W_lib.config import load_config
+from project_W_lib.logger import get_logger
 
 import project_W.dependencies as dp
 
 from ._version import __commit_id__, __version__
-from .models.settings import SecretKeyValidated
-from .config import load_config
-from .logger import get_logger
+from .models.settings import Settings, SecretKeyValidated
 from .cli_tasks import (
     execute_background_tasks,
     perform_database_encrypted_content_deletion,
     perform_secret_key_rotation,
 )
+
+program_name = "project-W"
+logger = get_logger(program_name)
 
 
 @click.command()
@@ -77,8 +80,6 @@ def main(
     development: bool,
     root_static_files: Path | None,
 ):
-    logger = get_logger("project-W")
-
     # post application version for debug purposes and bug reports
     logger.info(f"Running application version {__version__}")
     if __commit_id__ is None:
@@ -92,7 +93,11 @@ def main(
     dp.client_path = root_static_files
 
     # parse config file
-    dp.config = load_config([custom_config_path]) if custom_config_path else load_config()
+    dp.config = (
+        load_config(program_name, Settings, [custom_config_path])
+        if custom_config_path
+        else load_config(program_name, Settings)
+    )
     dp.auth_s = URLSafeTimedSerializer(
         dp.config.security.secret_key.root.get_secret_value(), "Project-W"
     )

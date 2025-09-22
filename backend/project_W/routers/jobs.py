@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_415_UNSUPPORTED_MEDIA_TYPE
+from project_W_lib.models.generic_response_data import ErrorResponse
 
 import project_W.dependencies as dp
 
@@ -15,7 +16,6 @@ from ..models.internal import (
 )
 from ..models.request_data import JobSettings, TranscriptTypeEnum
 from ..models.response_data import (
-    ErrorResponse,
     JobInfo,
     JobStatus,
 )

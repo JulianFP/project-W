@@ -7,8 +7,8 @@
 # -- Project information -----------------------------------------------------
 
 project = "Project-W"
-copyright = "2023-2025, Julian Partanen & Markus Everling"
-author = "Julian Partanen, Markus Everling"
+copyright = "2023-2025, Julian Partanen & contributors. See COPYING.md file for all contributors."
+author = "Julian Partanen"
 
 # -- General configuration ---------------------------------------------------
 

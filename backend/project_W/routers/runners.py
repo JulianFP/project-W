@@ -2,21 +2,21 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-
-import project_W.dependencies as dp
-
-from ..models.internal import OnlineRunner
-from ..models.request_data import (
+from project_W_lib.models.runner_request_data import (
     HeartbeatRequest,
     RunnerRegisterRequest,
     RunnerSubmitResultRequest,
 )
-from ..models.response_data import (
-    ErrorResponse,
+from project_W_lib.models.generic_response_data import ErrorResponse
+from project_W_lib.models.runner_response_data import (
     HeartbeatResponse,
     RegisteredResponse,
     RunnerJobInfoResponse,
 )
+
+import project_W.dependencies as dp
+
+from ..models.internal import OnlineRunner
 from ..security.auth import (
     online_runner_dependency_responses,
     runner_dependency_responses,
