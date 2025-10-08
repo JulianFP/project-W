@@ -457,45 +457,121 @@ CPU
 NixOS
 -----
 
-We provide NixOS flakes for the backend & frontend combination. Each of the flakes provide a development shell and a package, and the Project-W flake also provides a NixOS module that we will be using now. The runner package, dev shell and NixOS module are currently not functional because nixpkgs hasn't the required version of whisperx right now and updating it is not trivial.
+We provide a NixOS flake in the Project-W repository. This flake provides development shells, packages as well as NixOS modules for all three subprojects. While the runner package does theoretically come with all dependencies for proper NVIDIA/CUDA support, it hasn't been tested yet if it actually runs on GPU.
+
+To start you need to add our flake as an input to your own. For this add the following to your 'inputs' section in your flake.nix:
+
+   .. code-block:: Nix
+
+      inputs = {
+        ...
+        project-W.url = "github:JulianFP/project-W";
+      };
+
+Note that overriding the `nixpkgs` input of the flake might not work, especially if you are using a stable branch of nixpkgs. Your mileage may vary.
+
+If you want to use our NixOS module, you need to import it, e.g.:
+
+   .. code-block:: Nix
+
+      nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
+        ...
+        modules = [
+          inputs.project-W.nixosModules.default
+          ...
+        ];
+      };
+
+You might also want to add the nix-community binary cache, especially when using the runner, since otherwise it will do some expensive builds (e.g. compiling nccl). To do this you can for example add this to your NixOS config:
+
+   .. code-block:: Nix
+
+      nix.settings = {
+        substituters = [
+          "https://nix-community.cachix.org"
+        ];
+        trusted-public-keys = [
+          "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+        ];
+      };
+
+Now you can start using the packages and module. It's options are available under ``services.project-W``. For a full list and description of options go to `nix/backend_module.nix` and `nix/runner_module.nix` in the project-W repository. Also the ``services.project-W.server.settings`` and ``services.project-W.runner.settings`` attribute set are just copies of the backend and runner options of the config file, so you can also refer to :ref:`description_backend_config-label` and :ref:`description_runner_config-label` for these parts. You can just use ``!ENV`` at the beginning of Nix strings as well, the module will take care that these are correctly translated into appropriate YAML. Use the ``services.project-W.server.envFile``/``services.project-W.runner.envFile`` option to pass a path to a file that sets the required environment variables. You can use secret management systems like sops-nix for this to securely manage these secrets. Don't write sensitive information into any of the options directly because then they would be world-readable in the nix store!
 
 Backend & Frontend
 ``````````````````
 
-First you need to import our flake into your flake containing the NixOS config of your machine. For this add the following to your 'inputs' section of your flake.nix:
+Note that the backend module automatically sets up PostgreSQL and Redis, and connects Project-W to both of them. If you want to set that up yourself or if you want to use external instances running on different machines can disable this by setting ``services.project-W.server.enableLocalPostgres`` and ``services.project-W.server.enableLocalRedis``.
 
-    .. code-block:: Nix
+Here is an example config to get the Project-W server (backend & frontend combination) up and running (using sops-nix for secret management), using an external reverse proxy (not part of this config):
 
-        inputs = {
-          ...
-          project-W = {
-            url = "github:JulianFP/project-W";
-            inputs.nixpkgs.follows = "nixpkgs";
+   .. code-block:: Nix
+
+      sops.secrets."project-w_secrets" = {
+        sopsFile = <path to secret file>;
+        mode = "0400";
+        owner = config.services.project-W.server.user;
+      };
+
+      services.project-W.server = {
+        enable = true;
+        settings = {
+          client_url = "https://<your domain>/#";
+          web_server = {
+            allowed_hosts = [
+              "localhost"
+              "<your domain>"
+            ];
+            reverse_proxy.trusted_proxies = [
+              "<your reverse proxy ip>"
+            ];
+            no_https = true;
+          };
+          security = {
+            secret_key = "!ENV \${SECRET_KEY}";
+          };
+          smtp_server = {
+            hostname = "<your email servers address>";
+            port = 587;
+            secure = "starttls";
+            sender_email = "<your sender email>";
+            username = "<your username email>";
+            password = "!ENV \${SMTP_PASSWORD}";
           };
         };
-
-Next you need to pass your inputs as an argument to your outputs, where you then can import the module:
-
-    .. code-block:: Nix
-
-        nixosConfiguration.<your machines hostname> = nixpkgs.lib.nixosSystem {
-          ...
-          modules = [
-            inputs.project-W.nixosModules.default
-            ...
-          ];
-        };
-
-Now you can start using the module. It's options are available under ``services.project-W``. For a full list and description of options go to nix/module.nix in the project-W repository. Also the ``services.project-W.settings`` attribute set is just a copy of the options of the config file, so you can also refer to :ref:`description_backend_config-label` for this part. You can just use ``!ENV`` at the beginning of Nix strings as well, the module will take care that these are correctly translated into appropriate YAML. Use the ``services.project-W.envFile`` option to pass a path to a file that sets the required environment variables. You can use secret management systems like sops-nix for this to securely manage these secrets. Don't write sensitive information into the ``services.project-W.settings`` because then they would be world-readable in the nix store!
-
-Please also make sure to setup a Postgresql and Redis server since that is out of scope of this NixOS module. Refer to the NixOS wiki for how to do that.
+        envFile = config.sops.secrets."project-w_secrets".path;
+      };
 
 Runner
 ``````
 
-As already mentioned the runner package and module are currently not working. Use the docker or manual installation method for the runner or make a PR to fix it.
+Here is an example config to get the Project-W runner up and running (using sops-nix for secret management), running on CPU:
 
-.. _manual_installation-label:
+   .. code-block:: Nix
+
+      sops.secrets."project-w-runner_secrets" = {
+        sopsFile = <path to secret file>;
+        mode = "0400";
+        owner = config.services.project-W.runner.user;
+      };
+
+      services.project-W.runner = {
+        enable = true;
+        settings = {
+          runner_attributes.name = "<your runners name>";
+          backend_settings = {
+            url = "https://<the domain of your Project-W server>";
+            auth_token = "!ENV \${AUTH_TOKEN}";
+          };
+          whisper_settings = {
+            hf_token = "!ENV \${HF_TOKEN}";
+            torch_device = "cpu";
+            compute_type = "int8";
+            batch_size = 4;
+          };
+        };
+        envFile = config.sops.secrets."project-w-runner_secrets".path;
+      };
+
 
 Manual installation
 -------------------

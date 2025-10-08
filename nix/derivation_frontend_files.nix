@@ -9,7 +9,7 @@
 }:
 
 mkPnpmPackage rec {
-  src = ../../frontend;
+  src = ../frontend;
 
   version = "0.3.0";
 

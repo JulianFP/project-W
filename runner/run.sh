@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-python -m project_W_runner --dummy
+project_W_runner --dummy
