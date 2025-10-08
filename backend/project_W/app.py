@@ -77,7 +77,8 @@ async def lifespan(app: FastAPI):
     await dp.db.close()
     await dp.ch.close()
     await dp.smtp.close()
-    await ldap_deps.ldap_adapter.close()
+    if dp.config.security.ldap_providers:
+        await ldap_deps.ldap_adapter.close()
 
 
 # this can be in Markdown
