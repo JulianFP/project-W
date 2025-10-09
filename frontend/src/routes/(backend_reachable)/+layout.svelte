@@ -124,9 +124,7 @@ async function logout(): Promise<void> {
           <FooterLink href="#/tos">Terms of Services</FooterLink>
         {/if}
         <FooterLink href={`${PUBLIC_BACKEND_BASE_URL}/docs`} target="_blank" rel="noopener noreferrer">API docs</FooterLink>
-        <FooterLink href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Backend</FooterLink>
-        <FooterLink href="https://github.com/JulianFP/project-W-frontend" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Frontend</FooterLink>
-        <FooterLink href="https://github.com/JulianFP/project-W-runner" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>Runner</FooterLink>
+        <FooterLink href="https://github.com/JulianFP/project-W" target="_blank" rel="noopener noreferrer"><GithubSolid class="inline mr-2"/>GitHub</FooterLink>
       </FooterLinkGroup>
     </div>
     <hr class="my-6 lg:my-8 border-gray-200 dark:border-gray-700"/>

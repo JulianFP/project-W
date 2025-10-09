@@ -29,7 +29,7 @@ mkPnpmPackage rec {
 
   meta = {
     description = "Frontend files for Project-W";
-    homepage = "https://github.com/JulianFP/project-W-frontend";
+    homepage = "https://github.com/JulianFP/project-W";
     license = lib.licenses.agpl3Only;
   };
 }

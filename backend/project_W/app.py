@@ -91,10 +91,7 @@ Project-W is a platform for creating transcripts of audio files (speech-to-text)
 
 In addition to [the OpenAPI doc](/docs) there is also [a Redoc doc](/redoc) available if you prefer.
 
-If you are looking for documentation about something else than the API then refer to the [full Project-W documentation](https://project-w.readthedocs.io). You can also find the source code of all Project-W components on GitHub:
-- [Backend](https://github.com/julianfp/project-w)
-- [Frontend](https://github.com/julianfp/project-w-frontend)
-- [Runner](https://github.com/julianfp/project-w-runner)
+If you are looking for documentation about something else than the API then refer to the [full Project-W documentation](https://project-w.readthedocs.io). You can also find the [source code of all Project-W components on GitHub](https://github.com/julianfp/project-w).
 """
 app_tags_metadata = [
     {
@@ -183,7 +180,7 @@ app.include_router(runners.router, prefix="/api")
 @app.get("/api/about")
 async def about() -> AboutResponse:
     """
-    Returns a brief description of Project-W, a link to the backend's GitHub repository, the backend's version currently running on the system as well as the imprint of this instance (if it was configured by the instance's admin).
+    Returns a brief description of Project-W, a link to the GitHub repository containing the backend's code, the backend's version currently running on the system as well as the imprint of this instance (if it was configured by the instance's admin).
     """
     return AboutResponse(
         description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",

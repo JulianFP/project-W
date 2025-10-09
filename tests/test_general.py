@@ -121,7 +121,7 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert job_info[0].get("runner_name") == runner_name
         assert (
             job_info[0].get("runner_source_code_url")
-            == "https://github.com/JulianFP/project-W-runner"
+            == "https://github.com/JulianFP/project-W/tree/main/runner"
         )
         runner_version_splitted = job_info[0].get("runner_version").split(".")
         assert (
@@ -139,7 +139,7 @@ def test_full_workflow_simple(runner, get_logged_in_client, helper_functions):
         assert job_info[0].get("runner_name") == runner_name
         assert (
             job_info[0].get("runner_source_code_url")
-            == "https://github.com/JulianFP/project-W-runner"
+            == "https://github.com/JulianFP/project-W/tree/main/runner"
         )
         runner_version_splitted = job_info[0].get("runner_version").split(".")
         assert (

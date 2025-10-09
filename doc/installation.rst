@@ -18,7 +18,7 @@ Docker
 We provide two docker images, one for the backend that also serves the frontend at the same time, one that runs cleanup jobs and other periodic tasks with cron, and one for the runner. In the following we assume that you want to host our backend, periodic background tasks, and client/frontend on the same server, and the runner on a different one. If this assumption doesn't hold for you (e.g. if you want the frontend to be served by a different server than the backends API), then you may have to write your own Dockerfiles and docker-compose.yml or choose a different installation method like NixOS ;).
 
 .. note::
-   For both docker images there are multiple docker image tags. The examples below will use the 'latest' tag which will pull the latest stable release (recommended). If you want to pull the development version (latest git commit on main branch), then choose the 'main' tag instead. Alternatively you can also pinpoint the docker image to a specific version. Go to the Packages section of each GitHub repository to find out which tags are available. To use a tag other than 'latest' add it to the end of the 'image:' lines in the docker-compose.yml files below like this: image: <source>/<name>:<tag>
+   For both docker images there are multiple docker image tags. The examples below will use the 'latest' tag which will pull the latest stable release (recommended). If you want to pull the development version (latest git commit on main branch), then choose the 'main' tag instead. Alternatively you can also pinpoint the docker image to a specific version. Go to the Packages section of the GitHub repository to find out which tags are available. To use a tag other than 'latest' add it to the end of the 'image:' lines in the docker-compose.yml files below like this: image: <source>/<name>:<tag>
 
 .. _docker_backend_frontend-label:
 
@@ -585,11 +585,11 @@ The frontend is written in Svelte and needs to be compiled into native Javascrip
 
 1. Install nodejs
 
-2. Clone the frontend repository and enter it:
+2. Clone the repository and enter the frontend directory:
 
    .. code-block:: console
 
-      git clone https://github.com/JulianFP/project-W-frontend.git & cd project-W-frontend
+      git clone https://github.com/JulianFP/project-W.git & cd project-W/frontend
 
 3. Install pnpm:
 
@@ -611,19 +611,19 @@ The frontend is written in Svelte and needs to be compiled into native Javascrip
 
 You can find the result in the ./build directory. Now we will now setup the backend which will serve the static files inside this build directory together with the API. This way the frontend and the API are served from the same origin.
 
-5. Install Python (3.11 or newer, I have tested 3.11 to 3.13) and pip
+5. `Install uv <https://docs.astral.sh/uv/getting-started/installation/>`_
 
-6. Clone this repository and enter it:
-
-   .. code-block:: console
-
-      git clone https://github.com/JulianFP/project-W.git & cd project-W
-
-7. Install the package with pip:
+6. Change into the backend directory:
 
    .. code-block:: console
 
-      python -m pip install .
+      cd ../backend
+
+7. Install the project:
+
+   .. code-block:: console
+
+      uv sync
 
 8. Spin up a Postgresql and Redis server (outside of the scope of this tutorial) and put the config.yml file of the backend either into /etc/xdg/project-W/ or ~/.config/project-W/. Alternatively you can also set a custom path to the config file using the `--custom_config_path` CLI option in the command below.
 
@@ -631,31 +631,31 @@ You can find the result in the ./build directory. Now we will now setup the back
 
    .. code-block:: console
 
-      project_W --root_static_files <path to the build directory of the frontend>
+      uv run project_W --root_static_files <path to the build directory of the frontend>
 
 10. Run the background jobs once. This command should be executed at least once each day, so you probably want add a cron job or a systemd service + timer for it:
 
    .. code-block:: console
 
-      project_W --run_periodic_tasks
+      uv run project_W --run_periodic_tasks
 
 
 Runner
 ``````
 
-1. Install Python (3.11 or 3.12, I have mostly tested 3.12), pip, and ffmpeg.
+1. `Install uv <https://docs.astral.sh/uv/getting-started/installation/>`_ and ffmpeg.
 
-2. Clone this repository and enter it:
-
-   .. code-block:: bash
-
-      git clone https://github.com/JulianFP/project-W-runner.git & cd project-W-runner
-
-3. Install the package including the whisperx dependencies with pip:
+2. Clone the repository and enter the runner directory:
 
    .. code-block:: bash
 
-      python -m pip install .[not_dummy]
+      git clone https://github.com/JulianFP/project-W.git & cd project-W/runner
+
+3. Install the project including it's whisper dependencies:
+
+   .. code-block:: bash
+
+      uv sync --all-extras
 
 4. Put the config.yml file of the runner either into /etc/xdg/project-W-runner/ or ~/.config/project-W-runner/. Alternatively you can also set a custom path to the config file using the `--custom_config_path` CLI option in the command below.
 
@@ -663,6 +663,6 @@ Runner
 
    .. code-block:: bash
 
-      project_W_runner
+      uv run project_W_runner
 
 6. You may want to make sure that the runner will always restart itself even if it crashes. Currently this might happen in rare cases, so maybe write a script or a systemd service that will always automatically restart the runner in case of a crash.

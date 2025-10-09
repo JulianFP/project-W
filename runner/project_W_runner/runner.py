@@ -50,7 +50,7 @@ class Runner:
     config: Settings
     git_hash: str
     backend_url: str
-    source_code_url = "https://github.com/JulianFP/project-W-runner"
+    source_code_url = "https://github.com/JulianFP/project-W/tree/main/runner"
     id: int | None
     session_token: str | None
     current_job_data: JobData | None  # protected by the following cond element
