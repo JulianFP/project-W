@@ -25,7 +25,7 @@ repos:
     rev: v2.1.4
     hooks:
       - id: biome-check
-      - files: "^frontend/"
+        files: "^frontend/"
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
