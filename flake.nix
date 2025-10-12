@@ -3,60 +3,126 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    systems.url = "github:nix-systems/default";
+    pnpm2nix-nzbr = {
+      #use this instead of main repo nzbr/pnpm2nix-nzbr because this pr fixes compatibility with lockfile v9
+      #see https://github.com/nzbr/pnpm2nix-nzbr/pull/40
+      url = "github:wrvsrx/pnpm2nix-nzbr/adapt-to-v9";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     pre-commit-hooks = {
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    project-W-frontend = {
-      url = "github:julianfp/project-W-frontend";
+    pyproject-nix = {
+      url = "github:pyproject-nix/pyproject.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    uv2nix = {
+      url = "github:pyproject-nix/uv2nix";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    pyproject-build-systems = {
+      url = "github:pyproject-nix/build-system-pkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.uv2nix.follows = "uv2nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
+  #to avoid long nccl build
+  nixConfig = {
+    extra-substituters = [
+      "https://nix-community.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+    ];
+  };
+
   outputs =
     inputs@{
+      self,
       nixpkgs,
-      systems,
-      project-W-frontend,
+      pnpm2nix-nzbr,
+      pyproject-nix,
+      uv2nix,
+      pyproject-build-systems,
       ...
     }:
     let
-      pythonOverlay = import ./nix/overlay.nix;
-      eachSystem = nixpkgs.lib.genAttrs (import systems);
-      pkgsFor = eachSystem (
-        system:
-        import nixpkgs {
-          inherit system;
-          #overlays add all new packages and their dependencies
-          overlays = [ pythonOverlay ];
+      inherit (nixpkgs) lib;
+      forAllSystems = lib.genAttrs lib.systems.flakeExposed;
+      devShellAttrs = (
+        import ./nix/make_dev_shells.nix {
+          inherit forAllSystems inputs;
+          desiredDevEnvs = {
+            "project_W-env" = {
+              workspaceRoot = "/backend";
+              pythonPkg = (pkgs: pkgs.python313);
+              extraPackages = (pkgs: [ ]);
+            };
+            "project_W_runner-env" = {
+              workspaceRoot = "/runner";
+              pythonPkg = (pkgs: pkgs.python312);
+              extraPackages = (pkgs: [ pkgs.ffmpeg ]);
+            };
+            "doc-env" = {
+              workspaceRoot = "/doc";
+              pythonPkg = (pkgs: pkgs.python313);
+              extraPackages = (pkgs: [ ]);
+            };
+            "tests-env" = {
+              workspaceRoot = "/tests";
+              pythonPkg = (pkgs: pkgs.python313);
+              extraPackages = (pkgs: [ ]);
+            };
+          };
         }
       );
     in
     {
-      packages = eachSystem (system: rec {
-        default = project-W;
-        project-W = pkgsFor.${system}.python3Packages.project-W;
-      });
-      devShells = eachSystem (system: {
-        default = import ./nix/shell.nix {
-          inherit inputs system;
-          pkgs = pkgsFor.${system};
-        };
-      });
-      nixosModules.default =
-        { pkgs, ... }:
-        {
-          #apply overlay
-          nixpkgs.overlays = [
-            pythonOverlay
-            (final: prev: {
-              project-W-frontend = project-W-frontend.packages."${pkgs.system}".project-W_frontend;
-            })
-          ];
+      devShells = devShellAttrs.devShells;
 
-          imports = [ ./nix/module.nix ];
+      packages = forAllSystems (
+        system:
+        let
+          backendPythonSet = devShellAttrs.pythonSetsSets."project_W-env".${system};
+          runnerPythonSet = devShellAttrs.pythonSetsSets."project_W_runner-env".${system};
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
+          inherit (pkgs.callPackages pyproject-nix.build.util { }) mkApplication;
+        in
+        {
+          project_W = mkApplication {
+            venv =
+              backendPythonSet.mkVirtualEnv "project_W-env"
+                devShellAttrs.workspaces."project_W-env".deps.optionals;
+            package = backendPythonSet.project-w;
+          };
+          project_W_runner = mkApplication {
+            venv =
+              runnerPythonSet.mkVirtualEnv "project_W_runner-env"
+                devShellAttrs.workspaces."project_W_runner-env".deps.optionals;
+            package = runnerPythonSet.project-w-runner;
+          };
+          project_W_frontend = pkgs.callPackage ./nix/derivation_frontend_files.nix {
+            inherit self;
+            mkPnpmPackage = pnpm2nix-nzbr.packages.${system}.mkPnpmPackage;
+          };
+          default = self.packages.${system}.project_W;
+        }
+      );
+
+      nixosModules.default =
+        args@{ pkgs, ... }:
+        {
+          imports = [
+            (import ./nix/backend_module.nix (args // { inputs = inputs; }))
+            (import ./nix/runner_module.nix (args // { inputs = inputs; }))
+          ];
         };
-      overlays.default = pythonOverlay;
     };
 }

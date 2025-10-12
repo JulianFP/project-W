@@ -1,0 +1,13 @@
+# ATTENTION: This config file is for a development setup of the project-W runner. Refer to https://project-w.readthedocs.io/en/stable/installation.html for example config files for production deployments!
+runner_attributes:
+  name: "test runner"
+backend_settings:
+  url: http://localhost:5000
+  auth_token: <your runner token>
+whisper_settings:
+  model_prefetching: none
+  #add a huggingface token if not in dummy mode
+  hf_token: ""
+  torch_device: cpu
+  compute_type: int8
+  batch_size: 4

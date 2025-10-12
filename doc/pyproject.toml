@@ -1,0 +1,18 @@
+[project]
+name = "project_W_docs"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "autodoc-pydantic>=2.2.0",
+    "project-w",
+    "project-w-runner",
+    "sphinx>=8.2.3",
+    "sphinx-mdinclude>=0.6.2",
+    "sphinx-rtd-theme>=3.0.2",
+    "sphinxcontrib-openapi>=0.8.4",
+]
+
+[tool.uv.sources]
+project_W = { path = "../backend" }
+project_W_runner = { path = "../runner" }

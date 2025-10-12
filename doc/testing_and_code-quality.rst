@@ -47,7 +47,7 @@ Test cases have some control over these fixtures over pytest's indirect parametr
 Code style and formatting
 -------------------------
 
-We aim to have a consistent code styling to increase readability, maintainability and long-term for nicer git diffs. To ensure this we use `pre-commit <https://pre-commit.com/>`_ hooks. The ``.pre-commit-config.yaml`` file is ready in the root of all three repositories. Just install pre-commit on your system and run ``pre-commit install`` for each repository.
+We aim to have a consistent code styling to increase readability, maintainability and to improve git diffs. To ensure this we use `pre-commit <https://pre-commit.com/>`_ hooks. For this we provide a ``.pre-commit-config.yaml`` file in the repository root that installs hooks for all sub-projects of Project-W. Just install pre-commit on your system and run ``pre-commit install`` while inside the repository.
 
 Python
 ``````

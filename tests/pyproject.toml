@@ -1,0 +1,13 @@
+[project]
+name = "tests"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "psycopg[binary,pool]>=3.2.9",
+    "pytest>=8.4.2",
+    "pytest-timeout>=2.4.0",
+    "redis[hiredis]>=6.4.0",
+    "smtpdfix>=0.5.2",
+]

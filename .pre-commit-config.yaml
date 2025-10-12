@@ -16,11 +16,19 @@ repos:
     rev: v0.12.10
     hooks:
       - id: ruff-check
+        files: "^backend/|^runner/"
         args: [--fix, --exit-non-zero-on-fix, --show-fixes]
       - id: ruff-format
+        files: "^backend/|^runner/"
+
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v2.1.4
+    hooks:
+      - id: biome-check
+        files: "^frontend/"
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
     hooks:
       - id: codespell
-        args: [-w ]
+        args: [-w, --ignore-words-list=delet, "--skip=frontend/src/lib/utils/schema.d.ts,frontend/pnpm-lock.yaml,frontend/package.json" ]

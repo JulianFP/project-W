@@ -1,0 +1,55 @@
+[build-system]
+requires = [
+    "setuptools>=80",
+    #we need larger than 9 to get PR https://github.com/pypa/setuptools-scm/pull/1154
+    "setuptools_scm>=9",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "project_W_runner"
+description = "The runner of Project-W, a self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI"
+maintainers = [
+    { name = "Julian Partanen", email = "julian@partanengroup.de"},
+]
+dynamic = ["version"]
+requires-python = ">=3.11,<3.13"
+license = "AGPL-3.0-only"
+dependencies = [
+    "click>=8.2.1",
+    "httpx>=0.28.1",
+    "project-w-lib",
+    "pydantic>=2.11.7",
+]
+
+[project.scripts]
+project_W_runner = "project_W_runner.__main__:main"
+
+[project.optional-dependencies]
+not-dummy = [
+    "hf-xet>=1.1.9",
+    "whisperx>=3.4.2",
+]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+project-w-lib = { path = "../lib", editable = true }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["project_W_runner*"]
+
+[tool.setuptools_scm]
+root = ".."
+version_scheme = "python-simplified-semver"
+local_scheme = "node-and-date"
+version_file = "project_W_runner/_version.py"
+
+[tool.pyright]
+include = ["."]
+extraPaths = ["../lib"]
+
+[tool.ruff]
+line-length = 100

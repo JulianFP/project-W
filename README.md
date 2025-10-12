@@ -16,9 +16,9 @@ In some research fields at our university a lot of interviews (and transcription
 
 This is where Project W comes in: It is designed so that everything can be hosted by the university itself on powerful hardware (like an A100 GPU) while it is very easy to be used by the average person. Just go to the website, sign up and upload some files!
 
-## Why are there three repositories?
+## Why are there three main components?
 
-Project W consists of three components: The frontend/client, the backend, and the runner. We decided to host them on different git repositories to separate them better.
+Project W consists of three components: The frontend/client, the backend, and the runner. They are all available in [this single mono-repository](https://github.com/JulianFP/project-W).
 
 ![UML-diagram](https://github.com/JulianFP/project-W/assets/70963316/717c278c-e985-47d4-9b97-3b861dbe99ca)
 
@@ -36,4 +36,4 @@ We took part in the poster session of the E-Science-Tage 2025 conference. If you
 
 ## Acknowledgments
 
-This repository was set up using the [SSC Cookiecutter for Python Packages](https://github.com/ssciwr/cookiecutter-python-package).
+Parts of this repository were set up using the [SSC Cookiecutter for Python Packages](https://github.com/ssciwr/cookiecutter-python-package).

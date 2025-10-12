@@ -7,8 +7,8 @@
 # -- Project information -----------------------------------------------------
 
 project = "Project-W"
-copyright = "2023-2025, Julian Partanen & Markus Everling"
-author = "Julian Partanen, Markus Everling"
+copyright = "2023-2025, Julian Partanen & contributors. See COPYING.md file for all contributors."
+author = "Julian Partanen"
 
 # -- General configuration ---------------------------------------------------
 
@@ -29,7 +29,10 @@ templates_path = []
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+exclude_patterns = [
+    ".venv",
+    ".direnv",
+]
 
 # -- Options for HTML output -------------------------------------------------
 
