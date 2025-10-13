@@ -82,8 +82,71 @@
       );
     in
     {
+      # Run the hooks in a sandbox with `nix flake check`.
+      # Read-only filesystem and no internet access.
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
+        in
+        {
+          pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
+            src = ./.;
+            hooks = {
+              end-of-file-fixer.enable = true;
+              trim-trailing-whitespace.enable = true;
+              check-added-large-files.enable = true;
+              check-merge-conflicts.enable = true;
+              check-symlinks.enable = true;
+              check-docstring-first.enable = true;
+              check-builtin-literals.enable = true;
+              check-python.enable = true;
+              python-debug-statements.enable = true;
+              biome = {
+                enable = true;
+                files = "^frontend/";
+                types_or = [ ];
+              };
+              ruff = {
+                enable = true;
+                files = "^backend/|^runner/";
+              };
+              ruff-format = {
+                enable = true;
+                files = "^backend/|^runner/";
+              };
+              codespell = {
+                enable = true;
+                name = "codespell";
+                entry = "${pkgs.codespell}/bin/codespell -w --ignore-words-list=delet --skip=frontend/src/lib/utils/schema.d.ts,frontend/pnpm-lock.yaml,frontend/package.json";
+              };
+              nixfmt-rfc-style.enable = true;
+            };
+          };
+        }
+      );
+
+      # Run the hooks with `nix fmt`.
+      formatter = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          config = self.checks.${system}.pre-commit-check.config;
+          inherit (config) package configFile;
+          script = ''
+            ${pkgs.lib.getExe package} run --all-files --config ${configFile}
+          '';
+        in
+        pkgs.writeShellScriptBin "pre-commit-run" script
+      );
+
+      # Enter a development shell with `nix develop`
       devShells = devShellAttrs.devShells;
 
+      #build a production package with `nix build`
       packages = forAllSystems (
         system:
         let

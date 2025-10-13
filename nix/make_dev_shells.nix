@@ -60,45 +60,12 @@ in
       virtualenvs = builtins.mapAttrs (
         name: set: set.mkVirtualEnv name workspaces.${name}.deps.all
       ) pythonSets;
-      pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
-        src = ./.;
-        hooks = {
-          end-of-file-fixer.enable = true;
-          trim-trailing-whitespace.enable = true;
-          check-added-large-files.enable = true;
-          check-merge-conflicts.enable = true;
-          check-symlinks.enable = true;
-          check-docstring-first.enable = true;
-          check-builtin-literals.enable = true;
-          check-python.enable = true;
-          python-debug-statements.enable = true;
-          biome = {
-            enable = true;
-            files = "^frontend/";
-            types_or = [ ];
-          };
-          ruff = {
-            enable = true;
-            files = "^backend/|^runner/";
-          };
-          ruff-format = {
-            enable = true;
-            files = "^backend/|^runner/";
-          };
-          codespell = {
-            enable = true;
-            name = "codespell";
-            entry = "${pkgs.codespell}/bin/codespell -w --ignore-words-list=delet --skip=frontend/src/lib/utils/schema.d.ts,frontend/pnpm-lock.yaml,frontend/package.json";
-          };
-          nixfmt-rfc-style.enable = true;
-        };
-      };
       commonPackages = [
         pkgs.uv
         pkgs.nodejs_24
         pkgs.corepack_24
       ]
-      ++ pre-commit-check.enabledPackages;
+      ++ inputs.self.checks.${system}.pre-commit-check.enabledPackages;
       commonShellHook = ''
         export REPO_ROOT=$(git rev-parse --show-toplevel)
         localOverwriteFile="$REPO_ROOT/.pre-commit-config.yaml"
@@ -109,17 +76,16 @@ in
         git update-index --skip-worktree "$REPO_ROOT/backend/config.yml"
         git update-index --skip-worktree "$REPO_ROOT/runner/config.yml"
       ''
-      + pre-commit-check.shellHook;
+      + inputs.self.checks.${system}.pre-commit-check.shellHook;
     in
     (builtins.mapAttrs (
       name: venv:
       pkgs.mkShell {
-        buildInputs = pre-commit-check.enabledPackages;
+        buildInputs = commonPackages;
         packages = [
           venv
           inputs.pyproject-nix.packages.${system}.build-editable
         ]
-        ++ commonPackages
         ++ (desiredDevEnvs.${name}.extraPackages pkgs);
         env = {
           UV_NO_SYNC = "1";
