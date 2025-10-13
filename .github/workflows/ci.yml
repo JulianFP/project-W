@@ -62,6 +62,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login with ghcr.io
+        #don't cache on PR's since they don't necessarily have access to repo packages
+        if: ${{ github.event_name != 'pull_request' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -81,7 +83,7 @@ jobs:
           push: false
           load: true
           cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}:buildcache,mode=max', env.BACKEND_IMAGE) || '' }}
 
       - name: Build Project-W dummy runner docker image
         uses: docker/build-push-action@v6
@@ -91,8 +93,8 @@ jobs:
           tags: project-w_runner_dummy:latest
           push: false
           load: true
-          cache-from: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache
-          cache-to: type=registry,ref=ghcr.io/julianfp/project-w_runner_dummy:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.DUMMY_RUNNER_IMAGE }}:buildcache
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}:buildcache,mode=max', env.DUMMY_RUNNER_IMAGE) || '' }}
 
       - name: Setup SSL certificates
         run: |
