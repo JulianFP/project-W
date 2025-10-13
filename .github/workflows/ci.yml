@@ -207,28 +207,28 @@ jobs:
       - docker-build
     steps:
       - name: Download backend digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ${{ runner.temp }}/backend-digests
           pattern: backend-digests-*
           merge-multiple: true
 
       - name: Download cron digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ${{ runner.temp }}/cron-digests
           pattern: cron-digests-*
           merge-multiple: true
 
       - name: Download runner digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ${{ runner.temp }}/runner-digests
           pattern: runner-digests-*
           merge-multiple: true
 
       - name: Download dummy runner digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ${{ runner.temp }}/dummy-runner-digests
           pattern: dummy-runner-digests-*
