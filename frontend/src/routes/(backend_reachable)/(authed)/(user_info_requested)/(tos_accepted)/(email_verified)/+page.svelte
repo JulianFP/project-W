@@ -1,433 +1,442 @@
 <script lang="ts">
-import { EventSource } from "eventsource";
-import {
-	A,
-	Alert,
-	Banner,
-	Checkbox,
-	P,
-	PaginationNav,
-	Progressbar,
-	Span,
-	Spinner,
-	Table,
-	TableBody,
-	TableBodyCell,
-	TableBodyRow,
-	TableHead,
-	TableHeadCell,
-	Tooltip,
-} from "flowbite-svelte";
-import {
-	CaretDownSolid,
-	CaretSortSolid,
-	CaretUpSolid,
-	ChevronLeftOutline,
-	ChevronRightOutline,
-	DownloadSolid,
-	InfoCircleSolid,
-	PlusOutline,
-	RedoOutline,
-	StopSolid,
-	TrashBinSolid,
-} from "flowbite-svelte-icons";
-import { SvelteMap } from "svelte/reactivity";
-import { slide } from "svelte/transition";
+	import { EventSource } from "eventsource";
+	import {
+		A,
+		Alert,
+		Banner,
+		Checkbox,
+		P,
+		PaginationNav,
+		Progressbar,
+		Span,
+		Spinner,
+		Table,
+		TableBody,
+		TableBodyCell,
+		TableBodyRow,
+		TableHead,
+		TableHeadCell,
+		Tooltip,
+	} from "flowbite-svelte";
+	import {
+		CaretDownSolid,
+		CaretSortSolid,
+		CaretUpSolid,
+		ChevronLeftOutline,
+		ChevronRightOutline,
+		DownloadSolid,
+		InfoCircleSolid,
+		PlusOutline,
+		RedoOutline,
+		StopSolid,
+		TrashBinSolid,
+	} from "flowbite-svelte-icons";
+	import { SvelteMap } from "svelte/reactivity";
+	import { slide } from "svelte/transition";
 
-import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-import Button from "$lib/components/button.svelte";
-import CenterPage from "$lib/components/centerPage.svelte";
-import CloseButton from "$lib/components/closeButton.svelte";
-import ConfirmModal from "$lib/components/confirmModal.svelte";
-import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
-import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
-import { alerts, auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import {
-	deletLoggedIn,
-	getLoggedIn,
-	postLoggedIn,
-} from "$lib/utils/httpRequestsAuth.svelte";
-import type { components } from "$lib/utils/schema";
-import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
+	import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+	import Button from "$lib/components/button.svelte";
+	import CenterPage from "$lib/components/centerPage.svelte";
+	import CloseButton from "$lib/components/closeButton.svelte";
+	import ConfirmModal from "$lib/components/confirmModal.svelte";
+	import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
+	import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
+	import { alerts, auth } from "$lib/utils/global_state.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import {
+		deletLoggedIn,
+		getLoggedIn,
+		postLoggedIn,
+	} from "$lib/utils/httpRequestsAuth.svelte";
+	import type { components } from "$lib/utils/schema";
+	import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
 
-type JobSettingsResp = components["schemas"]["JobSettings-Output"];
-type Data = {
-	about: components["schemas"]["AboutResponse"];
-};
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
-
-type SortKey = components["schemas"]["JobSortKey"];
-type Job = components["schemas"]["JobInfo"];
-type ProcessedJob = Job & {
-	creation_date: Date;
-	finish_date: Date | null;
-};
-
-let fetchingJobs = $state(false);
-let jobs_ordered_selected: SvelteMap<number, boolean> = $state(new SvelteMap());
-let jobs_info: SvelteMap<number, ProcessedJob> = $state(new SvelteMap());
-let job_creation_date_since: SvelteMap<number, string> = $state(
-	new SvelteMap(),
-);
-let job_finish_date_since: SvelteMap<number, string> = $state(new SvelteMap());
-let job_count: number = $state(0);
-let job_count_total: number = $state(0);
-
-//table stuff
-const jobs_per_page = 10;
-let currentPage = $state(1);
-let totalPages = $derived(Math.max(Math.ceil(job_count / jobs_per_page), 1));
-let selectedItems: number[] = $derived(
-	Array.from(jobs_ordered_selected.entries())
-		.filter(([, val]) => val)
-		.map(([key]) => key),
-);
-let headerCheckboxSelected = $state(false);
-let selectedAbortButtonDisabled = $state(true);
-let selectedDeleteButtonDisabled = $state(true);
-let openRow: number | null = $state(null);
-
-//modal stuff
-let pre_filled_job_settings: JobSettingsResp | undefined = $state();
-let submitModalOpen = $state(false);
-let downloadModalOpen = $state(false);
-let downloadJobId: number = $state(-1);
-let downloadFileName: string = $state("");
-let abortModalOpen = $state(false);
-let abortModalJobs: number[] = $state([]);
-let deleteModalOpen = $state(false);
-let deleteModalJobs: number[] = $state([]);
-
-//job query parameters
-let sort_key: SortKey = $state("creation_time");
-let descending: boolean = $state(true);
-let exclude_finished = $state(false);
-let exclude_downloaded = $state(true);
-
-function process_job(job: Job) {
-	const creation_date_getter = () => {
-		const date = jobs_info.get(job.id)?.creation_date;
-		if (!date) throw new Error();
-		return date;
+	type JobSettingsResp = components["schemas"]["JobSettings-Output"];
+	type Data = {
+		about: components["schemas"]["AboutResponse"];
 	};
-	const creation_date_since_setter = (date_since: string) => {
-		job_creation_date_since.set(job.id, date_since);
+	interface Props {
+		data: Data;
+	}
+	let { data }: Props = $props();
+
+	type SortKey = components["schemas"]["JobSortKey"];
+	type Job = components["schemas"]["JobInfo"];
+	type ProcessedJob = Job & {
+		creation_date: Date;
+		finish_date: Date | null;
 	};
-	const creation_date = new Date(job.creation_timestamp);
-	const creation_date_since = autoupdate_date_since(
-		creation_date_getter,
-		creation_date_since_setter,
-		creation_date,
+
+	let fetchingJobs = $state(false);
+	let jobs_ordered_selected: SvelteMap<number, boolean> = $state(
+		new SvelteMap(),
 	);
-	job_creation_date_since.set(job.id, creation_date_since);
-	let finish_date: Date | null = null;
-	if (job.finish_timestamp) {
-		const finish_date_getter = () => {
-			const date = jobs_info.get(job.id)?.finish_date;
+	let jobs_info: SvelteMap<number, ProcessedJob> = $state(new SvelteMap());
+	let job_creation_date_since: SvelteMap<number, string> = $state(
+		new SvelteMap(),
+	);
+	let job_finish_date_since: SvelteMap<number, string> = $state(
+		new SvelteMap(),
+	);
+	let job_count: number = $state(0);
+	let job_count_total: number = $state(0);
+
+	//table stuff
+	const jobs_per_page = 10;
+	let currentPage = $state(1);
+	let totalPages = $derived(Math.max(Math.ceil(job_count / jobs_per_page), 1));
+	let selectedItems: number[] = $derived(
+		Array.from(jobs_ordered_selected.entries())
+			.filter(([, val]) => val)
+			.map(([key]) => key),
+	);
+	let headerCheckboxSelected = $state(false);
+	let selectedAbortButtonDisabled = $state(true);
+	let selectedDeleteButtonDisabled = $state(true);
+	let openRow: number | null = $state(null);
+
+	//modal stuff
+	let pre_filled_job_settings: JobSettingsResp | undefined = $state();
+	let submitModalOpen = $state(false);
+	let downloadModalOpen = $state(false);
+	let downloadJobId: number = $state(-1);
+	let downloadFileName: string = $state("");
+	let abortModalOpen = $state(false);
+	let abortModalJobs: number[] = $state([]);
+	let deleteModalOpen = $state(false);
+	let deleteModalJobs: number[] = $state([]);
+
+	//job query parameters
+	let sort_key: SortKey = $state("creation_time");
+	let descending: boolean = $state(true);
+	let exclude_finished = $state(false);
+	let exclude_downloaded = $state(true);
+
+	function process_job(job: Job) {
+		const creation_date_getter = () => {
+			const date = jobs_info.get(job.id)?.creation_date;
 			if (!date) throw new Error();
 			return date;
 		};
-		const finish_date_since_setter = (date_since: string) => {
-			job_finish_date_since.set(job.id, date_since);
+		const creation_date_since_setter = (date_since: string) => {
+			job_creation_date_since.set(job.id, date_since);
 		};
-		finish_date = new Date(job.finish_timestamp);
-		const finish_date_since = autoupdate_date_since(
-			finish_date_getter,
-			finish_date_since_setter,
-			finish_date,
+		const creation_date = new Date(job.creation_timestamp);
+		const creation_date_since = autoupdate_date_since(
+			creation_date_getter,
+			creation_date_since_setter,
+			creation_date,
 		);
-		job_finish_date_since.set(job.id, finish_date_since);
+		job_creation_date_since.set(job.id, creation_date_since);
+		let finish_date: Date | null = null;
+		if (job.finish_timestamp) {
+			const finish_date_getter = () => {
+				const date = jobs_info.get(job.id)?.finish_date;
+				if (!date) throw new Error();
+				return date;
+			};
+			const finish_date_since_setter = (date_since: string) => {
+				job_finish_date_since.set(job.id, date_since);
+			};
+			finish_date = new Date(job.finish_timestamp);
+			const finish_date_since = autoupdate_date_since(
+				finish_date_getter,
+				finish_date_since_setter,
+				finish_date,
+			);
+			job_finish_date_since.set(job.id, finish_date_since);
+		}
+		jobs_info.set(job.id, {
+			...job,
+			creation_date: creation_date,
+			finish_date: finish_date,
+		});
 	}
-	jobs_info.set(job.id, {
-		...job,
-		creation_date: creation_date,
-		finish_date: finish_date,
-	});
-}
 
-async function fetch_jobs() {
-	fetchingJobs = true;
-	try {
-		job_count = await getLoggedIn<number>("jobs/count", {
-			exclude_finished: exclude_finished.toString(),
-			exclude_downloaded: exclude_downloaded.toString(),
-		});
-		job_count_total = await getLoggedIn<number>("jobs/count", {
-			exclude_finished: "false",
-			exclude_downloaded: "false",
-		});
-		if (job_count > 0) {
-			const job_ids = await getLoggedIn<number[]>("jobs/get", {
-				start_index: (jobs_per_page * (currentPage - 1)).toString(),
-				end_index: (jobs_per_page * currentPage - 1).toString(),
-				sort_key: sort_key,
-				descending: descending.toString(),
+	async function fetch_jobs() {
+		fetchingJobs = true;
+		try {
+			job_count = await getLoggedIn<number>("jobs/count", {
 				exclude_finished: exclude_finished.toString(),
 				exclude_downloaded: exclude_downloaded.toString(),
 			});
-			let jobs_ordered_selected_loc = new Map<number, boolean>();
-			for (const job_id of job_ids) {
-				//to preserve the ordering of the jobs
-				jobs_ordered_selected_loc.set(job_id, false);
-			}
-			if (jobs_ordered_selected_loc.size === 0) {
+			job_count_total = await getLoggedIn<number>("jobs/count", {
+				exclude_finished: "false",
+				exclude_downloaded: "false",
+			});
+			if (job_count > 0) {
+				const job_ids = await getLoggedIn<number[]>("jobs/get", {
+					start_index: (jobs_per_page * (currentPage - 1)).toString(),
+					end_index: (jobs_per_page * currentPage - 1).toString(),
+					sort_key: sort_key,
+					descending: descending.toString(),
+					exclude_finished: exclude_finished.toString(),
+					exclude_downloaded: exclude_downloaded.toString(),
+				});
+				let jobs_ordered_selected_loc = new Map<number, boolean>();
+				for (const job_id of job_ids) {
+					//to preserve the ordering of the jobs
+					jobs_ordered_selected_loc.set(job_id, false);
+				}
+				if (jobs_ordered_selected_loc.size === 0) {
+					jobs_ordered_selected.clear();
+					jobs_info.clear();
+				} else {
+					jobs_ordered_selected = new SvelteMap(jobs_ordered_selected_loc);
+					let args_formatted: string[][] = [];
+					for (const job_id of jobs_ordered_selected_loc.keys()) {
+						let job = jobs_info.get(job_id);
+						if (!job) {
+							args_formatted.push(["job_ids", job_id.toString()]);
+						} else {
+							process_job(job);
+						}
+					}
+					if (args_formatted.length > 0) {
+						const jobs_unsorted = await getLoggedIn<Job[]>(
+							"jobs/info",
+							args_formatted,
+						);
+						for (const job of jobs_unsorted) {
+							process_job(job);
+						}
+						for (const job_id of jobs_info.keys()) {
+							if (!jobs_ordered_selected_loc.has(job_id))
+								jobs_info.delete(job_id);
+						}
+					}
+				}
+			} else {
 				jobs_ordered_selected.clear();
 				jobs_info.clear();
-			} else {
-				jobs_ordered_selected = new SvelteMap(jobs_ordered_selected_loc);
-				let args_formatted: string[][] = [];
-				for (const job_id of jobs_ordered_selected_loc.keys()) {
-					let job = jobs_info.get(job_id);
-					if (!job) {
-						args_formatted.push(["job_ids", job_id.toString()]);
-					} else {
-						process_job(job);
-					}
-				}
-				if (args_formatted.length > 0) {
-					const jobs_unsorted = await getLoggedIn<Job[]>(
-						"jobs/info",
-						args_formatted,
-					);
-					for (const job of jobs_unsorted) {
-						process_job(job);
-					}
-					for (const job_id of jobs_info.keys()) {
-						if (!jobs_ordered_selected_loc.has(job_id))
-							jobs_info.delete(job_id);
-					}
-				}
 			}
-		} else {
-			jobs_ordered_selected.clear();
-			jobs_info.clear();
+			updateHeaderCheckbox();
+		} catch (err: unknown) {
+			let errorMsg = "Error occurred while fetching jobs from backend: ";
+			if (err instanceof BackendCommError) {
+				errorMsg += err.message;
+			} else {
+				errorMsg += "Unknown error";
+			}
+			alerts.push({ msg: errorMsg, color: "red" });
+		}
+		fetchingJobs = false;
+	}
+	fetch_jobs();
+
+	async function update_jobs(job_ids: number[]) {
+		let args_formatted: string[][] = [];
+		for (const job_id of job_ids) {
+			args_formatted.push(["job_ids", job_id.toString()]);
+		}
+		try {
+			const jobs_unsorted = await getLoggedIn<Job[]>(
+				"jobs/info",
+				args_formatted,
+			);
+			for (const job of jobs_unsorted) {
+				process_job(job);
+			}
+		} catch (err: unknown) {
+			let errorMsg = "Error occurred while updating job: ";
+			if (err instanceof BackendCommError) {
+				errorMsg += err.message;
+			} else {
+				errorMsg += "Unknown error";
+			}
+			alerts.push({ msg: errorMsg, color: "red" });
+		}
+	}
+
+	function deselect_all_jobs() {
+		for (let id of jobs_ordered_selected.keys()) {
+			jobs_ordered_selected.set(id, false);
 		}
 		updateHeaderCheckbox();
-	} catch (err: unknown) {
-		let errorMsg = "Error occurred while fetching jobs from backend: ";
-		if (err instanceof BackendCommError) {
-			errorMsg += err.message;
+	}
+
+	function sortClickHandler(key: SortKey) {
+		if (sort_key === key) descending = !descending;
+		else sort_key = key;
+		fetch_jobs();
+	}
+
+	async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
+		try {
+			await postLoggedIn("jobs/abort", jobIdsToAbort);
+		} catch (err: unknown) {
+			let errorMsg = `Error occurred while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
+			if (err instanceof BackendCommError) errorMsg += err.message;
+			else errorMsg += "Unknown error";
+			alerts.push({ msg: errorMsg, color: "red" });
+		}
+	}
+	async function postAbortJobs(abortedJobIds: number[]): Promise<void> {
+		for (const job_id of abortedJobIds) {
+			jobs_info.delete(job_id);
+		}
+		await update_jobs(abortedJobIds);
+		updateHeaderCheckbox();
+	}
+
+	async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
+		try {
+			await deletLoggedIn("jobs/delete", jobIdsToAbort);
+		} catch (err: unknown) {
+			let errorMsg = `Error occurred while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
+			if (err instanceof BackendCommError) errorMsg += err.message;
+			else errorMsg += "Unknown error";
+			alerts.push({ msg: errorMsg, color: "red" });
+		}
+	}
+
+	function openAbortModal(jobIds: number[]) {
+		if (
+			!abortModalOpen &&
+			jobIds.length > 0 &&
+			!deleteModalOpen &&
+			!submitModalOpen &&
+			!downloadModalOpen
+		) {
+			abortModalJobs = jobIds;
+			abortModalOpen = true;
+		}
+	}
+
+	function openDeleteModal(jobIds: number[]) {
+		if (
+			!deleteModalOpen &&
+			jobIds.length > 0 &&
+			!abortModalOpen &&
+			!submitModalOpen &&
+			!downloadModalOpen
+		) {
+			deleteModalJobs = jobIds;
+			deleteModalOpen = true;
+		}
+	}
+
+	function openSubmitModal(
+		pre_fill_with_settings_of_job: number | null = null,
+	) {
+		if (pre_fill_with_settings_of_job != null) {
+			pre_filled_job_settings = jobs_info.get(
+				pre_fill_with_settings_of_job,
+			)?.settings;
 		} else {
-			errorMsg += "Unknown error";
+			pre_filled_job_settings = undefined;
 		}
-		alerts.push({ msg: errorMsg, color: "red" });
+		if (
+			!submitModalOpen &&
+			!abortModalOpen &&
+			!deleteModalOpen &&
+			!downloadModalOpen
+		) {
+			submitModalOpen = true;
+		}
 	}
-	fetchingJobs = false;
-}
-fetch_jobs();
 
-async function update_jobs(job_ids: number[]) {
-	let args_formatted: string[][] = [];
-	for (const job_id of job_ids) {
-		args_formatted.push(["job_ids", job_id.toString()]);
-	}
-	try {
-		const jobs_unsorted = await getLoggedIn<Job[]>("jobs/info", args_formatted);
-		for (const job of jobs_unsorted) {
-			process_job(job);
+	function openDownloadModal(job_id: number, file_name: string) {
+		if (
+			!submitModalOpen &&
+			!abortModalOpen &&
+			!deleteModalOpen &&
+			!downloadModalOpen
+		) {
+			downloadJobId = job_id;
+			downloadFileName = file_name;
+			downloadModalOpen = true;
 		}
-	} catch (err: unknown) {
-		let errorMsg = "Error occurred while updating job: ";
-		if (err instanceof BackendCommError) {
-			errorMsg += err.message;
+	}
+
+	function updateHeaderCheckbox(job: Job | null = null) {
+		//update headerCheckbox
+		if (
+			jobs_ordered_selected.size === 0 ||
+			(job != null && !jobs_ordered_selected.get(job.id))
+		) {
+			headerCheckboxSelected = false;
 		} else {
-			errorMsg += "Unknown error";
-		}
-		alerts.push({ msg: errorMsg, color: "red" });
-	}
-}
-
-function deselect_all_jobs() {
-	for (let id of jobs_ordered_selected.keys()) {
-		jobs_ordered_selected.set(id, false);
-	}
-	updateHeaderCheckbox();
-}
-
-function sortClickHandler(key: SortKey) {
-	if (sort_key === key) descending = !descending;
-	else sort_key = key;
-	fetch_jobs();
-}
-
-async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
-	try {
-		await postLoggedIn("jobs/abort", jobIdsToAbort);
-	} catch (err: unknown) {
-		let errorMsg = `Error occurred while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
-		if (err instanceof BackendCommError) errorMsg += err.message;
-		else errorMsg += "Unknown error";
-		alerts.push({ msg: errorMsg, color: "red" });
-	}
-}
-async function postAbortJobs(abortedJobIds: number[]): Promise<void> {
-	for (const job_id of abortedJobIds) {
-		jobs_info.delete(job_id);
-	}
-	await update_jobs(abortedJobIds);
-	updateHeaderCheckbox();
-}
-
-async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
-	try {
-		await deletLoggedIn("jobs/delete", jobIdsToAbort);
-	} catch (err: unknown) {
-		let errorMsg = `Error occurred while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
-		if (err instanceof BackendCommError) errorMsg += err.message;
-		else errorMsg += "Unknown error";
-		alerts.push({ msg: errorMsg, color: "red" });
-	}
-}
-
-function openAbortModal(jobIds: number[]) {
-	if (
-		!abortModalOpen &&
-		jobIds.length > 0 &&
-		!deleteModalOpen &&
-		!submitModalOpen &&
-		!downloadModalOpen
-	) {
-		abortModalJobs = jobIds;
-		abortModalOpen = true;
-	}
-}
-
-function openDeleteModal(jobIds: number[]) {
-	if (
-		!deleteModalOpen &&
-		jobIds.length > 0 &&
-		!abortModalOpen &&
-		!submitModalOpen &&
-		!downloadModalOpen
-	) {
-		deleteModalJobs = jobIds;
-		deleteModalOpen = true;
-	}
-}
-
-function openSubmitModal(pre_fill_with_settings_of_job: number | null = null) {
-	if (pre_fill_with_settings_of_job != null) {
-		pre_filled_job_settings = jobs_info.get(
-			pre_fill_with_settings_of_job,
-		)?.settings;
-	} else {
-		pre_filled_job_settings = undefined;
-	}
-	if (
-		!submitModalOpen &&
-		!abortModalOpen &&
-		!deleteModalOpen &&
-		!downloadModalOpen
-	) {
-		submitModalOpen = true;
-	}
-}
-
-function openDownloadModal(job_id: number, file_name: string) {
-	if (
-		!submitModalOpen &&
-		!abortModalOpen &&
-		!deleteModalOpen &&
-		!downloadModalOpen
-	) {
-		downloadJobId = job_id;
-		downloadFileName = file_name;
-		downloadModalOpen = true;
-	}
-}
-
-function updateHeaderCheckbox(job: Job | null = null) {
-	//update headerCheckbox
-	if (
-		jobs_ordered_selected.size === 0 ||
-		(job != null && !jobs_ordered_selected.get(job.id))
-	) {
-		headerCheckboxSelected = false;
-	} else {
-		let allSelected = true;
-		for (let [job_id, selected] of jobs_ordered_selected.entries()) {
-			if (!selected) {
-				allSelected = false;
-				jobs_ordered_selected.set(job_id, false);
+			let allSelected = true;
+			for (let [job_id, selected] of jobs_ordered_selected.entries()) {
+				if (!selected) {
+					allSelected = false;
+					jobs_ordered_selected.set(job_id, false);
+				}
 			}
+			headerCheckboxSelected = allSelected;
 		}
-		headerCheckboxSelected = allSelected;
+
+		//update disabled states
+		if (selectedItems.length === 0) {
+			selectedAbortButtonDisabled = true;
+			selectedDeleteButtonDisabled = true;
+		} else {
+			let includesNotRunning = false;
+			let includesNotDone = false;
+			for (const job of jobs_info.values()) {
+				if (selectedItems.includes(job.id)) {
+					if (
+						![
+							"not_queued",
+							"pending_runner",
+							"runner_assigned",
+							"runner_in_progress",
+						].includes(job.step)
+					)
+						includesNotRunning = true;
+					if (!["success", "downloaded", "failed"].includes(job.step))
+						includesNotDone = true;
+				}
+				if (includesNotRunning && includesNotDone) break;
+			}
+			selectedAbortButtonDisabled = includesNotRunning;
+			selectedDeleteButtonDisabled = includesNotDone;
+		}
 	}
 
-	//update disabled states
-	if (selectedItems.length === 0) {
-		selectedAbortButtonDisabled = true;
-		selectedDeleteButtonDisabled = true;
+	// update jobs using SSE (Server-Sent Events)
+	function updateJobOnSSEEvent(event: MessageEvent) {
+		const job_id: number = Number.parseInt(event.data, 10);
+		if (auth.loggedIn && jobs_info.has(job_id)) {
+			update_jobs([job_id]);
+		}
+	}
+	function reloadSSEListeners() {
+		const evtSource = new EventSource(
+			`${PUBLIC_BACKEND_BASE_URL}/api/jobs/events`,
+			{
+				withCredentials: true,
+				fetch: (input, init) =>
+					fetch(input, {
+						...init,
+						headers: {
+							...init.headers,
+						},
+					}),
+			},
+		);
+		evtSource.removeEventListener("job_deleted", fetch_jobs);
+		evtSource.removeEventListener("job_created", fetch_jobs);
+		evtSource.removeEventListener("job_updated", updateJobOnSSEEvent);
+		evtSource.addEventListener("job_deleted", fetch_jobs);
+		evtSource.addEventListener("job_created", fetch_jobs);
+		evtSource.addEventListener("job_updated", updateJobOnSSEEvent);
+	}
+	reloadSSEListeners();
+	if (window.cookieStore !== undefined) {
+		cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
+			for (const { name, value } of event.changed) {
+				if (name === "token" && value) {
+					reloadSSEListeners();
+				}
+			}
+		});
 	} else {
-		let includesNotRunning = false;
-		let includesNotDone = false;
-		for (const job of jobs_info.values()) {
-			if (selectedItems.includes(job.id)) {
-				if (
-					![
-						"not_queued",
-						"pending_runner",
-						"runner_assigned",
-						"runner_in_progress",
-					].includes(job.step)
-				)
-					includesNotRunning = true;
-				if (!["success", "downloaded", "failed"].includes(job.step))
-					includesNotDone = true;
-			}
-			if (includesNotRunning && includesNotDone) break;
-		}
-		selectedAbortButtonDisabled = includesNotRunning;
-		selectedDeleteButtonDisabled = includesNotDone;
+		console.warn(
+			"Your browser doesn't seem to support the Cookie Store API. Automatic updates of the jobs table may be impacted by this. Consider updating your browser!",
+		);
 	}
-}
-
-// update jobs using SSE (Server-Sent Events)
-function updateJobOnSSEEvent(event: MessageEvent) {
-	const job_id: number = Number.parseInt(event.data);
-	if (auth.loggedIn && jobs_info.has(job_id)) {
-		update_jobs([job_id]);
-	}
-}
-function reloadSSEListeners() {
-	const evtSource = new EventSource(
-		`${PUBLIC_BACKEND_BASE_URL}/api/jobs/events`,
-		{
-			withCredentials: true,
-			fetch: (input, init) =>
-				fetch(input, {
-					...init,
-					headers: {
-						...init.headers,
-					},
-				}),
-		},
-	);
-	evtSource.removeEventListener("job_deleted", fetch_jobs);
-	evtSource.removeEventListener("job_created", fetch_jobs);
-	evtSource.removeEventListener("job_updated", updateJobOnSSEEvent);
-	evtSource.addEventListener("job_deleted", fetch_jobs);
-	evtSource.addEventListener("job_created", fetch_jobs);
-	evtSource.addEventListener("job_updated", updateJobOnSSEEvent);
-}
-reloadSSEListeners();
-if (window.cookieStore !== undefined) {
-	cookieStore.addEventListener("change", (event: CookieChangeEvent) => {
-		for (const { name, value } of event.changed) {
-			if (name === "token" && value) {
-				reloadSSEListeners();
-			}
-		}
-	});
-} else {
-	console.warn(
-		"Your browser doesn't seem to support the Cookie Store API. Automatic updates of the jobs table may be impacted by this. Consider updating your browser!",
-	);
-}
 </script>
 
 <CenterPage title="Your transcription jobs">

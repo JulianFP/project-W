@@ -166,3 +166,6 @@ backend-config*
 
 #ignore config files
 config.yml
+
+#ignore dev setup files
+project-W-data

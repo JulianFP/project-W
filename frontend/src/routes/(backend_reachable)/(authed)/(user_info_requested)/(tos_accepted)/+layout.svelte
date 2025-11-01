@@ -1,68 +1,69 @@
 <script lang="ts">
-import { Checkbox, Heading, Helper, P } from "flowbite-svelte";
-import type { Snippet } from "svelte";
-import { invalidate } from "$app/navigation";
-import CenterPage from "$lib/components/centerPage.svelte";
-import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-import type { components } from "$lib/utils/schema";
+	import { Checkbox, Heading, Helper, P } from "flowbite-svelte";
+	import type { Snippet } from "svelte";
+	import { invalidate } from "$app/navigation";
+	import CenterPage from "$lib/components/centerPage.svelte";
+	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	about: components["schemas"]["AboutResponse"];
-	user_info: components["schemas"]["User"];
-};
-interface Props {
-	data: Data;
-	children: Snippet;
-}
-let { data, children }: Props = $props();
-
-let not_accepted_tos: [string, boolean][] = $state([]);
-
-function reset_not_accepted_tos() {
-	not_accepted_tos = [];
-	for (let [server_tos_id, server_tos] of Object.entries(
-		data.about.terms_of_services,
-	)) {
-		if (
-			!data.user_info.accepted_tos[server_tos_id] ||
-			data.user_info.accepted_tos[server_tos_id] < server_tos.version
-		) {
-			not_accepted_tos.push([server_tos_id, false]);
-		}
+	type Data = {
+		about: components["schemas"]["AboutResponse"];
+		user_info: components["schemas"]["User"];
+	};
+	interface Props {
+		data: Data;
+		children: Snippet;
 	}
-}
-reset_not_accepted_tos();
+	let { data, children }: Props = $props();
 
-let waiting: boolean = $state(false);
-let error: boolean = $state(false);
-let errorMsg: string = $state("");
-let enabled = $derived(not_accepted_tos.every(([_, accepted]) => accepted));
+	let not_accepted_tos: [string, boolean][] = $state([]);
 
-async function acceptTos(): Promise<void> {
-	waiting = true;
-	try {
-		for (let [tos_id, selected] of not_accepted_tos) {
-			if (selected) {
-				await postLoggedIn<string>("users/accept_tos", {}, false, {
-					tos_id: tos_id,
-					tos_version: data.about.terms_of_services[tos_id].version.toString(),
-				});
+	function reset_not_accepted_tos() {
+		not_accepted_tos = [];
+		for (let [server_tos_id, server_tos] of Object.entries(
+			data.about.terms_of_services,
+		)) {
+			if (
+				!data.user_info.accepted_tos[server_tos_id] ||
+				data.user_info.accepted_tos[server_tos_id] < server_tos.version
+			) {
+				not_accepted_tos.push([server_tos_id, false]);
 			}
 		}
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			errorMsg = err.message;
-		} else {
-			errorMsg = "Unknown error";
-		}
-		error = true;
 	}
-	await invalidate("app:user_info");
 	reset_not_accepted_tos();
-	waiting = false;
-}
+
+	let waiting: boolean = $state(false);
+	let error: boolean = $state(false);
+	let errorMsg: string = $state("");
+	let enabled = $derived(not_accepted_tos.every(([_, accepted]) => accepted));
+
+	async function acceptTos(): Promise<void> {
+		waiting = true;
+		try {
+			for (let [tos_id, selected] of not_accepted_tos) {
+				if (selected) {
+					await postLoggedIn<string>("users/accept_tos", {}, false, {
+						tos_id: tos_id,
+						tos_version:
+							data.about.terms_of_services[tos_id].version.toString(),
+					});
+				}
+			}
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				errorMsg = err.message;
+			} else {
+				errorMsg = "Unknown error";
+			}
+			error = true;
+		}
+		await invalidate("app:user_info");
+		reset_not_accepted_tos();
+		waiting = false;
+	}
 </script>
 {#if not_accepted_tos.length === 0}
   {@render children()}

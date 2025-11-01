@@ -1,11 +1,11 @@
 <script lang="ts">
-import { P } from "flowbite-svelte";
+	import { P } from "flowbite-svelte";
 
-interface Props {
-	children?: import("svelte").Snippet;
-}
+	interface Props {
+		children?: import("svelte").Snippet;
+	}
 
-let { children }: Props = $props();
+	let { children }: Props = $props();
 </script>
 
 <div class="flex flex-col w-full h-full justify-evenly items-center my-8">

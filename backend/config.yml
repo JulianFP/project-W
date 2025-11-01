@@ -3,21 +3,48 @@ client_url: http://localhost:5173/#
 web_server:
   address: "127.0.0.1"
   no_https: true
-postgres_connection_string: "postgresql://postgres@%2Fvar%2Frun%2Fpostgresql/postgres"
+postgres_connection_string: "postgresql://project_w@localhost:5432"
 redis_connection:
-  unix_socket_path: "/var/run/redis-project-W/redis.sock"
+  connection_string: "redis://localhost:6379/project-W"
 security:
   secret_key: f26a5feb0eb502fb2b4f872026ce7b5d3986dbfef77d72d3f29050df2f8b3bdb
   local_account:
     user_provisioning:
       0:
-        email: <your email>
-        password: verysecurepassword
+        email: project_w-admin@example.org
+        password: Password-1234!
         is_admin: true
+  ldap_providers:
+    OpenLDAP:
+      server_address: "ldap://127.0.0.1:3000"
+      service_account_auth:
+        user: "cn=admin,dc=example,dc=org"
+        password: "admin"
+      username_attributes:
+        - "cn"
+        - "mail"
+      uid_attribute: "uid"
+      mail_attribute: "mail"
+      user_query:
+        base_dn: "ou=users,dc=example,dc=org"
+        filter: "objectClass=inetOrgPerson"
+      admin_query:
+        base_dn: "ou=admins,dc=example,dc=org"
+        filter: "objectClass=inetOrgPerson"
+  oidc_providers:
+    KeyCloak:
+      icon_url: "https://www.keycloak.org/resources/favicon.svg"
+      base_url: "http://127.0.0.1:8081/realms/project-w_realm"
+      client_id: "project-w"
+      client_secret: "787XYwQNoRe1HiKBRaGYsZCOo0D31oyv"
+      user_role:
+        field_name: "group"
+        name: "users"
+      admin_role:
+        field_name: "group"
+        name: "admins"
 smtp_server:
-  hostname: <your hostname>
-  port: 587
-  secure: starttls
-  sender_email: <your email>
-  username: <your username>
-  password: <your password>
+  hostname: localhost
+  port: 1025
+  secure: plain
+  sender_email: project_w@example.com

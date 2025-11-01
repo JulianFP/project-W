@@ -1,19 +1,19 @@
 <script lang="ts">
-import { A, Heading, Hr, P, Span } from "flowbite-svelte";
-import { version } from "$app/environment";
-import CenterPage from "$lib/components/centerPage.svelte";
+	import { A, Heading, Hr, P, Span } from "flowbite-svelte";
+	import { version } from "$app/environment";
+	import CenterPage from "$lib/components/centerPage.svelte";
 
-import type { components } from "$lib/utils/schema";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	about: components["schemas"]["AboutResponse"];
-};
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
+	type Data = {
+		about: components["schemas"]["AboutResponse"];
+	};
+	interface Props {
+		data: Data;
+	}
+	let { data }: Props = $props();
 
-let [frontend_version, frontend_git_hash] = version.split("|");
+	let [frontend_version, frontend_git_hash] = version.split("|");
 </script>
 
 <CenterPage title="About">

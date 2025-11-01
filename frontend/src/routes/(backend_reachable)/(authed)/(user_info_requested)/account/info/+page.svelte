@@ -1,67 +1,70 @@
 <script lang="ts">
-import { Alert, Helper } from "flowbite-svelte";
+	import { Alert, Helper } from "flowbite-svelte";
 
-import Button from "$lib/components/button.svelte";
-import CenterPage from "$lib/components/centerPage.svelte";
-import ChangeEmailField from "$lib/components/changeEmailField.svelte";
-import ConfirmModal from "$lib/components/confirmModal.svelte";
-import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-import { alerts, auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { deletLoggedIn, getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-import type { components } from "$lib/utils/schema";
+	import Button from "$lib/components/button.svelte";
+	import CenterPage from "$lib/components/centerPage.svelte";
+	import ChangeEmailField from "$lib/components/changeEmailField.svelte";
+	import ConfirmModal from "$lib/components/confirmModal.svelte";
+	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
+	import { alerts, auth } from "$lib/utils/global_state.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import {
+		deletLoggedIn,
+		getLoggedIn,
+	} from "$lib/utils/httpRequestsAuth.svelte";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	user_info: components["schemas"]["User"];
-};
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
-
-let waitingForResend = $state(false);
-let resendError = $state(false);
-let resendErrorMsg = $state("");
-
-let modalOpen = $state(false);
-
-async function deleteUser() {
-	try {
-		await deletLoggedIn<null>("users/delete");
-		alerts.push({ msg: "User was deleted successfully!", color: "green" });
-		auth.logout();
-	} catch (err: unknown) {
-		let errorMsg = "Error occurred during user deletion: ";
-		if (err instanceof BackendCommError) {
-			errorMsg += err.message;
-		} else {
-			errorMsg += "Unknown error";
-		}
-		alerts.push({ msg: errorMsg, color: "red" });
+	type Data = {
+		user_info: components["schemas"]["User"];
+	};
+	interface Props {
+		data: Data;
 	}
-}
+	let { data }: Props = $props();
 
-async function getResendEmail() {
-	waitingForResend = true;
-	resendError = false;
-	resendErrorMsg = "";
+	let waitingForResend = $state(false);
+	let resendError = $state(false);
+	let resendErrorMsg = $state("");
 
-	try {
-		let resendResponse = await getLoggedIn<string>(
-			"local-account/resend_activation_email",
-		);
-		alerts.push({ msg: resendResponse, color: "green" });
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			resendErrorMsg = err.message;
-		} else {
-			resendErrorMsg = "Unknown error";
+	let modalOpen = $state(false);
+
+	async function deleteUser() {
+		try {
+			await deletLoggedIn<null>("users/delete");
+			alerts.push({ msg: "User was deleted successfully!", color: "green" });
+			auth.logout();
+		} catch (err: unknown) {
+			let errorMsg = "Error occurred during user deletion: ";
+			if (err instanceof BackendCommError) {
+				errorMsg += err.message;
+			} else {
+				errorMsg += "Unknown error";
+			}
+			alerts.push({ msg: errorMsg, color: "red" });
 		}
-		resendError = true;
 	}
 
-	waitingForResend = false;
-}
+	async function getResendEmail() {
+		waitingForResend = true;
+		resendError = false;
+		resendErrorMsg = "";
+
+		try {
+			let resendResponse = await getLoggedIn<string>(
+				"local-account/resend_activation_email",
+			);
+			alerts.push({ msg: resendResponse, color: "green" });
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				resendErrorMsg = err.message;
+			} else {
+				resendErrorMsg = "Unknown error";
+			}
+			resendError = true;
+		}
+
+		waitingForResend = false;
+	}
 </script>
 
 <CenterPage title="Account settings">

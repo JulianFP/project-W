@@ -1,21 +1,21 @@
 <script lang="ts">
-import { A, Span } from "flowbite-svelte";
-import CenterPage from "$lib/components/centerPage.svelte";
+	import { A, Span } from "flowbite-svelte";
+	import CenterPage from "$lib/components/centerPage.svelte";
 
-import type { components } from "$lib/utils/schema";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	about: components["schemas"]["AboutResponse"];
-};
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
+	type Data = {
+		about: components["schemas"]["AboutResponse"];
+	};
+	interface Props {
+		data: Data;
+	}
+	let { data }: Props = $props();
 
-if (data.about.imprint != null && data.about.imprint.url != null) {
-	const win: Window = window;
-	win.location = data.about.imprint.url;
-}
+	if (data.about.imprint != null && data.about.imprint.url != null) {
+		const win: Window = window;
+		win.location = data.about.imprint.url;
+	}
 </script>
 
 <CenterPage title="Imprint of this instance">

@@ -25,6 +25,24 @@ Regardless which component you want to develop on, start of by cloning the repos
 
       git clone https://github.com/JulianFP/project-W.git && cd project-W
 
+You can now start all the components required to run the backend using docker/podman. For this run:
+
+   .. code-block:: console
+
+      docker compose up
+
+in the repository root. This will setup development PostgreSQL, Redis, Mailpit (SMTP), OpenLDAP, and Keycloak servers plus pgadmin and redisinsight for database debugging. It will configure everything automatically as well (i.e. setup a PostgreSQL database, connect pgadmin to postgres, setup OpenLDAP users and a Keycloak realm). Give it some time to start everything up, and then you can visit the tools in your browser:
+
+- pgadmin: http://localhost:8080
+
+- redisinsight: http://localhost:5540
+
+- Mailpit: http://localhost:8025
+
+- Keycloak: http://localhost:8081
+
+You can now proceed with starting up the Project-W backend. The provided default config file for it is already configured to connect to all these docker components.
+
 Backend
 ```````
 
@@ -46,7 +64,13 @@ Backend
 
       source .venv/bin/activate
 
-You are now ready to go!
+4. Startup the backend development server:
+
+   .. code-block:: console
+
+      ./run.sh
+
+You are now ready to go! You should now be able to access the Swagger UI of your running backend under http://localhost:5000/docs.
 
 Frontend
 ````````
@@ -64,28 +88,44 @@ Frontend
 
       pnpm install
 
-You are now ready to go!
+3. Startup the frontend development server:
+
+   .. code-block:: console
+
+      pnpm dev
+
+You are now ready to go! You should now be able to access the frontend under http://localhost:5173.
 
 Runner
 ``````
 
-1. Enter the ``runner`` directory
+1. First, you need to create a runner token for your local Project-W backend. Refer to :doc:`connect_runner_backend` for how to do that, while using ``http://localhost:5000`` as your backend url.
+
+2. Enter the ``runner`` directory
 
    .. code-block:: console
 
       cd runner
 
-2. Sync all the dependencies. If you don't want to download all the whisper-related dependencies and just want to use the runner in it's dummy mode (where it doesn't actually transcribe anything and always just returns the same dummy transcript), then you can also omit the ``--all-extras`` argument:
+3. Sync all the dependencies. If you don't want to download all the whisper-related dependencies and just want to use the runner in it's dummy mode (where it doesn't actually transcribe anything and always just returns the same dummy transcript), then you can also omit the ``--all-extras`` argument:
 
    .. code-block:: console
 
       uv sync --dev --all-extras
 
-3. Enter the venv:
+4. Enter the venv:
 
    .. code-block:: console
 
       source .venv/bin/activate
+
+5. Replace the ``<your runner token>`` placeholder in the runner `config.yml` file with the runner token you obtained in step 1.
+
+6. Startup the runner:
+
+   .. code-block:: console
+
+      ./run.sh
 
 You are now ready to go! Note that by default, Whisper caches downloaded models in ``$HOME/.cache/whisper/``. If you would like
 the runner to download the models into a different directory, set ``whisper_settings.model_cache_dir`` in your ``config.yml`` to the desired directory.

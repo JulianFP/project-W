@@ -1,67 +1,67 @@
 <script lang="ts">
-import "../../app.css";
-import {
-	Alert,
-	Avatar,
-	Banner,
-	DarkMode,
-	Dropdown,
-	DropdownDivider,
-	DropdownItem,
-	Footer,
-	FooterBrand,
-	FooterCopyright,
-	FooterLink,
-	FooterLinkGroup,
-	NavBrand,
-	Navbar,
-} from "flowbite-svelte";
-import {
-	AdjustmentsHorizontalSolid,
-	BullhornSolid,
-	GithubSolid,
-	InfoCircleSolid,
-	LockSolid,
-	UserEditSolid,
-} from "flowbite-svelte-icons";
-import type { Snippet } from "svelte";
-import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-import { alerts, auth, routing } from "$lib/utils/global_state.svelte";
-import { BackendCommError, delet } from "$lib/utils/httpRequests.svelte";
-import type { components } from "$lib/utils/schema";
+	import "../../app.css";
+	import {
+		Alert,
+		Avatar,
+		Banner,
+		DarkMode,
+		Dropdown,
+		DropdownDivider,
+		DropdownItem,
+		Footer,
+		FooterBrand,
+		FooterCopyright,
+		FooterLink,
+		FooterLinkGroup,
+		NavBrand,
+		Navbar,
+	} from "flowbite-svelte";
+	import {
+		AdjustmentsHorizontalSolid,
+		BullhornSolid,
+		GithubSolid,
+		InfoCircleSolid,
+		LockSolid,
+		UserEditSolid,
+	} from "flowbite-svelte-icons";
+	import type { Snippet } from "svelte";
+	import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+	import { alerts, auth, routing } from "$lib/utils/global_state.svelte";
+	import { BackendCommError, delet } from "$lib/utils/httpRequests.svelte";
+	import type { components } from "$lib/utils/schema";
 
-let dropDownOpen = $state(false);
+	let dropDownOpen = $state(false);
 
-type Data = {
-	about: components["schemas"]["AboutResponse"];
-	user_info: components["schemas"]["User"];
-};
-interface Props {
-	data: Data;
-	children: Snippet;
-}
-let { data, children }: Props = $props();
-
-async function logout(): Promise<void> {
-	//send post request and wait for response
-	try {
-		await delet<string>("users/logout", {}, {}, {}, window.fetch, true);
-		auth.logout();
-	} catch (err: unknown) {
-		let errorMsg: string;
-		if (err instanceof BackendCommError) {
-			if (err.status === 401) {
-				//ignore 401 error because we want to logout anyway
-				auth.logout();
-				return;
-			}
-			errorMsg = err.message;
-		} else {
-			errorMsg = "Unknown error";
-		}
-		alerts.push({ msg: `Error during logout: ${errorMsg}`, color: "red" });
+	type Data = {
+		about: components["schemas"]["AboutResponse"];
+		user_info: components["schemas"]["User"];
+	};
+	interface Props {
+		data: Data;
+		children: Snippet;
 	}
-}
+	let { data, children }: Props = $props();
+
+	async function logout(): Promise<void> {
+		//send post request and wait for response
+		try {
+			await delet<string>("users/logout", {}, {}, {}, window.fetch, true);
+			auth.logout();
+		} catch (err: unknown) {
+			let errorMsg: string;
+			if (err instanceof BackendCommError) {
+				if (err.status === 401) {
+					//ignore 401 error because we want to logout anyway
+					auth.logout();
+					return;
+				}
+				errorMsg = err.message;
+			} else {
+				errorMsg = "Unknown error";
+			}
+			alerts.push({ msg: `Error during logout: ${errorMsg}`, color: "red" });
+		}
+	}
 </script>
 <!-- On smaller screens (height <1250px) the login site will be expanded to the size of the screen pushing the footer outside the screen. Looks better that way-->
 <div class={`flex flex-col gap-8 ${routing.location.startsWith("#/auth") ? "min-h-[min(calc(100vh+180px),max(100vh,1250px))]" : "min-h-screen"}`}>

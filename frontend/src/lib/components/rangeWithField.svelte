@@ -1,7 +1,7 @@
 <script lang="ts">
-import { Input, Range } from "flowbite-svelte";
+	import { Input, Range } from "flowbite-svelte";
 
-let { value = $bindable(), min, max, step, id, ...rest } = $props();
+	let { value = $bindable(), min, max, step, id, ...rest } = $props();
 </script>
 
 <div class="flex gap-2 items-center">

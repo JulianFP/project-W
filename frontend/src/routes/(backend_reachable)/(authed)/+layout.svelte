@@ -1,14 +1,14 @@
 <script lang="ts">
-import WaitingForGoto from "$lib/components/waitingForGoto.svelte";
-import { auth, routing } from "$lib/utils/global_state.svelte";
+	import WaitingForGoto from "$lib/components/waitingForGoto.svelte";
+	import { auth, routing } from "$lib/utils/global_state.svelte";
 
-$effect(() => {
-	if (!auth.loggedIn && auth.loggedInSettled) {
-		routing.dest_forward();
-	}
-});
+	$effect(() => {
+		if (!auth.loggedIn && auth.loggedInSettled) {
+			routing.dest_forward();
+		}
+	});
 
-let { children } = $props();
+	let { children } = $props();
 </script>
 {#await auth.awaitLoggedIn}
   <WaitingForGoto/>

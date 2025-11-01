@@ -1,10 +1,10 @@
 <script lang="ts">
-import { Heading } from "flowbite-svelte";
-import { ArrowLeftOutline } from "flowbite-svelte-icons";
+	import { Heading } from "flowbite-svelte";
+	import { ArrowLeftOutline } from "flowbite-svelte-icons";
 
-import Button from "./button.svelte";
+	import Button from "./button.svelte";
 
-let { backButtonUri, heading, children } = $props();
+	let { backButtonUri, heading, children } = $props();
 </script>
 
 <div class="mx-auto max-w-lg">

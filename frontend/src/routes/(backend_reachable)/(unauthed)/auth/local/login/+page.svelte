@@ -1,60 +1,60 @@
 <script lang="ts">
-import { A, Helper } from "flowbite-svelte";
-import { AngleRightOutline } from "flowbite-svelte-icons";
-import Button from "$lib/components/button.svelte";
-import EmailField from "$lib/components/emailField.svelte";
-import FormPage from "$lib/components/formPage.svelte";
-import PasswordField from "$lib/components/passwordField.svelte";
-import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
-import { auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
-import type { components } from "$lib/utils/schema";
+	import { A, Helper } from "flowbite-svelte";
+	import { AngleRightOutline } from "flowbite-svelte-icons";
+	import Button from "$lib/components/button.svelte";
+	import EmailField from "$lib/components/emailField.svelte";
+	import FormPage from "$lib/components/formPage.svelte";
+	import PasswordField from "$lib/components/passwordField.svelte";
+	import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
+	import { auth } from "$lib/utils/global_state.svelte";
+	import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	auth_settings: components["schemas"]["AuthSettings"];
-};
+	type Data = {
+		auth_settings: components["schemas"]["AuthSettings"];
+	};
 
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
-
-let error: boolean = $state(false);
-let errorMsg: string = $state("");
-let waitingForPromise = $state(false);
-let email: string = $state("");
-let password: string = $state("");
-
-async function postLogin(event: Event): Promise<void> {
-	waitingForPromise = true; //show loading button
-	event.preventDefault(); //disable page reload after form submission
-
-	//send post request and wait for response
-	try {
-		await post<string>(
-			"local-account/login",
-			{
-				grant_type: "password",
-				username: email,
-				password: password,
-			},
-			true,
-			{},
-			{},
-			window.fetch,
-			true,
-		);
-		auth.login();
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			errorMsg = err.message;
-		} else {
-			errorMsg = "Unknown error";
-		}
-		error = true;
+	interface Props {
+		data: Data;
 	}
-	waitingForPromise = false;
-}
+	let { data }: Props = $props();
+
+	let error: boolean = $state(false);
+	let errorMsg: string = $state("");
+	let waitingForPromise = $state(false);
+	let email: string = $state("");
+	let password: string = $state("");
+
+	async function postLogin(event: Event): Promise<void> {
+		waitingForPromise = true; //show loading button
+		event.preventDefault(); //disable page reload after form submission
+
+		//send post request and wait for response
+		try {
+			await post<string>(
+				"local-account/login",
+				{
+					grant_type: "password",
+					username: email,
+					password: password,
+				},
+				true,
+				{},
+				{},
+				window.fetch,
+				true,
+			);
+			auth.login();
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				errorMsg = err.message;
+			} else {
+				errorMsg = "Unknown error";
+			}
+			error = true;
+		}
+		waitingForPromise = false;
+	}
 </script>
 
 <FormPage backButtonUri="#/auth" heading="Login with Project-W account">

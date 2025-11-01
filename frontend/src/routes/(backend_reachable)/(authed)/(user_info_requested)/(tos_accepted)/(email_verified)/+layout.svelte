@@ -1,47 +1,47 @@
 <script lang="ts">
-import { Heading, Helper, P } from "flowbite-svelte";
-import { MailBoxSolid } from "flowbite-svelte-icons";
-import type { Snippet } from "svelte";
-import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-import { alerts } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-import type { components } from "$lib/utils/schema";
+	import { Heading, Helper, P } from "flowbite-svelte";
+	import { MailBoxSolid } from "flowbite-svelte-icons";
+	import type { Snippet } from "svelte";
+	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
+	import { alerts } from "$lib/utils/global_state.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	user_info: components["schemas"]["User"];
-};
-interface Props {
-	data: Data;
-	children: Snippet;
-}
-let { data, children }: Props = $props();
-
-let waitingForResend = $state(false);
-let resendError = $state(false);
-let resendErrorMsg = $state("");
-
-async function getResendEmail() {
-	waitingForResend = true;
-	resendError = false;
-	resendErrorMsg = "";
-
-	try {
-		let resendResponse = await getLoggedIn<string>(
-			"local-account/resend_activation_email",
-		);
-		alerts.push({ msg: resendResponse, color: "green" });
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			resendErrorMsg = err.message;
-		} else {
-			resendErrorMsg = "Unknown error";
-		}
-		resendError = true;
+	type Data = {
+		user_info: components["schemas"]["User"];
+	};
+	interface Props {
+		data: Data;
+		children: Snippet;
 	}
+	let { data, children }: Props = $props();
 
-	waitingForResend = false;
-}
+	let waitingForResend = $state(false);
+	let resendError = $state(false);
+	let resendErrorMsg = $state("");
+
+	async function getResendEmail() {
+		waitingForResend = true;
+		resendError = false;
+		resendErrorMsg = "";
+
+		try {
+			let resendResponse = await getLoggedIn<string>(
+				"local-account/resend_activation_email",
+			);
+			alerts.push({ msg: resendResponse, color: "green" });
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				resendErrorMsg = err.message;
+			} else {
+				resendErrorMsg = "Unknown error";
+			}
+			resendError = true;
+		}
+
+		waitingForResend = false;
+	}
 </script>
 {#if data.user_info.is_verified}
   {@render children()}

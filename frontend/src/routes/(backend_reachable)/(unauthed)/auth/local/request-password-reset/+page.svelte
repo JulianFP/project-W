@@ -1,45 +1,45 @@
 <script lang="ts">
-import { Helper } from "flowbite-svelte";
+	import { Helper } from "flowbite-svelte";
 
-import EmailField from "$lib/components/emailField.svelte";
-import FormPage from "$lib/components/formPage.svelte";
-import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
+	import EmailField from "$lib/components/emailField.svelte";
+	import FormPage from "$lib/components/formPage.svelte";
+	import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
 
-import { alerts, routing } from "$lib/utils/global_state.svelte";
-import { BackendCommError, get } from "$lib/utils/httpRequests.svelte";
+	import { alerts, routing } from "$lib/utils/global_state.svelte";
+	import { BackendCommError, get } from "$lib/utils/httpRequests.svelte";
 
-let error = $state(false);
-let errorMsg = $state("");
-let response: string = $state("");
-let waitingForPromise = $state(false);
-let email: string = $state("");
+	let error = $state(false);
+	let errorMsg = $state("");
+	let response: string = $state("");
+	let waitingForPromise = $state(false);
+	let email: string = $state("");
 
-async function postRequestPasswordReset(event: Event): Promise<void> {
-	waitingForPromise = true; //show loading button
-	event.preventDefault(); //disable page reload after form submission
+	async function postRequestPasswordReset(event: Event): Promise<void> {
+		waitingForPromise = true; //show loading button
+		event.preventDefault(); //disable page reload after form submission
 
-	try {
-		response = await get<string>("local-account/request_password_reset", {
-			email: email,
-		});
+		try {
+			response = await get<string>("local-account/request_password_reset", {
+				email: email,
+			});
 
-		alerts.push({ msg: response, color: "green" });
-		await routing.set({
-			destination: "#/",
-			params: {},
-			overwriteParams: true,
-			history: true,
-		});
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			errorMsg = err.message;
-		} else {
-			errorMsg = "Unknown error";
+			alerts.push({ msg: response, color: "green" });
+			await routing.set({
+				destination: "#/",
+				params: {},
+				overwriteParams: true,
+				history: true,
+			});
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				errorMsg = err.message;
+			} else {
+				errorMsg = "Unknown error";
+			}
+			error = true;
+			waitingForPromise = false;
 		}
-		error = true;
-		waitingForPromise = false;
 	}
-}
 </script>
 
 <FormPage backButtonUri="#/auth/local/login" heading="Request password reset email for your Project-W account">

@@ -1,138 +1,140 @@
 <script lang="ts">
-import {
-	Badge,
-	Checkbox,
-	Dropzone,
-	Label,
-	Modal,
-	Tooltip,
-} from "flowbite-svelte";
-import { FileMusicSolid, QuestionCircleOutline } from "flowbite-svelte-icons";
-import { SvelteMap } from "svelte/reactivity";
-import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+	import {
+		Badge,
+		Checkbox,
+		Dropzone,
+		Label,
+		Modal,
+		Tooltip,
+	} from "flowbite-svelte";
+	import { FileMusicSolid, QuestionCircleOutline } from "flowbite-svelte-icons";
+	import { SvelteMap } from "svelte/reactivity";
+	import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
 
-import { alerts } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-import { type components } from "$lib/utils/schema";
-import CloseButton from "./closeButton.svelte";
-import JobSettingsForm from "./jobSettingsForm.svelte";
-import WaitingSubmitButton from "./waitingSubmitButton.svelte";
+	import { alerts } from "$lib/utils/global_state.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+	import { type components } from "$lib/utils/schema";
+	import CloseButton from "./closeButton.svelte";
+	import JobSettingsForm from "./jobSettingsForm.svelte";
+	import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-type JobSettingsResp = components["schemas"]["JobSettings-Output"];
-interface Props {
-	open?: boolean;
-	pre_action?: () => Promise<void>;
-	post_action?: () => Promise<void>;
-	pre_filled_in_settings?: JobSettingsResp;
-}
-let {
-	open = $bindable(false),
-	pre_action = async () => {},
-	post_action = async () => {},
-	pre_filled_in_settings,
-}: Props = $props();
-
-let files: FileList | null = $state(null);
-let all_files: SvelteMap<string, File> = $state(new SvelteMap<string, File>());
-$effect(() => {
-	if (files) {
-		for (let i = 0; i < files.length; i++) {
-			const file = files.item(i);
-			if (file && !all_files.has(file.name)) {
-				all_files.set(file.name, file);
-			}
-		}
-		files = null;
+	type JobSettingsResp = components["schemas"]["JobSettings-Output"];
+	interface Props {
+		open?: boolean;
+		pre_action?: () => Promise<void>;
+		post_action?: () => Promise<void>;
+		pre_filled_in_settings?: JobSettingsResp;
 	}
-});
+	let {
+		open = $bindable(false),
+		pre_action = async () => {},
+		post_action = async () => {},
+		pre_filled_in_settings,
+	}: Props = $props();
 
-let makeNewDefaults: boolean = $state(false);
-let get_job_settings = $state(() => {
-	return {};
-});
-
-let waitingForPromise = $state(false);
-
-function handleChange(event: Event): void {
-	const target = event.target as HTMLInputElement;
-	files = target.files;
-}
-
-function dropHandle(event: DragEvent): void {
-	event.preventDefault();
-	files = event.dataTransfer?.files ?? null;
-}
-
-async function postJob(file: File, job_settings_id: number) {
-	let form_data = new FormData();
-	form_data.set("audio_file", file);
-	return await fetch(
-		`${PUBLIC_BACKEND_BASE_URL}/api/jobs/submit_job?job_settings_id=${job_settings_id.toString()}`,
-		{
-			method: "POST",
-			credentials: "include",
-			body: form_data,
-		},
+	let files: FileList | null = $state(null);
+	let all_files: SvelteMap<string, File> = $state(
+		new SvelteMap<string, File>(),
 	);
-}
-
-async function submitJob(): Promise<void> {
-	if (all_files.size > 0) {
-		await pre_action();
-		waitingForPromise = true;
-
-		//send job settings
-		try {
-			const settings_id = await postLoggedIn<number>(
-				"jobs/submit_settings",
-				get_job_settings(),
-				false,
-				{
-					is_new_default: makeNewDefaults.toString(),
-				},
-			);
-
-			//send all requests at ones and wait for promises in parallel with "allSettled" method
-			//show results to user ones all promises have settled
-			let promises: Promise<Response>[] = [];
-			for (let file of all_files.values()) {
-				promises.push(postJob(file, settings_id));
-			}
-			let responses: PromiseSettledResult<Response>[] =
-				await Promise.allSettled(promises);
-
-			for (const [i, file] of Array.from(all_files.values()).entries()) {
-				const response: PromiseSettledResult<Response> = responses[i];
-				if (response.status !== "fulfilled" || !response.value.ok) {
-					alerts.push({
-						msg: `Error occurred while submitting job with filename '${file.name}'`,
-						color: "red",
-					});
+	$effect(() => {
+		if (files) {
+			for (let i = 0; i < files.length; i++) {
+				const file = files.item(i);
+				if (file && !all_files.has(file.name)) {
+					all_files.set(file.name, file);
 				}
 			}
-		} catch (err: unknown) {
-			let errorMsg = "Error occurred while trying to submit job settings: ";
-			if (err instanceof BackendCommError) {
-				errorMsg += err.message;
-			} else {
-				errorMsg += "Unknown error";
-			}
-			alerts.push({ msg: errorMsg, color: "red" });
+			files = null;
 		}
+	});
 
-		open = false;
-		waitingForPromise = false;
-		await post_action();
-	}
-}
+	let makeNewDefaults: boolean = $state(false);
+	let get_job_settings = $state(() => {
+		return {};
+	});
 
-function onAction(params: { action: string; data: FormData }): boolean {
-	if (params.action === "submit") {
-		submitJob();
+	let waitingForPromise = $state(false);
+
+	function handleChange(event: Event): void {
+		const target = event.target as HTMLInputElement;
+		files = target.files;
 	}
-	return false;
-}
+
+	function dropHandle(event: DragEvent): void {
+		event.preventDefault();
+		files = event.dataTransfer?.files ?? null;
+	}
+
+	async function postJob(file: File, job_settings_id: number) {
+		let form_data = new FormData();
+		form_data.set("audio_file", file);
+		return await fetch(
+			`${PUBLIC_BACKEND_BASE_URL}/api/jobs/submit_job?job_settings_id=${job_settings_id.toString()}`,
+			{
+				method: "POST",
+				credentials: "include",
+				body: form_data,
+			},
+		);
+	}
+
+	async function submitJob(): Promise<void> {
+		if (all_files.size > 0) {
+			await pre_action();
+			waitingForPromise = true;
+
+			//send job settings
+			try {
+				const settings_id = await postLoggedIn<number>(
+					"jobs/submit_settings",
+					get_job_settings(),
+					false,
+					{
+						is_new_default: makeNewDefaults.toString(),
+					},
+				);
+
+				//send all requests at ones and wait for promises in parallel with "allSettled" method
+				//show results to user ones all promises have settled
+				let promises: Promise<Response>[] = [];
+				for (let file of all_files.values()) {
+					promises.push(postJob(file, settings_id));
+				}
+				let responses: PromiseSettledResult<Response>[] =
+					await Promise.allSettled(promises);
+
+				for (const [i, file] of Array.from(all_files.values()).entries()) {
+					const response: PromiseSettledResult<Response> = responses[i];
+					if (response.status !== "fulfilled" || !response.value.ok) {
+						alerts.push({
+							msg: `Error occurred while submitting job with filename '${file.name}'`,
+							color: "red",
+						});
+					}
+				}
+			} catch (err: unknown) {
+				let errorMsg = "Error occurred while trying to submit job settings: ";
+				if (err instanceof BackendCommError) {
+					errorMsg += err.message;
+				} else {
+					errorMsg += "Unknown error";
+				}
+				alerts.push({ msg: errorMsg, color: "red" });
+			}
+
+			open = false;
+			waitingForPromise = false;
+			await post_action();
+		}
+	}
+
+	function onAction(params: { action: string; data: FormData }): boolean {
+		if (params.action === "submit") {
+			submitJob();
+		}
+		return false;
+	}
 </script>
 
 <Modal form title={all_files.size > 1 ? `Submit ${all_files.size.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction} onclose={() => all_files.clear()}>

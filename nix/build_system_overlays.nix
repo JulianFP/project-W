@@ -104,16 +104,19 @@ mapAttrs (
         cuda_nvml_dev # <nvml.h>
         cuda_nvrtc
         cuda_nvtx # -llibNVToolsExt
-        cusparselt
         libcublas
         libcufft
         libcufile
         libcurand
         libcusolver
         libcusparse
+        libcusparse_lt
         cudnn
         nccl
       ];
+    autoPatchelfIgnoreMissingDeps = [
+      "libcuda.so.1"
+    ];
   });
   torchaudio =
     (prev.torchaudio.override {
@@ -147,7 +150,7 @@ mapAttrs (
       });
   nvidia-cufile-cu12 = prev.nvidia-cufile-cu12.overrideAttrs (old: {
     buildInputs = (old.buildInputs or [ ]) ++ [
-      pkgs.cudaPackages.libcufile
+      pkgs.rdma-core
     ];
   });
   nvidia-cusolver-cu12 = prev.nvidia-cusolver-cu12.overrideAttrs (old: {
@@ -157,7 +160,7 @@ mapAttrs (
   });
   nvidia-cusparse-cu12 = prev.nvidia-cusparse-cu12.overrideAttrs (old: {
     buildInputs = (old.buildInputs or [ ]) ++ [
-      pkgs.cudaPackages.libcusparse
+      pkgs.cudaPackages.libnvjitlink
     ];
   });
   soundfile =

@@ -1,0 +1,12 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "Project-W dev",
+            "Group": "Servers",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "project_w",
+            "Username": "project_w"
+        }
+    }
+}
