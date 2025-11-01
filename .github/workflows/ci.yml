@@ -193,7 +193,7 @@ jobs:
           touch "${{ runner.temp }}/${{ matrix.container }}-digests/${digest#sha256:}"
 
       - name: Upload ${{ matrix.container }} digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.container }}-digests-${{ env.PLATFORM_PAIR }}
           path: ${{ runner.temp }}/${{ matrix.container }}-digests/*
