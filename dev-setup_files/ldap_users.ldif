@@ -1,0 +1,31 @@
+# organisational unit for Project-W admins
+dn: ou=admins,dc=example,dc=org
+changetype: add
+objectClass: organizationalUnit
+ou: admins
+
+# user: admin_user of admins unit
+dn: uid=admin_user,ou=admins,dc=example,dc=org
+changetype: add
+objectClass: inetOrgPerson
+cn: admin user
+sn: admin
+uid: admin_user
+mail: admin_user@example.org
+userPassword: Password1234!
+
+# organisational unit for regular Project-W users
+dn: ou=users,dc=example,dc=org
+changetype: add
+objectClass: organizationalUnit
+ou: users
+
+# user: normal_user of users unit
+dn: uid=normal_user,ou=users,dc=example,dc=org
+changetype: add
+objectClass: inetOrgPerson
+cn: normal user
+sn: user
+uid: normal_user
+mail: normal_user@example.org
+userPassword: Password1234!

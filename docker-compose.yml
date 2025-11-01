@@ -1,0 +1,81 @@
+services:
+  mailpit:
+    image: docker.io/axllent/mailpit
+    restart: unless-stopped
+    volumes:
+      - ./project-W-data/mailpit:/data
+    ports:
+      - 8025:8025
+      - 1025:1025
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+  postgres:
+    image: docker.io/postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: project_w
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command: ["postgres", "-c", "log_statement=all", "-c", "log_connections=true", "-c", "log_disconnections=true"]
+    volumes:
+      - ./project-W-data/postgres/:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+  pgadmin:
+    image: docker.io/dpage/pgadmin4
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@example.com
+      PGADMIN_DEFAULT_PASSWORD: Password1234
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: True
+      PGADMIN_CONFIG_SERVER_MODE: False
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: False
+    volumes:
+      - ./dev-setup_files/pgadmin_servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - 8080:80
+  redis:
+    image: docker.io/redis:8
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+  redisinsight:
+    image: docker.io/redis/redisinsight
+    restart: unless-stopped
+    environment:
+      RI_DATABASE_MANAGEMENT: false
+      RI_REDIS_HOST: redis
+      RI_REDIS_PORT: 6379
+    ports:
+      - 5540:5540
+  openldap:
+    image: docker.io/osixia/openldap
+    restart: unless-stopped
+    environment:
+      LDAP_BASE_DN: "dc=example,dc=org"
+      LDAP_ORGANISATION: "Example Organization"
+      LDAP_DOMAIN: "example.org"
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_TLS: "false"
+    volumes:
+      - ./dev-setup_files/ldap_users.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-ldap_users.ldif
+    ports:
+      - 3000:389
+    command:
+      --copy-service --loglevel debug
+  keycloak:
+    image: quay.io/keycloak/keycloak
+    restart: unless-stopped
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./dev-setup_files/keycloak_realm.json:/opt/keycloak/data/import/realm.json
+    command:
+      - start-dev
+      - --import-realm
+      - --log-level=debug
+    ports:
+      - 8081:8080
