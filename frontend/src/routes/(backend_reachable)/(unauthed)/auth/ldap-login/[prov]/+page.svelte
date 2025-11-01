@@ -1,59 +1,59 @@
 <script lang="ts">
-import { Helper, Input, Label } from "flowbite-svelte";
-import { AngleRightOutline, UserCircleSolid } from "flowbite-svelte-icons";
-import FormPage from "$lib/components/formPage.svelte";
-import PasswordField from "$lib/components/passwordField.svelte";
-import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
-import { auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
-import type { components } from "$lib/utils/schema";
+	import { Helper, Input, Label } from "flowbite-svelte";
+	import { AngleRightOutline, UserCircleSolid } from "flowbite-svelte-icons";
+	import FormPage from "$lib/components/formPage.svelte";
+	import PasswordField from "$lib/components/passwordField.svelte";
+	import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
+	import { auth } from "$lib/utils/global_state.svelte";
+	import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	auth_settings: components["schemas"]["AuthSettings"];
-	prov: string;
-};
+	type Data = {
+		auth_settings: components["schemas"]["AuthSettings"];
+		prov: string;
+	};
 
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
-
-let error: boolean = $state(false);
-let errorMsg: string = $state("");
-let waitingForPromise = $state(false);
-let username: string = $state("");
-let password: string = $state("");
-
-async function postLogin(event: Event): Promise<void> {
-	waitingForPromise = true; //show loading button
-	event.preventDefault(); //disable page reload after form submission
-
-	//send post request and wait for response
-	try {
-		await post<string>(
-			`ldap/login/${data.prov}`,
-			{
-				grant_type: "password",
-				username: username,
-				password: password,
-			},
-			true,
-			{},
-			{},
-			window.fetch,
-			true,
-		);
-		auth.login();
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			errorMsg = err.message;
-		} else {
-			errorMsg = "Unknown error";
-		}
-		error = true;
+	interface Props {
+		data: Data;
 	}
-	waitingForPromise = false;
-}
+	let { data }: Props = $props();
+
+	let error: boolean = $state(false);
+	let errorMsg: string = $state("");
+	let waitingForPromise = $state(false);
+	let username: string = $state("");
+	let password: string = $state("");
+
+	async function postLogin(event: Event): Promise<void> {
+		waitingForPromise = true; //show loading button
+		event.preventDefault(); //disable page reload after form submission
+
+		//send post request and wait for response
+		try {
+			await post<string>(
+				`ldap/login/${data.prov}`,
+				{
+					grant_type: "password",
+					username: username,
+					password: password,
+				},
+				true,
+				{},
+				{},
+				window.fetch,
+				true,
+			);
+			auth.login();
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				errorMsg = err.message;
+			} else {
+				errorMsg = "Unknown error";
+			}
+			error = true;
+		}
+		waitingForPromise = false;
+	}
 </script>
 
 <FormPage backButtonUri="#/auth" heading={`Login with ${data.prov} account`}>

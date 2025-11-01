@@ -1,16 +1,16 @@
 <script lang="ts">
-import { Heading, P } from "flowbite-svelte";
-import CenterPage from "$lib/components/centerPage.svelte";
+	import { Heading, P } from "flowbite-svelte";
+	import CenterPage from "$lib/components/centerPage.svelte";
 
-import type { components } from "$lib/utils/schema";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	about: components["schemas"]["AboutResponse"];
-};
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
+	type Data = {
+		about: components["schemas"]["AboutResponse"];
+	};
+	interface Props {
+		data: Data;
+	}
+	let { data }: Props = $props();
 </script>
 
 <CenterPage title="Terms of Services">

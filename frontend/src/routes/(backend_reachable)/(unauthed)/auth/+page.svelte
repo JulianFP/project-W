@@ -1,17 +1,17 @@
 <script lang="ts">
-import { Hr, P } from "flowbite-svelte";
-import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-import Button from "$lib/components/button.svelte";
-import type { components } from "$lib/utils/schema";
+	import { Hr, P } from "flowbite-svelte";
+	import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
+	import Button from "$lib/components/button.svelte";
+	import type { components } from "$lib/utils/schema";
 
-type Data = {
-	auth_settings: components["schemas"]["AuthSettings"];
-};
+	type Data = {
+		auth_settings: components["schemas"]["AuthSettings"];
+	};
 
-interface Props {
-	data: Data;
-}
-let { data }: Props = $props();
+	interface Props {
+		data: Data;
+	}
+	let { data }: Props = $props();
 </script>
 
 <div class="flex flex-col mx-auto max-w-lg">

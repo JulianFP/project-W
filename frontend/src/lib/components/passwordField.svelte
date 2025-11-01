@@ -1,26 +1,26 @@
 <script lang="ts">
-import { Helper, Input, Label } from "flowbite-svelte";
-import {
-	EyeOutline,
-	EyeSlashOutline,
-	InfoCircleSolid,
-	LockSolid,
-} from "flowbite-svelte-icons";
+	import { Helper, Input, Label } from "flowbite-svelte";
+	import {
+		EyeOutline,
+		EyeSlashOutline,
+		InfoCircleSolid,
+		LockSolid,
+	} from "flowbite-svelte-icons";
 
-function disableError(): void {
-	error = false;
-}
+	function disableError(): void {
+		error = false;
+	}
 
-let {
-	children,
-	id = "password",
-	value = $bindable(),
-	error = $bindable(false),
-	passwordVisible = $bindable(false),
-	password_new = false,
-	helper_text = "",
-	...rest
-} = $props();
+	let {
+		children,
+		id = "password",
+		value = $bindable(),
+		error = $bindable(false),
+		passwordVisible = $bindable(false),
+		password_new = false,
+		helper_text = "",
+		...rest
+	} = $props();
 </script>
 
 <div class="mb-6 w-full">

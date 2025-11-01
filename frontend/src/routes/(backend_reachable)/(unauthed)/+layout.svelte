@@ -1,15 +1,15 @@
 <script lang="ts">
-import { Heading, Span } from "flowbite-svelte";
-import WaitingForGoto from "$lib/components/waitingForGoto.svelte";
-import { auth, routing } from "$lib/utils/global_state.svelte";
+	import { Heading, Span } from "flowbite-svelte";
+	import WaitingForGoto from "$lib/components/waitingForGoto.svelte";
+	import { auth, routing } from "$lib/utils/global_state.svelte";
 
-$effect(() => {
-	if (auth.loggedIn && auth.loggedInSettled) {
-		routing.login_forward();
-	}
-});
+	$effect(() => {
+		if (auth.loggedIn && auth.loggedInSettled) {
+			routing.login_forward();
+		}
+	});
 
-let { children } = $props();
+	let { children } = $props();
 </script>
 {#await auth.awaitLoggedIn}
   <WaitingForGoto/>

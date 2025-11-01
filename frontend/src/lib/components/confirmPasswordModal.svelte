@@ -1,64 +1,64 @@
 <script lang="ts">
-import { Helper, Modal, P } from "flowbite-svelte";
+	import { Helper, Modal, P } from "flowbite-svelte";
 
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import PasswordField from "./passwordField.svelte";
-import WaitingSubmitButton from "./waitingSubmitButton.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import PasswordField from "./passwordField.svelte";
+	import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-let waitingForPromise = $state(false);
-let errorMsg = $state("");
-let error = $state(false);
+	let waitingForPromise = $state(false);
+	let errorMsg = $state("");
+	let error = $state(false);
 
-interface Props {
-	open?: boolean;
-	value: string;
-	onerror: (err: BackendCommError) => void;
-	action: () => Promise<void>;
-	children?: import("svelte").Snippet;
-}
+	interface Props {
+		open?: boolean;
+		value: string;
+		onerror: (err: BackendCommError) => void;
+		action: () => Promise<void>;
+		children?: import("svelte").Snippet;
+	}
 
-let {
-	open = $bindable(false),
-	value = $bindable(),
-	onerror,
-	action,
-	children,
-}: Props = $props();
+	let {
+		open = $bindable(false),
+		value = $bindable(),
+		onerror,
+		action,
+		children,
+	}: Props = $props();
 
-async function submitAction(): Promise<void> {
-	waitingForPromise = true;
-	error = false;
-	errorMsg = "";
+	async function submitAction(): Promise<void> {
+		waitingForPromise = true;
+		error = false;
+		errorMsg = "";
 
-	try {
-		await action();
-		value = "";
-		open = false;
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			if (err.status === 403) {
-				errorMsg = err.message;
-				error = true;
+		try {
+			await action();
+			value = "";
+			open = false;
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				if (err.status === 403) {
+					errorMsg = err.message;
+					error = true;
+				} else {
+					value = "";
+					open = false;
+					onerror(err);
+				}
 			} else {
-				value = "";
-				open = false;
-				onerror(err);
+				errorMsg = "Unknown error!";
+				error = true;
 			}
-		} else {
-			errorMsg = "Unknown error!";
-			error = true;
 		}
+
+		waitingForPromise = false;
 	}
 
-	waitingForPromise = false;
-}
-
-function onAction(params: { action: string; data: FormData }): boolean {
-	if (params.action === "submit") {
-		submitAction();
+	function onAction(params: { action: string; data: FormData }): boolean {
+		if (params.action === "submit") {
+			submitAction();
+		}
+		return false;
 	}
-	return false;
-}
 </script>
 
 <Modal form title="Confirm by entering your password" bind:open={open} onaction={onAction} class="w-fit">

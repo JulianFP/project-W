@@ -1,34 +1,34 @@
 <script lang="ts">
-import { Heading, Modal, P } from "flowbite-svelte";
-import { ExclamationCircleOutline } from "flowbite-svelte-icons";
-import { slide } from "svelte/transition";
+	import { Heading, Modal, P } from "flowbite-svelte";
+	import { ExclamationCircleOutline } from "flowbite-svelte-icons";
+	import { slide } from "svelte/transition";
 
-import Button from "./button.svelte";
-import WaitingSubmitButton from "./waitingSubmitButton.svelte";
+	import Button from "./button.svelte";
+	import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-let waitingForPromise = $state(false);
+	let waitingForPromise = $state(false);
 
-interface Props {
-	open?: boolean;
-	action: () => Promise<void>;
-	post_action?: () => Promise<void>;
-	children?: import("svelte").Snippet;
-}
+	interface Props {
+		open?: boolean;
+		action: () => Promise<void>;
+		post_action?: () => Promise<void>;
+		children?: import("svelte").Snippet;
+	}
 
-let {
-	open = $bindable(false),
-	action,
-	post_action = async () => {},
-	children,
-}: Props = $props();
+	let {
+		open = $bindable(false),
+		action,
+		post_action = async () => {},
+		children,
+	}: Props = $props();
 
-async function submitAction(): Promise<void> {
-	waitingForPromise = true;
-	await action();
-	open = false;
-	waitingForPromise = false;
-	await post_action();
-}
+	async function submitAction(): Promise<void> {
+		waitingForPromise = true;
+		await action();
+		open = false;
+		waitingForPromise = false;
+		await post_action();
+	}
 </script>
 
 <Modal bind:open={open} size="xs" transition={slide} class="text-center">

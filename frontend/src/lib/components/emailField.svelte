@@ -1,13 +1,13 @@
 <script lang="ts">
-import { Helper, Input, Label } from "flowbite-svelte";
-import { EnvelopeSolid, InfoCircleSolid } from "flowbite-svelte-icons";
+	import { Helper, Input, Label } from "flowbite-svelte";
+	import { EnvelopeSolid, InfoCircleSolid } from "flowbite-svelte-icons";
 
-let {
-	value = $bindable(),
-	error = $bindable(false),
-	helper_text = "",
-	...rest
-} = $props();
+	let {
+		value = $bindable(),
+		error = $bindable(false),
+		helper_text = "",
+		...rest
+	} = $props();
 </script>
 
 <div class="mb-6">

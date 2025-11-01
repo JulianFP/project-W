@@ -1,48 +1,48 @@
 <script lang="ts">
-import { Helper, Input, Label, Span } from "flowbite-svelte";
-import { CloseOutline, PenSolid } from "flowbite-svelte-icons";
+	import { Helper, Input, Label, Span } from "flowbite-svelte";
+	import { CloseOutline, PenSolid } from "flowbite-svelte-icons";
 
-import { alerts } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-import Button from "./button.svelte";
-import ConfirmPasswordModal from "./confirmPasswordModal.svelte";
+	import { alerts } from "$lib/utils/global_state.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+	import Button from "./button.svelte";
+	import ConfirmPasswordModal from "./confirmPasswordModal.svelte";
 
-interface Props {
-	defaultValue: string;
-}
+	interface Props {
+		defaultValue: string;
+	}
 
-let { defaultValue, ...rest }: Props = $props();
+	let { defaultValue, ...rest }: Props = $props();
 
-let lockedInput = $state(true);
-let email: string = $state(defaultValue);
-let disabledSubmit: boolean = $derived(email === defaultValue); //make submit only possible if value has changed
-let password: string = $state("");
-let error = $state(false);
-let errorMsg: string = $state("");
-let modalOpen = $state(false);
+	let lockedInput = $state(true);
+	let email: string = $state(defaultValue);
+	let disabledSubmit: boolean = $derived(email === defaultValue); //make submit only possible if value has changed
+	let password: string = $state("");
+	let error = $state(false);
+	let errorMsg: string = $state("");
+	let modalOpen = $state(false);
 
-function toggleLock(): void {
-	email = defaultValue;
-	error = false;
-	lockedInput = !lockedInput;
-}
+	function toggleLock(): void {
+		email = defaultValue;
+		error = false;
+		lockedInput = !lockedInput;
+	}
 
-function openModal(event: Event) {
-	event.preventDefault();
-	modalOpen = true;
-}
+	function openModal(event: Event) {
+		event.preventDefault();
+		modalOpen = true;
+	}
 
-async function changeUserEmail(): Promise<void> {
-	const response: string = await postLoggedIn<string>(
-		"local-account/change_user_email",
-		{
-			password: password,
-			new_email: email,
-		},
-	);
-	alerts.push({ msg: response, color: "green" });
-}
+	async function changeUserEmail(): Promise<void> {
+		const response: string = await postLoggedIn<string>(
+			"local-account/change_user_email",
+			{
+				password: password,
+				new_email: email,
+			},
+		);
+		alerts.push({ msg: response, color: "green" });
+	}
 </script>
 
 <form onsubmit={openModal}>

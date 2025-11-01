@@ -1,47 +1,47 @@
 <script lang="ts">
-import { Helper } from "flowbite-svelte";
+	import { Helper } from "flowbite-svelte";
 
-import CenterPage from "$lib/components/centerPage.svelte";
-import JobSettingsForm from "$lib/components/jobSettingsForm.svelte";
-import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+	import CenterPage from "$lib/components/centerPage.svelte";
+	import JobSettingsForm from "$lib/components/jobSettingsForm.svelte";
+	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
+	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
 
-let get_job_settings = $state(() => {
-	return {};
-});
-let requery_job_settings = $state(async () => {});
+	let get_job_settings = $state(() => {
+		return {};
+	});
+	let requery_job_settings = $state(async () => {});
 
-let waiting: boolean = $state(false);
-let error: boolean = $state(false);
-let errorMsg: string = $state("");
+	let waiting: boolean = $state(false);
+	let error: boolean = $state(false);
+	let errorMsg: string = $state("");
 
-async function submitAction(reset: boolean) {
-	error = false;
-	errorMsg = "";
-	waiting = true;
+	async function submitAction(reset: boolean) {
+		error = false;
+		errorMsg = "";
+		waiting = true;
 
-	try {
-		await postLoggedIn<number>(
-			"jobs/submit_settings",
-			reset ? {} : get_job_settings(),
-			false,
-			{
-				is_new_default: "true",
-			},
-		);
-	} catch (err: unknown) {
-		if (err instanceof BackendCommError) {
-			errorMsg = err.message;
-		} else {
-			errorMsg = "Unknown error";
+		try {
+			await postLoggedIn<number>(
+				"jobs/submit_settings",
+				reset ? {} : get_job_settings(),
+				false,
+				{
+					is_new_default: "true",
+				},
+			);
+		} catch (err: unknown) {
+			if (err instanceof BackendCommError) {
+				errorMsg = err.message;
+			} else {
+				errorMsg = "Unknown error";
+			}
+			error = true;
 		}
-		error = true;
-	}
 
-	await requery_job_settings();
-	waiting = false;
-}
+		await requery_job_settings();
+		waiting = false;
+	}
 </script>
 
 <CenterPage title="Account default job settings">
