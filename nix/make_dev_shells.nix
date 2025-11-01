@@ -1,5 +1,6 @@
 {
   forAllSystems,
+  pkgsFor,
   inputs,
   #ddesiredDevEnvs is an attribute set of attribute sets containing the values workspaceRoot, pythonPkg, extraPackages
   desiredDevEnvs,
@@ -22,13 +23,9 @@ let
     forAllSystems (
       system:
       let
-        pkgs = import inputs.nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-        };
-        python = (desiredDevEnvs.${name}.pythonPkg pkgs);
+        python = (desiredDevEnvs.${name}.pythonPkg pkgsFor.${system});
       in
-      (pkgs.callPackage inputs.pyproject-nix.build.packages {
+      (pkgsFor.${system}.callPackage inputs.pyproject-nix.build.packages {
         inherit python;
       }).overrideScope
         (
@@ -37,7 +34,7 @@ let
             overlay
             (import ./build_system_overlays.nix {
               inherit (inputs) self;
-              inherit pkgs;
+              pkgs = pkgsFor.${system};
             })
           ]
         )
@@ -50,22 +47,20 @@ in
   devShells = forAllSystems (
     system:
     let
-      pkgs = import inputs.nixpkgs {
-        inherit system;
-        config.allowUnfree = true;
-      };
       pythonSets = builtins.mapAttrs (
         name: sets: sets.${system}.overrideScope editableOverlays.${name}
       ) pythonSetsSets;
       virtualenvs = builtins.mapAttrs (
         name: set: set.mkVirtualEnv name workspaces.${name}.deps.all
       ) pythonSets;
-      commonPackages = [
-        pkgs.uv
-        pkgs.nodejs_24
-        pkgs.corepack_24
-      ]
-      ++ inputs.self.checks.${system}.pre-commit-check.enabledPackages;
+      commonPackages =
+        with pkgsFor.${system};
+        [
+          uv
+          nodejs_24
+          corepack_24
+        ]
+        ++ inputs.self.checks.${system}.pre-commit-check.enabledPackages;
       commonShellHook = ''
         export REPO_ROOT=$(git rev-parse --show-toplevel)
         localOverwriteFile="$REPO_ROOT/.pre-commit-config.yaml"
@@ -80,13 +75,13 @@ in
     in
     (builtins.mapAttrs (
       name: venv:
-      pkgs.mkShell {
+      pkgsFor.${system}.mkShell {
         buildInputs = commonPackages;
         packages = [
           venv
           inputs.pyproject-nix.packages.${system}.build-editable
         ]
-        ++ (desiredDevEnvs.${name}.extraPackages pkgs);
+        ++ (desiredDevEnvs.${name}.extraPackages pkgsFor.${system});
         env = {
           UV_NO_SYNC = "1";
           UV_PYTHON = pythonSets.${name}.python.interpreter;
@@ -99,7 +94,7 @@ in
       }
     ) virtualenvs)
     // {
-      root = pkgs.mkShell {
+      root = pkgsFor.${system}.mkShell {
         buildInputs = commonPackages;
         shellHook = commonShellHook;
       };

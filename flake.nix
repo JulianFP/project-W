@@ -53,9 +53,19 @@
     let
       inherit (nixpkgs) lib;
       forAllSystems = lib.genAttrs lib.systems.flakeExposed;
+      pkgsFor = forAllSystems (
+        system:
+        import nixpkgs {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            cudaSupport = true;
+          };
+        }
+      );
       devShellAttrs = (
         import ./nix/make_dev_shells.nix {
-          inherit forAllSystems inputs;
+          inherit forAllSystems pkgsFor inputs;
           desiredDevEnvs = {
             "project_W-env" = {
               workspaceRoot = "/backend";
@@ -84,63 +94,53 @@
     {
       # Run the hooks in a sandbox with `nix flake check`.
       # Read-only filesystem and no internet access.
-      checks = forAllSystems (
-        system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-          };
-        in
-        {
-          pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
-            src = ./.;
-            hooks = {
-              end-of-file-fixer.enable = true;
-              trim-trailing-whitespace.enable = true;
-              check-added-large-files.enable = true;
-              check-merge-conflicts.enable = true;
-              check-symlinks.enable = true;
-              check-docstring-first.enable = true;
-              check-builtin-literals.enable = true;
-              check-python.enable = true;
-              python-debug-statements.enable = true;
-              biome = {
-                enable = true;
-                files = "^frontend/";
-                types_or = [ ];
-              };
-              ruff = {
-                enable = true;
-                files = "^backend/|^runner/";
-              };
-              ruff-format = {
-                enable = true;
-                files = "^backend/|^runner/";
-              };
-              codespell = {
-                enable = true;
-                name = "codespell";
-                entry = "${pkgs.codespell}/bin/codespell -w --ignore-words-list=delet --skip=frontend/src/lib/utils/schema.d.ts,frontend/pnpm-lock.yaml,frontend/package.json";
-              };
-              nixfmt-rfc-style.enable = true;
+      checks = forAllSystems (system: {
+        pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
+          src = ./.;
+          hooks = {
+            end-of-file-fixer.enable = true;
+            trim-trailing-whitespace.enable = true;
+            check-added-large-files.enable = true;
+            check-merge-conflicts.enable = true;
+            check-symlinks.enable = true;
+            check-docstring-first.enable = true;
+            check-builtin-literals.enable = true;
+            check-python.enable = true;
+            python-debug-statements.enable = true;
+            biome = {
+              enable = true;
+              files = "^frontend/";
+              types_or = [ ];
             };
+            ruff = {
+              enable = true;
+              files = "^backend/|^runner/";
+            };
+            ruff-format = {
+              enable = true;
+              files = "^backend/|^runner/";
+            };
+            codespell = {
+              enable = true;
+              name = "codespell";
+              entry = "${pkgsFor.${system}.codespell}/bin/codespell -w --ignore-words-list=delet --skip=frontend/src/lib/utils/schema.d.ts,frontend/pnpm-lock.yaml,frontend/package.json";
+            };
+            nixfmt-rfc-style.enable = true;
           };
-        }
-      );
+        };
+      });
 
       # Run the hooks with `nix fmt`.
       formatter = forAllSystems (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
           config = self.checks.${system}.pre-commit-check.config;
           inherit (config) package configFile;
           script = ''
-            ${pkgs.lib.getExe package} run --all-files --config ${configFile}
+            ${pkgsFor.${system}.lib.getExe package} run --all-files --config ${configFile}
           '';
         in
-        pkgs.writeShellScriptBin "pre-commit-run" script
+        pkgsFor.${system}.writeShellScriptBin "pre-commit-run" script
       );
 
       # Enter a development shell with `nix develop`
@@ -152,11 +152,7 @@
         let
           backendPythonSet = devShellAttrs.pythonSetsSets."project_W-env".${system};
           runnerPythonSet = devShellAttrs.pythonSetsSets."project_W_runner-env".${system};
-          pkgs = import nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-          };
-          inherit (pkgs.callPackages pyproject-nix.build.util { }) mkApplication;
+          inherit (pkgsFor.${system}.callPackages pyproject-nix.build.util { }) mkApplication;
         in
         {
           project_W = mkApplication {
@@ -171,7 +167,7 @@
                 devShellAttrs.workspaces."project_W_runner-env".deps.optionals;
             package = runnerPythonSet.project-w-runner;
           };
-          project_W_frontend = pkgs.callPackage ./nix/derivation_frontend_files.nix {
+          project_W_frontend = pkgsFor.${system}.callPackage ./nix/derivation_frontend_files.nix {
             inherit self;
             mkPnpmPackage = pnpm2nix-nzbr.packages.${system}.mkPnpmPackage;
           };

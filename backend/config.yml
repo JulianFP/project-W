@@ -11,8 +11,8 @@ security:
   local_account:
     user_provisioning:
       0:
-        email: julian@partanengroup.de
-        password: Password-1234
+        email: project_w-admin@example.org
+        password: Password-1234!
         is_admin: true
   ldap_providers:
     OpenLDAP:
