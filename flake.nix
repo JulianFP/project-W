@@ -3,12 +3,6 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    pnpm2nix-nzbr = {
-      #use this instead of main repo nzbr/pnpm2nix-nzbr because this pr fixes compatibility with lockfile v9
-      #see https://github.com/nzbr/pnpm2nix-nzbr/pull/40
-      url = "github:wrvsrx/pnpm2nix-nzbr/adapt-to-v9";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     pre-commit-hooks = {
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -44,7 +38,6 @@
     inputs@{
       self,
       nixpkgs,
-      pnpm2nix-nzbr,
       pyproject-nix,
       uv2nix,
       pyproject-build-systems,
@@ -169,7 +162,6 @@
           };
           project_W_frontend = pkgsFor.${system}.callPackage ./nix/derivation_frontend_files.nix {
             inherit self;
-            mkPnpmPackage = pnpm2nix-nzbr.packages.${system}.mkPnpmPackage;
           };
           default = self.packages.${system}.project_W;
         }
