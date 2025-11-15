@@ -5,10 +5,10 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "autodoc-pydantic>=2.2.0",
+    "myst-parser>=4.0.1",
     "project-w",
     "project-w-runner",
     "sphinx>=8.2.3",
-    "sphinx-mdinclude>=0.6.2",
     "sphinx-rtd-theme>=3.0.2",
     "sphinxcontrib-openapi>=0.8.4",
 ]

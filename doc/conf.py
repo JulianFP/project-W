@@ -18,7 +18,7 @@ author = "Julian Partanen"
 extensions = [
     "sphinxcontrib.openapi",
     "sphinxcontrib.autodoc_pydantic",
-    "sphinx_mdinclude",
+    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
 ]
@@ -45,6 +45,7 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_extra_path = [ "_static" ]
 
 # These paths are either relative to html_static_path
 # or fully qualified paths (eg. https://...)
@@ -95,6 +96,7 @@ import os
 
 # -- Config file autodoc setup -----------------------------------------------
 import sys
+import sphinx.util.fileutil
 
 sys.path.append(os.path.abspath("."))
 
@@ -102,3 +104,10 @@ autodoc_pydantic_model_show_field_summary = False
 autodoc_pydantic_model_show_config_summary = False
 autodoc_pydantic_model_show_validator_members = False
 autodoc_pydantic_model_show_validator_summary = False
+
+# -- Copy frontend static folder and set favicon
+src = os.path.abspath(os.path.join('..', 'frontend', 'static'))
+dest = os.path.join('_static', 'frontend', 'static')
+os.makedirs(os.path.dirname(dest), exist_ok=True)
+sphinx.util.fileutil.copy_asset(src, dest)
+html_favicon = '_static/frontend/static/favicon.png'
