@@ -13,7 +13,7 @@ maintainers = [
     { name = "Julian Partanen", email = "julian@partanengroup.de"},
 ]
 dynamic = ["version"]
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11,<3.14"
 license = "AGPL-3.0-only"
 dependencies = [
     "click>=8.2.1",
@@ -28,7 +28,7 @@ project_W_runner = "project_W_runner.__main__:main"
 [project.optional-dependencies]
 not-dummy = [
     "hf-xet>=1.1.9",
-    "whisperx>=3.4.2",
+    "whisperx>=3.7.4",
 ]
 
 [tool.uv]

@@ -67,8 +67,13 @@
             };
             "project_W_runner-env" = {
               workspaceRoot = "/runner";
-              pythonPkg = (pkgs: pkgs.python312);
+              pythonPkg = (pkgs: pkgs.python313);
               extraPackages = (pkgs: [ pkgs.ffmpeg ]);
+            };
+            "project_W_lib-env" = {
+              workspaceRoot = "/lib";
+              pythonPkg = (pkgs: pkgs.python313);
+              extraPackages = (pkgs: [ ]);
             };
             "doc-env" = {
               workspaceRoot = "/doc";
