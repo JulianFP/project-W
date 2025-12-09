@@ -34,4 +34,7 @@ COPY --from=builder --chown=app:app /app/runner/.venv /app/runner/.venv
 # See https://github.com/m-bain/whisperX/issues/1304#issuecomment-3599713003
 ENV TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
 
+# See https://github.com/m-bain/whisperX/blob/main/CUDNN_TROUBLESHOOTING.md#solution-1-add-to-ld_library_path-recommended
+ENV LD_LIBRARY_PATH=/app/runner/.venv/lib/python3.13/site-packages/nvidia/cudnn/lib
+
 CMD ["/app/runner/.venv/bin/project_W_runner"]
