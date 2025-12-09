@@ -31,4 +31,7 @@ COPY ./README.md ./LICENSE.md ./COPYING.md /app/
 # Copy the environment, but not the source code
 COPY --from=builder --chown=app:app /app/runner/.venv /app/runner/.venv
 
+# See https://github.com/m-bain/whisperX/issues/1304#issuecomment-3599713003
+ENV TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
+
 CMD ["/app/runner/.venv/bin/project_W_runner"]
