@@ -182,6 +182,7 @@ in
       };
       users.groups = lib.mkIf (cfg.group == "project-W") {
         project-W = { };
+        redis-project-W = { };
       };
     };
 }
