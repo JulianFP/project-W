@@ -313,7 +313,7 @@ class SMTPSecureEnum(str, Enum):
 class SMTPServerSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     hostname: str = Field(
-        pattern=r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost$",
+        pattern=r"^[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*$",
         description="FQDN of your smtp server.",
     )
     port: int = Field(
