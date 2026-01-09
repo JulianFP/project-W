@@ -273,6 +273,7 @@
 		"ka",
 		"lv",
 		"tl",
+		"sv",
 	];
 
 	let languageNames = new Intl.DisplayNames(["en"], { type: "language" });

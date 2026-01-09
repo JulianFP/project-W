@@ -1,5 +1,5 @@
 #to use the same image as in normal runner
-FROM python:3.12-slim-bullseye AS builder
+FROM python:3.13-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=.git,target=.git \
     uv sync --locked --no-editable --compile-bytecode --project runner
 
-FROM python:3.12-slim-bullseye
+FROM python:3.13-slim
 
 # Copy licensing information
 COPY ./README.md ./LICENSE.md ./COPYING.md /app/

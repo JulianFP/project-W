@@ -1,5 +1,4 @@
-#bullseye required for whisperx
-FROM python:3.12-slim-bullseye AS builder
+FROM python:3.13-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -22,20 +21,20 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=.git,target=.git \
     uv sync --locked --no-editable --compile-bytecode --project runner --extra not_dummy
 
-FROM python:3.12-slim-bullseye
+FROM python:3.13-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg wget
-
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-keyring_1.1-1_all.deb
-
-RUN dpkg -i cuda-keyring_1.1-1_all.deb
-
-RUN apt-get update && apt-get install -y --no-install-recommends libcudnn8 libcudnn8-dev
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg
 
 # Copy licensing information
 COPY ./README.md ./LICENSE.md ./COPYING.md /app/
 
 # Copy the environment, but not the source code
 COPY --from=builder --chown=app:app /app/runner/.venv /app/runner/.venv
+
+# See https://github.com/m-bain/whisperX/issues/1304#issuecomment-3599713003
+ENV TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true
+
+# See https://github.com/m-bain/whisperX/blob/main/CUDNN_TROUBLESHOOTING.md#solution-1-add-to-ld_library_path-recommended
+ENV LD_LIBRARY_PATH=/app/runner/.venv/lib/python3.13/site-packages/nvidia/cudnn/lib
 
 CMD ["/app/runner/.venv/bin/project_W_runner"]

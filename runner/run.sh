@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-project_W_runner --dummy
+TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=true project_W_runner --dummy

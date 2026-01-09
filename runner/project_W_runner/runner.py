@@ -95,6 +95,7 @@ class Runner:
         if base_mime_type in ["audio", "video"]:
             async for chunk in response.aiter_bytes(10240):
                 job_tmp_file.write(chunk)
+            job_tmp_file.flush()
         else:
             raise ShutdownSignal(
                 "Error while trying to retrieve job audio: The content type of the response is neither audio nor video"

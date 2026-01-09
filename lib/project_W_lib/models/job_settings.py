@@ -276,6 +276,7 @@ supported_alignment_languages = [
     "ka",
     "lv",
     "tl",
+    "sv",
 ]
 
 
