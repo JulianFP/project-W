@@ -1240,8 +1240,8 @@ class PostgresAdapter(DatabaseAdapter):
                 ) = cleanup_info
                 general_last_cleanup = datetime.fromisoformat(general_last_cleanup_isoformat)
                 time_since_general_last_cleanup = datetime.now() - general_last_cleanup
-                # check for 23h instead of 24h to give cron (or similar tool) some flexibility in running the job
-                if time_since_general_last_cleanup.total_seconds() > 82800:
+                # check for 25h instead of 24h to give cron (or similar tool) some flexibility in running the job
+                if time_since_general_last_cleanup.total_seconds() > 90000:
                     self.logger.warning(
                         "It's more than 24 hours ago since the general database cleanup was last executed. This may indicate a mistake in your server setup, the general cleanup should always run at least once a day!"
                     )
@@ -1249,14 +1249,14 @@ class PostgresAdapter(DatabaseAdapter):
                 if dp.config.cleanup.user_retention_in_days is not None:
                     users_last_cleanup = datetime.fromisoformat(users_last_cleanup_isoformat)
                     time_since_users_last_cleanup = datetime.now() - users_last_cleanup
-                    if time_since_users_last_cleanup.total_seconds() > 82800:
+                    if time_since_users_last_cleanup.total_seconds() > 90000:
                         self.logger.warning(
                             "It's more than 24 hours ago since the users database cleanup was last executed, even though you enabled user database cleanups in the config. This may indicate a mistake in your server setup, the user cleanup should run at least once a day if enabled!"
                         )
                 if dp.config.cleanup.finished_job_retention_in_days is not None:
                     jobs_last_cleanup = datetime.fromisoformat(jobs_last_cleanup_isoformat)
                     time_since_jobs_last_cleanup = datetime.now() - jobs_last_cleanup
-                    if time_since_jobs_last_cleanup.total_seconds() > 82800:
+                    if time_since_jobs_last_cleanup.total_seconds() > 90000:
                         self.logger.warning(
                             "It's more than 24 hours ago since the jobs database cleanup was last executed, even though you enabled finished jobs database cleanups in the config. This may indicate a mistake in your server setup, the finished job cleanup should run at least once a day if enabled!"
                         )
@@ -2380,6 +2380,7 @@ class PostgresAdapter(DatabaseAdapter):
                     )
                 last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
                 time_since_last_cleanup = datetime.now() - last_cleanup
+                # check for 23h instead of 24h to give cron (or similar tool) some flexibility in running the job
                 if time_since_last_cleanup.total_seconds() < 82800:
                     self.logger.info(
                         "General cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
