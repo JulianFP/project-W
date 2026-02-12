@@ -7,12 +7,12 @@ from fastapi import HTTPException, status
 from httpx import AsyncClient, HTTPError, HTTPStatusError
 from pydantic import SecretStr
 from project_W_lib.logger import get_logger
+from project_W_lib.models.base import EmailValidated
 
 import project_W.dependencies as dp
 
-from ..models.base import EmailValidated
-from ..models.internal import OidcTokenInfoInternal
-from ..models.settings import OidcProviderSettings, OidcRoleSettings, Settings
+from ..models.internal_models import OidcTokenInfoInternal
+from ..models.setting_models import OidcProviderSettings, OidcRoleSettings, Settings
 
 oauth = OAuth()
 

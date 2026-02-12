@@ -2,14 +2,14 @@ import os
 import time
 from io import StringIO
 from typing import Callable
-from project_W_lib.models.job_settings import JobSettingsBase
+from project_W_lib.models.response_models import JobSettingsResponse
 
-from .models.settings import WhisperSettings
+from .models.setting_models import WhisperSettings
 
 
 def transcribe(
     audio_file: str,
-    job_settings: JobSettingsBase,
+    job_settings: JobSettingsResponse,
     whisper_settings: WhisperSettings,
     progress_callback: Callable[[float], None],
 ) -> dict[str, StringIO]:
@@ -20,7 +20,7 @@ def transcribe(
         raise Exception("dummy transcribe checks: The provided audio file is empty")
 
     # check pydantic models
-    JobSettingsBase.model_validate(job_settings.model_dump())
+    JobSettingsResponse.model_validate(job_settings.model_dump())
     WhisperSettings.model_validate(whisper_settings.model_dump())
 
     # simulate progress callback

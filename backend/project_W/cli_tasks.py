@@ -4,7 +4,7 @@ from project_W_lib.logger import get_logger
 
 import project_W.dependencies as dp
 
-from .models.settings import SecretKeyValidated
+from .models.setting_models import SecretKeyValidated
 from .database import PostgresAdapter
 from .security import ldap_deps, oidc_deps
 from .smtp import SmtpClient

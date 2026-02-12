@@ -8,7 +8,7 @@ from project_W_lib.config import load_config
 from project_W_lib.logger import get_logger
 
 from ._version import __commit_id__, __version__
-from .models.settings import Settings
+from .models.setting_models import Settings
 from .runner import Runner
 
 program_name = "project-W-runner"

@@ -17,32 +17,32 @@ from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 from pydantic import SecretStr, ValidationError
 from project_W_lib.logger import get_logger
-from project_W_lib.models.runner_request_data import Transcript
+from project_W_lib.models.base import EmailValidated, PasswordValidated
+from project_W_lib.models.request_models import JobSettingsRequest, Transcript, TranscriptTypeEnum
+from project_W_lib.models.response_models import (
+    RunnerCreatedResponse,
+    SiteBannerResponse,
+    JobSettingsResponse,
+)
 
 import project_W.dependencies as dp
 
 from ._version import version, version_tuple
-from .models.base import EmailValidated, PasswordValidated
-from .models.settings import SecretKeyValidated
-from .models.internal import (
-    JobAndSettingsInDb,
-    JobInDb,
-    JobSettingsInDb,
+from .models.setting_models import SecretKeyValidated
+from .models.internal_models import (
+    JobSettingsResponseWrapped,
+    JobAndSettingsInternal,
+    JobInternal,
     JobSortKey,
     LdapTokenInfoInternal,
-    LdapUserInDb,
-    LdapUserInDbAll,
-    LocalUserInDb,
-    LocalUserInDbAll,
+    LdapUserInternal,
+    LocalUserInternal,
     OidcTokenInfoInternal,
-    OidcUserInDb,
-    OidcUserInDbAll,
+    OidcUserInternal,
     OnlineRunner,
-    RunnerInDb,
+    RunnerInternal,
     TokenInfoInternal,
 )
-from .models.request_data import JobSettings, TranscriptTypeEnum
-from .models.response_data import RunnerCreatedInfo, SiteBannerResponse
 from .utils import hash_token, minutes_from_now_to_datetime, parse_version_tuple
 
 
@@ -314,12 +314,12 @@ class DatabaseAdapter(ABC):
     @abstractmethod
     async def _get_user_by_token_hashed(
         self, token_hash: str
-    ) -> tuple[LocalUserInDbAll | OidcUserInDbAll | LdapUserInDbAll, TokenInfoInternal] | None:
+    ) -> tuple[LocalUserInternal | OidcUserInternal | LdapUserInternal, TokenInfoInternal] | None:
         pass
 
     async def get_user_by_token(
         self, token: str
-    ) -> tuple[LocalUserInDbAll | OidcUserInDbAll | LdapUserInDbAll, TokenInfoInternal] | None:
+    ) -> tuple[LocalUserInternal | OidcUserInternal | LdapUserInternal, TokenInfoInternal] | None:
         """
         Validates the provided token and returns the associated user if valid (first tuple value)
         and the amount of minutes until the token will be expired.
@@ -332,7 +332,7 @@ class DatabaseAdapter(ABC):
     @abstractmethod
     async def get_user_by_id(
         self, user_id: int
-    ) -> LocalUserInDbAll | OidcUserInDbAll | LdapUserInDbAll | None:
+    ) -> LocalUserInternal | OidcUserInternal | LdapUserInternal | None:
         """
         Return the user with the specified id, regardless of whether this user is a local, oidc or ldap user.
         Return None if no such user exists
@@ -347,28 +347,28 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDbAll | None:
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInternal | None:
         """
         Return a local user with the matching email, or None if the email doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDbAll | None:
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInternal | None:
         """
         Return an oidc user with the matching iss/sub pair, or None if iss/sub doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDbAll | None:
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInternal | None:
         """
         Return an oidc user with the matching user id, or None if user_id doesn't match any user
         """
         pass
 
     @abstractmethod
-    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDbAll | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInternal | None:
         """
         Return an ldap user with the matching user id, or None if user_id doesn't match any user
         """
@@ -398,7 +398,7 @@ class DatabaseAdapter(ABC):
 
     async def get_local_user_by_email_checked_password(
         self, email: EmailValidated, password: SecretStr
-    ) -> LocalUserInDb | None:
+    ) -> LocalUserInternal | None:
         """
         Return a user with the matching email if the provided password is also correct, or None if the email doesn't match any user or the password is incorrect
         Basically 'get_local_user_by_email' with builtin password checker
@@ -461,7 +461,7 @@ class DatabaseAdapter(ABC):
 
     @abstractmethod
     async def add_new_job_settings(
-        self, user_id: int, job_settings: JobSettings, is_new_default: bool = False
+        self, user_id: int, job_settings: JobSettingsResponse, is_new_default: bool = False
     ) -> int:
         """
         Create a new set of job settings for the user with id user_id and return its id
@@ -470,7 +470,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_default_job_settings_of_user(self, user_id: int) -> JobSettings | None:
+    async def get_default_job_settings_of_user(self, user_id: int) -> JobSettingsResponse | None:
         """
         Return the job settings of that user that are marked as the default
         Returns None if the user doesn't have any default settings
@@ -478,7 +478,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_job_settings_by_job_id(self, job_id: int) -> JobSettings | None:
+    async def get_job_settings_by_job_id(self, job_id: int) -> JobSettingsResponse | None:
         """
         Return the job settings that are the job with the job id job_id has
         Returns None if no job with id job_id exists
@@ -522,7 +522,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_job_by_id(self, job_id) -> JobInDb | None:
+    async def get_job_by_id(self, job_id) -> JobInternal | None:
         """
         Returns the job matching the provided job_id.
         Returns None if no job with that id exists
@@ -530,7 +530,7 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobInDb]:
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobInternal]:
         """
         Returns all job metadata (excluding job settings, audio/audio oid, user_id, job_settings_id and transcript) for all provided job ids that belong to the provided user_id
         """
@@ -539,7 +539,7 @@ class DatabaseAdapter(ABC):
     @abstractmethod
     async def get_job_infos_with_settings_of_user(
         self, user_id: int, job_ids: list[int]
-    ) -> list[JobAndSettingsInDb]:
+    ) -> list[JobAndSettingsInternal]:
         """
         Returns all job metadata (including job settings but excluding audio/audio oid, user_id, job_settings_id and transcript) for all provided job ids that belong to the provided user_id
         """
@@ -613,7 +613,7 @@ class DatabaseAdapter(ABC):
         """
         pass
 
-    async def create_runner(self) -> RunnerCreatedInfo:
+    async def create_runner(self) -> RunnerCreatedResponse:
         """
         Creates a new runner, inserts it into the database and returns its newly generated token
         token generation is done here because it is important that the token is sever generated (because of how it is hashed)
@@ -627,7 +627,7 @@ class DatabaseAdapter(ABC):
             token_hash = hash_token(token)
 
         runner_id = await self._create_runner_hashed(token_hash)
-        return RunnerCreatedInfo(id=runner_id, token=token)
+        return RunnerCreatedResponse(id=runner_id, token=token)
 
     async def get_runner_by_token(self, token: str) -> int | None:
         token_hash = hash_token(token)
@@ -1314,12 +1314,13 @@ class PostgresAdapter(DatabaseAdapter):
             # the if condition below is susceptible to race conditions
             await self.__acquire_advisory_lock(conn)
 
-            async with conn.cursor(row_factory=class_row(LocalUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(LocalUserInternal)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
-                    FROM {self.schema}.local_accounts
-                    WHERE provision_number = %s
+                    FROM {self.schema}.local_accounts LOCAL, {self.schema}.users USERS
+                    WHERE USERS.id = LOCAL.id
+                    AND provision_number = %s
                 """,
                     (provision_number,),
                 )
@@ -1365,12 +1366,13 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def ensure_oidc_user_exists(self, iss: str, sub: str, email: EmailValidated) -> int:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(OidcUserInternal)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
-                    FROM {self.schema}.oidc_accounts
-                    WHERE iss = %s AND sub = %s
+                    FROM {self.schema}.oidc_accounts OIDC, {self.schema}.users USERS
+                    WHERE OIDC.id = USERS.id
+                    AND iss = %s AND sub = %s
                 """,
                     (iss, sub),
                 )
@@ -1412,12 +1414,13 @@ class PostgresAdapter(DatabaseAdapter):
         self, provider_name: str, uid: str, email: EmailValidated
     ) -> int:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(LdapUserInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(LdapUserInternal)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
-                    FROM {self.schema}.ldap_accounts
-                    WHERE provider_name = %s AND uid = %s
+                    FROM {self.schema}.ldap_accounts LDAP, {self.schema}.users USERS
+                    WHERE LDAP.id = USERS.id
+                    AND provider_name = %s AND uid = %s
                 """,
                     (provider_name, uid),
                 )
@@ -1593,7 +1596,7 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def _get_user_by_token_hashed(
         self, token_hash: str
-    ) -> tuple[LocalUserInDbAll | OidcUserInDbAll | LdapUserInDbAll, TokenInfoInternal] | None:
+    ) -> tuple[LocalUserInternal | OidcUserInternal | LdapUserInternal, TokenInfoInternal] | None:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=class_row(TokenInfoInternal)) as cur:
                 await cur.execute(
@@ -1616,9 +1619,9 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def __get_user_by_id(
         self, conn: AsyncConnection, user_id: int
-    ) -> LocalUserInDbAll | OidcUserInDbAll | LdapUserInDbAll | None:
+    ) -> LocalUserInternal | OidcUserInternal | LdapUserInternal | None:
         # check local_accounts
-        async with conn.cursor(row_factory=class_row(LocalUserInDbAll)) as cur:
+        async with conn.cursor(row_factory=class_row(LocalUserInternal)) as cur:
             await cur.execute(
                 f"""
                 SELECT *
@@ -1631,7 +1634,7 @@ class PostgresAdapter(DatabaseAdapter):
             if user := await cur.fetchone():
                 return user
         # check oidc_accounts
-        async with conn.cursor(row_factory=class_row(OidcUserInDbAll)) as cur:
+        async with conn.cursor(row_factory=class_row(OidcUserInternal)) as cur:
             await cur.execute(
                 f"""
                 SELECT *
@@ -1644,7 +1647,7 @@ class PostgresAdapter(DatabaseAdapter):
             if user := await cur.fetchone():
                 return user
         # check ldap_accounts
-        async with conn.cursor(row_factory=class_row(LdapUserInDbAll)) as cur:
+        async with conn.cursor(row_factory=class_row(LdapUserInternal)) as cur:
             await cur.execute(
                 f"""
                 SELECT *
@@ -1662,7 +1665,7 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def get_user_by_id(
         self, user_id: int
-    ) -> LocalUserInDbAll | OidcUserInDbAll | LdapUserInDbAll | None:
+    ) -> LocalUserInternal | OidcUserInternal | LdapUserInternal | None:
         async with self.apool.connection() as conn:
             return await self.__get_user_by_id(conn, user_id)
 
@@ -1678,9 +1681,9 @@ class PostgresAdapter(DatabaseAdapter):
                     (tos_id, tos_version, user_id),
                 )
 
-    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInDbAll | None:
+    async def get_local_user_by_email(self, email: EmailValidated) -> LocalUserInternal | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(LocalUserInDbAll)) as cur:
+            async with conn.cursor(row_factory=class_row(LocalUserInternal)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *
@@ -1692,9 +1695,9 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
-    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInDbAll | None:
+    async def get_oidc_user_by_iss_sub(self, iss: str, sub: str) -> OidcUserInternal | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDbAll)) as cur:
+            async with conn.cursor(row_factory=class_row(OidcUserInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -1706,9 +1709,9 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
-    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInDbAll | None:
+    async def get_oidc_user_by_id(self, user_id: int) -> OidcUserInternal | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(OidcUserInDbAll)) as cur:
+            async with conn.cursor(row_factory=class_row(OidcUserInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -1720,9 +1723,9 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
-    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInDbAll | None:
+    async def get_ldap_user_by_id(self, user_id: int) -> LdapUserInternal | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(LdapUserInDbAll)) as cur:
+            async with conn.cursor(row_factory=class_row(LdapUserInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -1834,7 +1837,7 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def _get_runner_by_token_hashed(self, token_hash: str) -> int | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(RunnerInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(RunnerInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -1850,7 +1853,7 @@ class PostgresAdapter(DatabaseAdapter):
                     return runner.id
 
     async def add_new_job_settings(
-        self, user_id: int, job_settings: JobSettings, is_new_default: bool = False
+        self, user_id: int, job_settings: JobSettingsResponse, is_new_default: bool = False
     ) -> int:
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -1876,9 +1879,9 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     raise Exception("Didn't return id of new job_settings")
 
-    async def get_default_job_settings_of_user(self, user_id: int) -> JobSettings | None:
+    async def get_default_job_settings_of_user(self, user_id: int) -> JobSettingsResponse | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(JobSettingsInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(JobSettingsResponseWrapped)) as cur:
                 await cur.execute(
                     f"""
                         SELECT settings
@@ -1892,7 +1895,7 @@ class PostgresAdapter(DatabaseAdapter):
                 else:
                     return entry.settings
 
-    async def get_job_settings_by_job_id(self, job_id: int) -> JobSettings | None:
+    async def get_job_settings_by_job_id(self, job_id: int) -> JobSettingsResponse | None:
         async with self.apool.connection() as conn:
             # first check if job uses application wide default settings
             async with conn.cursor(row_factory=scalar_row) as cur:
@@ -1905,9 +1908,9 @@ class PostgresAdapter(DatabaseAdapter):
                     (job_id,),
                 )
                 if await cur.fetchone():
-                    return JobSettings()
+                    return JobSettingsRequest()
 
-            async with conn.cursor(row_factory=class_row(JobSettingsInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(JobSettingsResponseWrapped)) as cur:
                 await cur.execute(
                     f"""
                         SELECT settings.settings
@@ -1937,7 +1940,7 @@ class PostgresAdapter(DatabaseAdapter):
                     )
                     job_settings_id = await cur.fetchone()
             else:
-                async with conn.cursor(row_factory=class_row(JobSettingsInDb)) as cur:
+                async with conn.cursor(row_factory=class_row(JobSettingsResponseWrapped)) as cur:
                     await cur.execute(
                         f"""
                             SELECT settings
@@ -2051,9 +2054,9 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchall()
 
-    async def get_job_by_id(self, job_id) -> JobInDb | None:
+    async def get_job_by_id(self, job_id) -> JobInternal | None:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(JobInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(JobInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -2064,9 +2067,9 @@ class PostgresAdapter(DatabaseAdapter):
                 )
                 return await cur.fetchone()
 
-    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobInDb]:
+    async def get_job_infos_of_user(self, user_id: int, job_ids: list[int]) -> list[JobInternal]:
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(JobInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(JobInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -2080,11 +2083,11 @@ class PostgresAdapter(DatabaseAdapter):
 
     async def get_job_infos_with_settings_of_user(
         self, user_id: int, job_ids: list[int]
-    ) -> list[JobAndSettingsInDb]:
+    ) -> list[JobAndSettingsInternal]:
         jobs = []
         async with self.apool.connection() as conn:
-            async with conn.cursor(row_factory=class_row(JobAndSettingsInDb)) as cur:
-                # first query jobs that use application wide default settings
+            # first query jobs that use application wide default settings
+            async with conn.cursor(row_factory=class_row(JobInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT *
@@ -2094,8 +2097,18 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                     (job_ids,),
                 )
-                jobs += await cur.fetchall()
-
+                jobs_without_settings = await cur.fetchall()
+                for job in jobs_without_settings:
+                    jobs.append(
+                        JobAndSettingsInternal.model_validate(
+                            {
+                                "settings": JobSettingsRequest().model_dump(),
+                                **job.model_dump(),
+                            }
+                        )
+                    )
+            # then the others
+            async with conn.cursor(row_factory=class_row(JobAndSettingsInternal)) as cur:
                 await cur.execute(
                     f"""
                         SELECT job.*, settings.settings
@@ -2781,7 +2794,7 @@ class PostgresAdapter(DatabaseAdapter):
     async def rotate_secret_key(self, new_secret_key: SecretKeyValidated):
         async with self.apool.connection() as conn:
             # re-encrypt audio files
-            async with conn.cursor(row_factory=class_row(JobInDb)) as cur:
+            async with conn.cursor(row_factory=class_row(JobInternal)) as cur:
                 await cur.execute(
                     f"""
                     SELECT *

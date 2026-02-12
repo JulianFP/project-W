@@ -4,7 +4,7 @@ from itsdangerous import URLSafeTimedSerializer
 
 from .caching import CachingAdapter
 from .database import DatabaseAdapter
-from .models.settings import Settings
+from .models.setting_models import Settings
 from .smtp import SmtpClient
 
 db: DatabaseAdapter

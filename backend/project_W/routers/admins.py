@@ -1,12 +1,12 @@
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from project_W_lib.models.request_models import EmailToUsersRequest, SiteBannerRequest
+from project_W_lib.models.response_models import RunnerCreatedResponse
 
 import project_W.dependencies as dp
 
-from ..models.request_data import EmailToUsers, SiteBanner
-from ..models.internal import LoginContext
-from ..models.response_data import RunnerCreatedInfo
+from ..models.internal_models import LoginContext
 from ..security.auth import auth_dependency_responses, validate_user
 
 router = APIRouter(
@@ -23,7 +23,7 @@ async def create_runner(
         LoginContext,
         Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
-) -> RunnerCreatedInfo:
+) -> RunnerCreatedResponse:
     """
     Create a new global runner that can be used by all users of this instance. Returns the id and the runner token of the newly created runner. Put this token into the config file of the runner that you are trying to host. Create a new runner token for each new runner that you want to host using this route!
     """
@@ -55,7 +55,7 @@ async def add_site_banner(
         LoginContext,
         Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
-    banner_info: SiteBanner,
+    banner_info: SiteBannerRequest,
 ) -> int:
     """
     Add a new banner to the website that will be broadcasted to all users. Returns the id of the created banner.
@@ -88,7 +88,7 @@ async def send_email_to_all_users(
         Depends(validate_user(require_verified=True, require_admin=True, require_tos=False)),
     ],
     background_tasks: BackgroundTasks,
-    email: EmailToUsers,
+    email: EmailToUsersRequest,
 ):
     """
     Sends out an email with the provided content to all users of this Project-W instance, regardless whether they are local accounts, oidc accounts or ldap accounts. The body is in plaintext format, don't forget to include line breaks for longer emails.

@@ -1,19 +1,19 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+from project_W_lib.models.response_models import LocalAccountOperationModeEnum
 
 import project_W.dependencies as dp
 
 from ._version import __version__
 from .caching import RedisAdapter
 from .database import PostgresAdapter
-from .models.base import LocalAccountOperationModeEnum
-from .models.response_data import AboutResponse, AuthSettings
-from .routers import admins, jobs, ldap, local_account, oidc, runners, users
+from .routers import general, admins, jobs, ldap, local_account, oidc, runners, users
 from .security import ldap_deps, oidc_deps
 from .smtp import SmtpClient
 
@@ -95,6 +95,10 @@ If you are looking for documentation about something else than the API then refe
 """
 app_tags_metadata = [
     {
+        "name": "general",
+        "description": "Routes that return information regarding the whole application. Not authenticated.",
+    },
+    {
         "name": "users",
         "description": "For regular users to manage their accounts",
     },
@@ -123,6 +127,14 @@ app_tags_metadata = [
         "description": "Routes used by Project-W runners to communicate with the backend, retrieve jobs and submit transcripts",
     },
 ]
+
+
+def custom_generate_unique_id(route: APIRoute):
+    """
+    for nicer function names in clients/frontends
+    """
+    return f"{route.tags[0]}-{route.name}"
+
 
 app = FastAPI(
     title="Project-W",
@@ -157,6 +169,7 @@ app = FastAPI(
         else None
     ),
     terms_of_service=f"{dp.config.client_url}/tos" if dp.config.terms_of_services else None,
+    generate_unique_id_function=custom_generate_unique_id,
 )
 # middleware required by authlib for oidc
 app.add_middleware(
@@ -171,36 +184,8 @@ if dp.config.web_server.reverse_proxy is not None:
         ProxyHeadersMiddleware, trusted_hosts=dp.config.web_server.reverse_proxy.trusted_proxies
     )
 
+app.include_router(general.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(admins.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(runners.router, prefix="/api")
-
-
-@app.get("/api/about")
-async def about() -> AboutResponse:
-    """
-    Returns a brief description of Project-W, a link to the GitHub repository containing the backend's code, the backend's version currently running on the system as well as the imprint of this instance (if it was configured by the instance's admin).
-    """
-    return AboutResponse(
-        description="A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI",
-        source_code="https://github.com/JulianFP/project-W",
-        version=__version__,
-        git_hash=dp.git_hash,
-        imprint=dp.config.imprint,
-        terms_of_services=dp.config.terms_of_services,
-        job_retention_in_days=dp.config.cleanup.finished_job_retention_in_days,
-        site_banners=await dp.db.list_site_banners(),
-    )
-
-
-@app.get("/api/auth_settings")
-async def auth_settings() -> AuthSettings:
-    """
-    Returns all information required by the client regarding which account types and identity providers this instance supports, whether account signup of local accounts is allowed, whether the creation of API tokens is allowed for each account type and so on.
-    """
-    return AuthSettings(
-        local_account=dp.config.security.local_account,
-        oidc_providers=dp.config.security.oidc_providers,
-        ldap_providers=dp.config.security.ldap_providers,
-    )
