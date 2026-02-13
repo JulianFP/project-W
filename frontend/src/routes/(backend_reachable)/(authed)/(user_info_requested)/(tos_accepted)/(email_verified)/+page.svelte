@@ -41,27 +41,31 @@
 	import ConfirmModal from "$lib/components/confirmModal.svelte";
 	import DownloadTranscriptModal from "$lib/components/downloadTranscriptModal.svelte";
 	import SubmitJobsModal from "$lib/components/submitJobsModal.svelte";
-	import { alerts, auth } from "$lib/utils/global_state.svelte";
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 	import {
-		deletLoggedIn,
-		getLoggedIn,
-		postLoggedIn,
-	} from "$lib/utils/httpRequestsAuth.svelte";
-	import type { components } from "$lib/utils/schema";
+		type AboutResponse,
+		type JobInfoResponse,
+		type JobSettingsResponse,
+		type JobSortKey,
+		jobsAbort,
+		jobsCount,
+		jobsDelete,
+		jobsGet,
+		jobsInfo,
+	} from "$lib/generated";
+	import { alerts, auth } from "$lib/utils/global_state.svelte";
+	import { get_error_msg } from "$lib/utils/http_utils";
 	import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
 
-	type JobSettingsResp = components["schemas"]["JobSettings-Output"];
 	type Data = {
-		about: components["schemas"]["AboutResponse"];
+		about: AboutResponse;
 	};
 	interface Props {
 		data: Data;
 	}
 	let { data }: Props = $props();
 
-	type SortKey = components["schemas"]["JobSortKey"];
-	type Job = components["schemas"]["JobInfo"];
+	type SortKey = JobSortKey;
+	type Job = JobInfoResponse;
 	type ProcessedJob = Job & {
 		creation_date: Date;
 		finish_date: Date | null;
@@ -96,7 +100,7 @@
 	let openRow: number | null = $state(null);
 
 	//modal stuff
-	let pre_filled_job_settings: JobSettingsResp | undefined = $state();
+	let pre_filled_job_settings: JobSettingsResponse | undefined = $state();
 	let submitModalOpen = $state(false);
 	let downloadModalOpen = $state(false);
 	let downloadJobId: number = $state(-1);
@@ -155,54 +159,68 @@
 
 	async function fetch_jobs() {
 		fetchingJobs = true;
-		try {
-			job_count = await getLoggedIn<number>("jobs/count", {
-				exclude_finished: exclude_finished.toString(),
-				exclude_downloaded: exclude_downloaded.toString(),
+		const count_resp = await jobsCount({
+			query: {
+				exclude_finished: exclude_finished,
+				exclude_downloaded: exclude_downloaded,
+			},
+		});
+		let error: unknown = count_resp.error;
+		if (!count_resp.error) {
+			job_count = count_resp.data;
+			const all_count_resp = await jobsCount({
+				query: { exclude_finished: false, exclude_downloaded: false },
 			});
-			job_count_total = await getLoggedIn<number>("jobs/count", {
-				exclude_finished: "false",
-				exclude_downloaded: "false",
-			});
+			error = all_count_resp.error;
+			if (!all_count_resp.error) {
+				job_count_total = all_count_resp.data;
+			}
 			if (job_count > 0) {
-				const job_ids = await getLoggedIn<number[]>("jobs/get", {
-					start_index: (jobs_per_page * (currentPage - 1)).toString(),
-					end_index: (jobs_per_page * currentPage - 1).toString(),
-					sort_key: sort_key,
-					descending: descending.toString(),
-					exclude_finished: exclude_finished.toString(),
-					exclude_downloaded: exclude_downloaded.toString(),
+				const job_ids_resp = await jobsGet({
+					query: {
+						start_index: jobs_per_page * (currentPage - 1),
+						end_index: jobs_per_page * currentPage - 1,
+						sort_key: sort_key,
+						descending: descending,
+						exclude_finished: exclude_finished,
+						exclude_downloaded: exclude_downloaded,
+					},
 				});
-				let jobs_ordered_selected_loc = new Map<number, boolean>();
-				for (const job_id of job_ids) {
-					//to preserve the ordering of the jobs
-					jobs_ordered_selected_loc.set(job_id, false);
-				}
-				if (jobs_ordered_selected_loc.size === 0) {
-					jobs_ordered_selected.clear();
-					jobs_info.clear();
-				} else {
-					jobs_ordered_selected = new SvelteMap(jobs_ordered_selected_loc);
-					let args_formatted: string[][] = [];
-					for (const job_id of jobs_ordered_selected_loc.keys()) {
-						let job = jobs_info.get(job_id);
-						if (!job) {
-							args_formatted.push(["job_ids", job_id.toString()]);
-						} else {
-							process_job(job);
-						}
+				error = job_ids_resp.error;
+				if (!job_ids_resp.error) {
+					let jobs_ordered_selected_loc = new Map<number, boolean>();
+					for (const job_id of job_ids_resp.data) {
+						//to preserve the ordering of the jobs
+						jobs_ordered_selected_loc.set(job_id, false);
 					}
-					if (args_formatted.length > 0) {
-						const jobs_unsorted = await getLoggedIn<Job[]>(
-							"jobs/info",
-							args_formatted,
-						);
-						for (const job of jobs_unsorted) {
-							process_job(job);
+					if (jobs_ordered_selected_loc.size === 0) {
+						jobs_ordered_selected.clear();
+						jobs_info.clear();
+					} else {
+						jobs_ordered_selected = new SvelteMap(jobs_ordered_selected_loc);
+						let jobs_to_query: number[] = [];
+						for (const job_id of jobs_ordered_selected_loc.keys()) {
+							let job = jobs_info.get(job_id);
+							if (!job) {
+								jobs_to_query.push(job_id);
+							} else {
+								process_job(job);
+							}
 						}
-						for (const job_id of jobs_info.keys()) {
-							if (!jobs_ordered_selected_loc.has(job_id))
-								jobs_info.delete(job_id);
+						if (jobs_to_query.length > 0) {
+							const jobs_unsorted_resp = await jobsInfo({
+								query: { job_ids: jobs_to_query },
+							});
+							error = jobs_unsorted_resp.error;
+							if (!jobs_unsorted_resp.error) {
+								for (const job of jobs_unsorted_resp.data) {
+									process_job(job);
+								}
+								for (const job_id of jobs_info.keys()) {
+									if (!jobs_ordered_selected_loc.has(job_id))
+										jobs_info.delete(job_id);
+								}
+							}
 						}
 					}
 				}
@@ -211,13 +229,9 @@
 				jobs_info.clear();
 			}
 			updateHeaderCheckbox();
-		} catch (err: unknown) {
-			let errorMsg = "Error occurred while fetching jobs from backend: ";
-			if (err instanceof BackendCommError) {
-				errorMsg += err.message;
-			} else {
-				errorMsg += "Unknown error";
-			}
+		}
+		if (error) {
+			const errorMsg = `Error occurred while fetching jobs from backend: ${get_error_msg(error)}`;
 			alerts.push({ msg: errorMsg, color: "red" });
 		}
 		fetchingJobs = false;
@@ -225,26 +239,14 @@
 	fetch_jobs();
 
 	async function update_jobs(job_ids: number[]) {
-		let args_formatted: string[][] = [];
-		for (const job_id of job_ids) {
-			args_formatted.push(["job_ids", job_id.toString()]);
-		}
-		try {
-			const jobs_unsorted = await getLoggedIn<Job[]>(
-				"jobs/info",
-				args_formatted,
-			);
-			for (const job of jobs_unsorted) {
+		const { data, error } = await jobsInfo({ query: { job_ids: job_ids } });
+		if (error) {
+			const errorMsg = `Error occurred while updating job: ${get_error_msg(error)}`;
+			alerts.push({ msg: errorMsg, color: "red" });
+		} else {
+			for (const job of data) {
 				process_job(job);
 			}
-		} catch (err: unknown) {
-			let errorMsg = "Error occurred while updating job: ";
-			if (err instanceof BackendCommError) {
-				errorMsg += err.message;
-			} else {
-				errorMsg += "Unknown error";
-			}
-			alerts.push({ msg: errorMsg, color: "red" });
 		}
 	}
 
@@ -262,15 +264,13 @@
 	}
 
 	async function abortJobs(jobIdsToAbort: number[]): Promise<void> {
-		try {
-			await postLoggedIn("jobs/abort", jobIdsToAbort);
-		} catch (err: unknown) {
-			let errorMsg = `Error occurred while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: `;
-			if (err instanceof BackendCommError) errorMsg += err.message;
-			else errorMsg += "Unknown error";
+		const { error } = await jobsAbort({ body: jobIdsToAbort });
+		if (error) {
+			const errorMsg = `Error occurred while trying to abort the jobs with ids ${jobIdsToAbort.toString()}: ${get_error_msg(error)}`;
 			alerts.push({ msg: errorMsg, color: "red" });
 		}
 	}
+
 	async function postAbortJobs(abortedJobIds: number[]): Promise<void> {
 		for (const job_id of abortedJobIds) {
 			jobs_info.delete(job_id);
@@ -279,13 +279,10 @@
 		updateHeaderCheckbox();
 	}
 
-	async function deleteJobs(jobIdsToAbort: number[]): Promise<void> {
-		try {
-			await deletLoggedIn("jobs/delete", jobIdsToAbort);
-		} catch (err: unknown) {
-			let errorMsg = `Error occurred while trying to delete the jobs with ids ${jobIdsToAbort.toString()}: `;
-			if (err instanceof BackendCommError) errorMsg += err.message;
-			else errorMsg += "Unknown error";
+	async function deleteJobs(jobIdsToDelete: number[]): Promise<void> {
+		const { error } = await jobsDelete({ body: jobIdsToDelete });
+		if (error) {
+			const errorMsg = `Error occurred while trying to delete the jobs with ids ${jobIdsToDelete.toString()}: ${get_error_msg(error)}`;
 			alerts.push({ msg: errorMsg, color: "red" });
 		}
 	}

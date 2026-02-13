@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { error } from "@sveltejs/kit";
+	import { error as svelte_error } from "@sveltejs/kit";
 	import {
 		Heading,
 		Helper,
@@ -27,23 +27,26 @@
 	import ConfirmPasswordModal from "$lib/components/confirmPasswordModal.svelte";
 	import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-	import { alerts, auth } from "$lib/utils/global_state.svelte";
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 	import {
-		deletLoggedIn,
-		getLoggedIn,
-		postLoggedIn,
-	} from "$lib/utils/httpRequestsAuth.svelte";
-	import type { components } from "$lib/utils/schema";
+		type AuthSettingsResponse,
+		localAccountChangeUserPassword,
+		type TokenInfoResponse,
+		type UserResponse,
+		usersGetAllTokenInfo,
+		usersGetNewApiToken,
+		usersInvalidateAllTokens,
+		usersInvalidateToken,
+	} from "$lib/generated";
+	import { alerts, auth } from "$lib/utils/global_state.svelte";
+	import { get_error_msg } from "$lib/utils/http_utils";
 	import { autoupdate_date_since } from "$lib/utils/timestamp_handling.svelte";
 
-	type TokenInfo = components["schemas"]["TokenInfo"];
-	type ProcessedTokenInfo = TokenInfo & {
+	type ProcessedTokenInfo = TokenInfoResponse & {
 		last_usage_date: Date;
 	};
 	type Data = {
-		user_info: components["schemas"]["User"];
-		auth_settings: components["schemas"]["AuthSettings"];
+		user_info: UserResponse;
+		auth_settings: AuthSettingsResponse;
 	};
 	interface Props {
 		data: Data;
@@ -57,7 +60,7 @@
 		new SvelteMap(),
 	);
 
-	function process_token_info(token: TokenInfo) {
+	function process_token_info(token: TokenInfoResponse) {
 		const date_getter = () => {
 			const date = token_infos.get(token.id)?.last_usage_date;
 			if (!date) throw new Error();
@@ -80,22 +83,13 @@
 	}
 
 	async function fetch_token_infos() {
-		try {
-			const return_val = await getLoggedIn<TokenInfo[]>(
-				"users/get_all_token_info",
-			);
+		const { error, data, response } = await usersGetAllTokenInfo();
+		if (error) {
+			svelte_error(response.status, get_error_msg(error));
+		} else {
 			token_infos.clear();
-			for (const token of return_val) {
+			for (const token of data) {
 				process_token_info(token);
-			}
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				error(err.status, err.message);
-			} else {
-				error(
-					400,
-					"Unknown error occurred while querying all token infos from the backend",
-				);
 			}
 		}
 	}
@@ -167,16 +161,18 @@
 		invalidAPIModalOpen = true;
 	}
 
-	async function changePassword(): Promise<void> {
-		const response = await postLoggedIn<string>(
-			"local-account/change_user_password",
-			{
-				password: password,
-				new_password: newPassword,
-			},
-		);
-		alerts.push({ msg: response, color: "green" });
+	async function changePassword(): Promise<{
+		error: unknown;
+		response: Response;
+	}> {
+		const { error, data, response } = await localAccountChangeUserPassword({
+			body: { password: password, new_password: newPassword },
+		});
+		if (!error) {
+			alerts.push({ msg: data, color: "green" });
+		}
 		newPassword = "";
+		return { error, response };
 	}
 
 	async function createAPIToken(event: Event): Promise<void> {
@@ -184,66 +180,45 @@
 
 		waitingForToken = true;
 		createAPITokenError = false;
-		try {
-			createdAPIToken = await postLoggedIn<string>(
-				"users/get_new_api_token",
-				{},
-				false,
-				{
-					name: tokenName,
-				},
-			);
+		const { error, data } = await usersGetNewApiToken({
+			query: { name: tokenName },
+		});
+		if (error) {
+			createAPITokenErrorMsg = get_error_msg(error);
+			createAPITokenError = true;
+		} else {
+			createdAPIToken = data;
 			createAPITokenModalOpen = true;
 			tokenName = "";
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				createAPITokenErrorMsg = err.message;
-			} else {
-				createAPITokenErrorMsg = "Unknown error";
-			}
-			createAPITokenError = true;
 		}
 		fetch_token_infos();
 		waitingForToken = false;
 	}
 
 	async function invalidateToken(id: number): Promise<void> {
-		try {
-			await deletLoggedIn<null>(
-				"users/invalidate_token",
-				{},
-				{ token_id: id.toString() },
-			);
+		const { error } = await usersInvalidateToken({ query: { token_id: id } });
+		if (error) {
+			const errorMsg = `Error occurred while trying to invalidate api token: ${get_error_msg(error)}`;
+			alerts.push({ msg: errorMsg, color: "red" });
+		} else {
 			alerts.push({
 				msg: `Successfully invalidated token with id ${id}`,
 				color: "green",
 			});
-		} catch (err: unknown) {
-			let errorMsg = "Error occurred while trying to invalidate api token: ";
-			if (err instanceof BackendCommError) {
-				errorMsg += err.message;
-			} else {
-				errorMsg += "Unknown error";
-			}
-			alerts.push({ msg: errorMsg, color: "red" });
 		}
 	}
 
 	async function invalidateAllTokens(): Promise<void> {
-		try {
-			await deletLoggedIn<null>("users/invalidate_all_tokens");
+		const { error } = await usersInvalidateAllTokens();
+		if (error) {
+			invalidErrorMsg = get_error_msg(error);
+			invalidError = true;
+		} else {
 			alerts.push({
 				msg: "All tokens succuessfully invalidated",
 				color: "green",
 			});
 			auth.logout();
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				invalidErrorMsg = err.message;
-			} else {
-				invalidErrorMsg = "Unknown error";
-			}
-			invalidError = true;
 		}
 	}
 </script>
@@ -324,7 +299,7 @@
   </div>
 </CenterPage>
 
-<ConfirmPasswordModal bind:open={passwordModalOpen} bind:value={password} action={changePassword} onerror={(err: BackendCommError) => {changePasswordErrorMsg = err.message; changePasswordError = true;}}>
+<ConfirmPasswordModal bind:open={passwordModalOpen} bind:value={password} action={changePassword} onerror={(error: unknown) => {changePasswordErrorMsg = get_error_msg(error); changePasswordError = true;}}>
   You are about to change this accounts password. You have to remember your new password in order to login in the future.
 </ConfirmPasswordModal>
 

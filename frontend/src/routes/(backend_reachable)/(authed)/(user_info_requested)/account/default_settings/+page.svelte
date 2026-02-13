@@ -4,8 +4,8 @@
 	import CenterPage from "$lib/components/centerPage.svelte";
 	import JobSettingsForm from "$lib/components/jobSettingsForm.svelte";
 	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-	import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+	import { jobsSubmitSettings } from "$lib/generated";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	let get_job_settings = $state(() => {
 		return {};
@@ -13,30 +13,22 @@
 	let requery_job_settings = $state(async () => {});
 
 	let waiting: boolean = $state(false);
-	let error: boolean = $state(false);
+	let errorOccurred: boolean = $state(false);
 	let errorMsg: string = $state("");
 
 	async function submitAction(reset: boolean) {
-		error = false;
+		errorOccurred = false;
 		errorMsg = "";
 		waiting = true;
 
-		try {
-			await postLoggedIn<number>(
-				"jobs/submit_settings",
-				reset ? {} : get_job_settings(),
-				false,
-				{
-					is_new_default: "true",
-				},
-			);
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				errorMsg = err.message;
-			} else {
-				errorMsg = "Unknown error";
-			}
-			error = true;
+		const body = reset ? {} : get_job_settings();
+		const { error } = await jobsSubmitSettings({
+			body: body,
+			query: { is_new_default: true },
+		});
+		if (error) {
+			errorMsg = get_error_msg(error);
+			errorOccurred = true;
 		}
 
 		await requery_job_settings();
@@ -47,7 +39,7 @@
 <CenterPage title="Account default job settings">
   <form onsubmit={async () => {await submitAction(false);}}>
     <JobSettingsForm bind:get_job_settings={get_job_settings} bind:re_query={requery_job_settings}/>
-    {#if error}
+    {#if errorOccurred}
       <Helper class="mb-2" color="red">{errorMsg}</Helper>
     {/if}
 

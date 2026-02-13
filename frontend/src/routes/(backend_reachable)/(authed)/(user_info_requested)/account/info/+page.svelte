@@ -6,16 +6,16 @@
 	import ChangeEmailField from "$lib/components/changeEmailField.svelte";
 	import ConfirmModal from "$lib/components/confirmModal.svelte";
 	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-	import { alerts, auth } from "$lib/utils/global_state.svelte";
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
 	import {
-		deletLoggedIn,
-		getLoggedIn,
-	} from "$lib/utils/httpRequestsAuth.svelte";
-	import type { components } from "$lib/utils/schema";
+		localAccountResendActivationEmail,
+		type UserResponse,
+		usersDelete,
+	} from "$lib/generated";
+	import { alerts, auth } from "$lib/utils/global_state.svelte";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	type Data = {
-		user_info: components["schemas"]["User"];
+		user_info: UserResponse;
 	};
 	interface Props {
 		data: Data;
@@ -29,18 +29,13 @@
 	let modalOpen = $state(false);
 
 	async function deleteUser() {
-		try {
-			await deletLoggedIn<null>("users/delete");
+		const { error } = await usersDelete();
+		if (error) {
+			const errorMsg = `Error occurred during user deletion: ${get_error_msg(error)}`;
+			alerts.push({ msg: errorMsg, color: "red" });
+		} else {
 			alerts.push({ msg: "User was deleted successfully!", color: "green" });
 			auth.logout();
-		} catch (err: unknown) {
-			let errorMsg = "Error occurred during user deletion: ";
-			if (err instanceof BackendCommError) {
-				errorMsg += err.message;
-			} else {
-				errorMsg += "Unknown error";
-			}
-			alerts.push({ msg: errorMsg, color: "red" });
 		}
 	}
 
@@ -49,18 +44,12 @@
 		resendError = false;
 		resendErrorMsg = "";
 
-		try {
-			let resendResponse = await getLoggedIn<string>(
-				"local-account/resend_activation_email",
-			);
-			alerts.push({ msg: resendResponse, color: "green" });
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				resendErrorMsg = err.message;
-			} else {
-				resendErrorMsg = "Unknown error";
-			}
+		const { error, data } = await localAccountResendActivationEmail();
+		if (error) {
+			resendErrorMsg = get_error_msg(error);
 			resendError = true;
+		} else {
+			alerts.push({ msg: data, color: "green" });
 		}
 
 		waitingForResend = false;

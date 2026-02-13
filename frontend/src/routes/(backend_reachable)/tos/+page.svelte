@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { Heading, P } from "flowbite-svelte";
 	import CenterPage from "$lib/components/centerPage.svelte";
-
-	import type { components } from "$lib/utils/schema";
+	import type { AboutResponse } from "$lib/generated";
 
 	type Data = {
-		about: components["schemas"]["AboutResponse"];
+		about: AboutResponse;
 	};
 	interface Props {
 		data: Data;

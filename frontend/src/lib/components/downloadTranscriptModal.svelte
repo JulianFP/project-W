@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { ButtonGroup, Helper, Label, Modal, P } from "flowbite-svelte";
-
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-	import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-	import type { components } from "$lib/utils/schema";
+	import {
+		jobsDownloadTranscript,
+		type TranscriptTypeEnum,
+	} from "$lib/generated";
+	import { get_error_msg } from "$lib/utils/http_utils";
 	import Button from "./button.svelte";
 	import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
@@ -21,10 +22,10 @@
 	}: Props = $props();
 
 	let waiting: boolean = $state(false);
-	let error: boolean = $state(false);
+	let errorOccurred: boolean = $state(false);
 	let errorMsg: string = $state("");
 
-	let format: components["schemas"]["TranscriptTypeEnum"] = $state("as_txt");
+	let format: TranscriptTypeEnum = $state("as_txt");
 
 	let format_ending = $derived(format.split("_")[1]);
 
@@ -60,22 +61,20 @@
 
 	async function downloadTranscript(): Promise<void> {
 		waiting = true;
-		error = false;
+		errorOccurred = false;
 
-		try {
+		const { data, error } = await jobsDownloadTranscript({
+			query: { job_id: job_id, transcript_type: format },
+		});
+		if (error) {
+			errorMsg = get_error_msg(error);
+			errorOccurred = true;
+		} else {
 			let transcript: string;
-			if (format === "as_json") {
-				transcript = JSON.stringify(
-					await getLoggedIn("jobs/download_transcript", {
-						job_id: job_id.toString(),
-						transcript_type: "as_json",
-					}),
-				);
+			if (typeof data === "string") {
+				transcript = data;
 			} else {
-				transcript = await getLoggedIn<string>("jobs/download_transcript", {
-					job_id: job_id.toString(),
-					transcript_type: format,
-				});
+				transcript = JSON.stringify(data);
 			}
 
 			//convert transcript to Blob and generate url for it
@@ -93,13 +92,6 @@
 			)}.${format_ending}`;
 			element.click();
 			open = false;
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				errorMsg = err.message;
-			} else {
-				errorMsg = "Unknown error";
-			}
-			error = true;
 		}
 
 		waiting = false;
@@ -131,7 +123,7 @@
     <P space="tighter" italic size="xs"><pre>{@html format_preview}</pre></P>
   </div>
 
-  {#if error}
+  {#if errorOccurred}
     <Helper color="red">{errorMsg}</Helper>
   {/if}
 
