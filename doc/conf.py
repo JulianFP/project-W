@@ -61,7 +61,7 @@ import json
 from pathlib import Path
 
 import project_W.dependencies as dp
-from project_W.models.settings import Settings
+from project_W.models.setting_models import Settings
 
 config_dict = {
     "client_url": "http://localhost:5173/#",

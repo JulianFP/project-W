@@ -3,26 +3,28 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_415_UNSUPPORTED_MEDIA_TYPE
-from project_W_lib.models.generic_response_data import ErrorResponse
+from project_W_lib.models.response_models import (
+    ErrorResponse,
+    InProcessJobResponse,
+    JobInfoResponse,
+    JobSettingsResponse,
+    JobStatus,
+)
+from project_W_lib.models.request_models import JobSettingsRequest, TranscriptTypeEnum
 
 import project_W.dependencies as dp
 
-from ..models.internal import (
-    JobAndSettingsInDb,
-    JobInDb,
+from ..models.internal_models import (
+    JobAndSettingsInternal,
+    JobInternal,
     JobSortKey,
     LoginContext,
     SSEEvent,
 )
-from ..models.request_data import JobSettings, TranscriptTypeEnum
-from ..models.response_data import (
-    JobInfo,
-    JobStatus,
-)
 from ..security.auth import auth_dependency_responses, validate_user
 
 
-async def job_status(job: JobInDb) -> JobStatus:
+async def job_status(job: JobInternal) -> JobStatus:
     if job.downloaded:
         return JobStatus.DOWNLOADED
     if job.downloaded is not None:
@@ -56,7 +58,7 @@ async def submit_settings(
         LoginContext,
         Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
-    job_settings: JobSettings,
+    job_settings: JobSettingsRequest,
     is_new_default: bool = False,
 ) -> int:
     """
@@ -66,12 +68,12 @@ async def submit_settings(
 
 
 @router.get("/default_settings")
-async def get_default_settings(
+async def default_settings(
     login_context: Annotated[
         LoginContext,
         Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
-) -> JobSettings:
+) -> JobSettingsResponse:
     """
     Returns the default job settings of the current account. If no job settings id is explicitly specified during job submission then these job settings will be used for the job. These job settings where either set previously using the submit_settings route or are the application defaults.
     """
@@ -80,7 +82,7 @@ async def get_default_settings(
     ) is not None:
         return job_settings
     else:
-        return JobSettings()
+        return JobSettingsRequest()
 
 
 @router.post(
@@ -133,7 +135,7 @@ async def submit_job(
 
 
 @router.get("/count")
-async def job_count(
+async def count(
     login_context: Annotated[
         LoginContext,
         Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
@@ -179,26 +181,27 @@ async def get(
 
 
 @router.get("/info")
-async def job_info(
+async def info(
     login_context: Annotated[
         LoginContext,
         Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
     ],
     job_ids: Annotated[list[int], Query()],
-) -> list[JobInfo]:
+) -> list[JobInfoResponse]:
     """
     Returns a list of job objects containing all information related to each of the specified jobs.
     Note that job infos will be returned in no specific order, please use the get route to get an ordering of jobs by id and only use this route to get additional information about these jobs.
     """
     job_and_setting_infos: list[
-        JobAndSettingsInDb
+        JobAndSettingsInternal
     ] = await dp.db.get_job_infos_with_settings_of_user(login_context.user.id, job_ids)
     job_infos = []
+    # JobInfoResponse consists of InProcessJobResponse, JobAndSettingsResponse, as well as a step field
     for job in job_and_setting_infos:
-        data = job.model_dump()  # JobAndSettings
+        data = job.model_dump()  # JobAndSettingsResponse
         data["step"] = await job_status(job)  # step
         if (in_process_job := await dp.ch.get_in_process_job(job.id)) is not None:
-            data = data | in_process_job.model_dump()  # InProcessJobBase
+            data = data | in_process_job.model_dump()  # InProcessJobResponse
             if (
                 runner_id := (await dp.ch.get_online_runner_id_by_assigned_job(job.id))
             ) is not None and (
@@ -206,10 +209,16 @@ async def job_info(
             ) is not None:
                 runner_dict = runner.model_dump()
                 for key, val in runner_dict.items():
-                    data[f"runner_{key}"] = val  # JobBase optional data
+                    data[f"runner_{key}"] = val  # JobResponse optional runner data from cache
         elif data["step"] in [JobStatus.SUCCESS, JobStatus.DOWNLOADED, JobStatus.ABORTING]:
-            data["progress"] = 100
-        job_infos.append(JobInfo.model_validate(data))
+            data = (
+                data | InProcessJobResponse(id=job.id, progress=100, abort=False).model_dump()
+            )  # InProcessJobResponse
+        else:
+            data = (
+                data | InProcessJobResponse(id=job.id, progress=0, abort=False).model_dump()
+            )  # InProcessJobResponse
+        job_infos.append(JobInfoResponse.model_validate(data))
     return job_infos
 
 
@@ -222,7 +231,7 @@ async def job_info(
         }
     },
 )
-async def abort_jobs(
+async def abort(
     login_context: Annotated[
         LoginContext,
         Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
@@ -232,7 +241,7 @@ async def abort_jobs(
     """
     Aborts a currently running job. This will put the job into a failed state with an error message saying that the job was aborted. Any processing of this job will be canceled.
     """
-    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(login_context.user.id, job_ids)
+    jobs: list[JobInternal] = await dp.db.get_job_infos_of_user(login_context.user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
         if jobStatus in [
@@ -270,7 +279,7 @@ async def abort_jobs(
         }
     },
 )
-async def delete_jobs(
+async def delete(
     login_context: Annotated[
         LoginContext,
         Depends(validate_user(require_verified=True, require_admin=False, require_tos=True)),
@@ -280,7 +289,7 @@ async def delete_jobs(
     """
     Deletes a completed (aborted/successfully finished) job. To delete a currently running job please use the abort route first and then delete it using this route.
     """
-    jobs: list[JobInDb] = await dp.db.get_job_infos_of_user(login_context.user.id, job_ids)
+    jobs: list[JobInternal] = await dp.db.get_job_infos_of_user(login_context.user.id, job_ids)
     for job in jobs:
         jobStatus = await job_status(job)
         if jobStatus not in [JobStatus.SUCCESS, JobStatus.FAILED, JobStatus.DOWNLOADED]:

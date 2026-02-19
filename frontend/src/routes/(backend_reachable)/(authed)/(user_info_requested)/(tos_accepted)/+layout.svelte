@@ -4,13 +4,16 @@
 	import { invalidate } from "$app/navigation";
 	import CenterPage from "$lib/components/centerPage.svelte";
 	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-	import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-	import type { components } from "$lib/utils/schema";
+	import {
+		type AboutResponse,
+		type UserResponse,
+		usersAcceptTos,
+	} from "$lib/generated";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	type Data = {
-		about: components["schemas"]["AboutResponse"];
-		user_info: components["schemas"]["User"];
+		about: AboutResponse;
+		user_info: UserResponse;
 	};
 	interface Props {
 		data: Data;
@@ -36,29 +39,25 @@
 	reset_not_accepted_tos();
 
 	let waiting: boolean = $state(false);
-	let error: boolean = $state(false);
+	let errorOccurred: boolean = $state(false);
 	let errorMsg: string = $state("");
 	let enabled = $derived(not_accepted_tos.every(([_, accepted]) => accepted));
 
 	async function acceptTos(): Promise<void> {
 		waiting = true;
-		try {
-			for (let [tos_id, selected] of not_accepted_tos) {
-				if (selected) {
-					await postLoggedIn<string>("users/accept_tos", {}, false, {
-						tos_id: tos_id,
-						tos_version:
-							data.about.terms_of_services[tos_id].version.toString(),
-					});
+		for (let [tos_id, selected] of not_accepted_tos) {
+			if (selected) {
+				const { error } = await usersAcceptTos({
+					query: {
+						tos_id: Number.parseInt(tos_id, 10),
+						tos_version: data.about.terms_of_services[tos_id].version,
+					},
+				});
+				if (error) {
+					errorMsg = get_error_msg(error);
+					errorOccurred = true;
 				}
 			}
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				errorMsg = err.message;
-			} else {
-				errorMsg = "Unknown error";
-			}
-			error = true;
 		}
 		await invalidate("app:user_info");
 		reset_not_accepted_tos();
@@ -80,7 +79,7 @@
           <Checkbox id={`accept_tos_${tos_id}`} bind:checked={not_accepted_tos[i][1]} tabindex={i+1}>I have read the terms and conditions above ({data.about.terms_of_services[tos_id].name}) and hereby agree to them</Checkbox>
         </div>
       {/each}
-      {#if error}
+      {#if errorOccurred}
         <Helper class="mt-2" color="red"><span class="font-medium">Accepting the terms of services failed:</span> {errorMsg}</Helper>
       {/if}
       <WaitingSubmitButton waiting={waiting} disabled={!enabled} tabindex={not_accepted_tos.length+1}>Confirm</WaitingSubmitButton>

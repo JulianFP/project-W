@@ -28,7 +28,7 @@ project_W_runner = "project_W_runner.__main__:main"
 [project.optional-dependencies]
 not-dummy = [
     "hf-xet>=1.1.9",
-    "whisperx>=3.7.4",
+    "whisperx>=3.7.5",
 ]
 
 [tool.uv]

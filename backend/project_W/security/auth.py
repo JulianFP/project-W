@@ -5,18 +5,17 @@ from fastapi import Depends, HTTPException, Response, status
 from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
 from project_W_lib.logger import get_logger
-from project_W_lib.models.generic_response_data import ErrorResponse
+from project_W_lib.models.response_models import ErrorResponse, UserResponse, UserTypeEnum
 
 import project_W.dependencies as dp
 
-from ..models.internal import (
-    LdapUserInDb,
-    LocalUserInDbAll,
+from ..models.internal_models import (
+    LdapUserInternal,
+    LocalUserInternal,
     LoginContext,
-    OidcUserInDb,
+    OidcUserInternal,
     OnlineRunner,
 )
-from ..models.response_data import User, UserTypeEnum
 from ..utils import hash_token
 from .oidc_deps import get_provider_name
 
@@ -151,15 +150,15 @@ def validate_user(
             )
         (user, token_info) = result
 
-        if isinstance(user, LocalUserInDbAll):
+        if isinstance(user, LocalUserInternal):
             user_type = UserTypeEnum.LOCAL
             provider_name = "project-W"
             is_verified = user.is_verified
-        elif isinstance(user, OidcUserInDb):
+        elif isinstance(user, OidcUserInternal):
             user_type = UserTypeEnum.OIDC
             provider_name = get_provider_name(user.iss)
             is_verified = True
-        elif isinstance(user, LdapUserInDb):
+        elif isinstance(user, LdapUserInternal):
             user_type = UserTypeEnum.LDAP
             provider_name = user.provider_name
             is_verified = True
@@ -192,7 +191,7 @@ def validate_user(
 
         if (
             no_provisioned_users
-            and isinstance(user, LocalUserInDbAll)
+            and isinstance(user, LocalUserInternal)
             and user.provision_number is not None
         ):
             raise HTTPException(
@@ -215,7 +214,7 @@ def validate_user(
                 set_token_cookie(response, new_token)
 
         return LoginContext(
-            user=User(
+            user=UserResponse(
                 id=user.id,
                 user_type=user_type,
                 email=user.email,

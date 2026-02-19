@@ -10,21 +10,18 @@
 	import { FileMusicSolid, QuestionCircleOutline } from "flowbite-svelte-icons";
 	import { SvelteMap } from "svelte/reactivity";
 	import { PUBLIC_BACKEND_BASE_URL } from "$env/static/public";
-
+	import { type JobSettingsResponse, jobsSubmitSettings } from "$lib/generated";
 	import { alerts } from "$lib/utils/global_state.svelte";
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-	import { postLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-	import { type components } from "$lib/utils/schema";
+	import { get_error_msg } from "$lib/utils/http_utils";
 	import CloseButton from "./closeButton.svelte";
 	import JobSettingsForm from "./jobSettingsForm.svelte";
 	import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-	type JobSettingsResp = components["schemas"]["JobSettings-Output"];
 	interface Props {
 		open?: boolean;
 		pre_action?: () => Promise<void>;
 		post_action?: () => Promise<void>;
-		pre_filled_in_settings?: JobSettingsResp;
+		pre_filled_in_settings?: JobSettingsResponse;
 	}
 	let {
 		open = $bindable(false),
@@ -85,21 +82,19 @@
 			waitingForPromise = true;
 
 			//send job settings
-			try {
-				const settings_id = await postLoggedIn<number>(
-					"jobs/submit_settings",
-					get_job_settings(),
-					false,
-					{
-						is_new_default: makeNewDefaults.toString(),
-					},
-				);
-
+			const { data, error } = await jobsSubmitSettings({
+				body: get_job_settings(),
+				query: { is_new_default: makeNewDefaults },
+			});
+			if (error) {
+				let errorMsg = `Error occurred while trying to submit job settings: ${get_error_msg(error)}`;
+				alerts.push({ msg: errorMsg, color: "red" });
+			} else {
 				//send all requests at ones and wait for promises in parallel with "allSettled" method
 				//show results to user ones all promises have settled
 				let promises: Promise<Response>[] = [];
 				for (let file of all_files.values()) {
-					promises.push(postJob(file, settings_id));
+					promises.push(postJob(file, data));
 				}
 				let responses: PromiseSettledResult<Response>[] =
 					await Promise.allSettled(promises);
@@ -113,14 +108,6 @@
 						});
 					}
 				}
-			} catch (err: unknown) {
-				let errorMsg = "Error occurred while trying to submit job settings: ";
-				if (err instanceof BackendCommError) {
-					errorMsg += err.message;
-				} else {
-					errorMsg += "Unknown error";
-				}
-				alerts.push({ msg: errorMsg, color: "red" });
 			}
 
 			open = false;

@@ -1,38 +1,36 @@
+import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { BackendCommError, get } from "./httpRequests.svelte";
-import type { components } from "./schema";
-
-type User = components["schemas"]["User"];
+import type { UserResponse } from "$lib/generated";
+import { usersInfo } from "$lib/generated";
+import { type Client, createClient } from "$lib/generated/client";
+import { client } from "$lib/generated/client.gen";
 
 class AuthManager {
 	//set logged in by default so that it tries to use authenticated route first before failing and logging out
-	#userDataFromCheck: User | null = null;
+	#userDataFromCheck: UserResponse | null = null;
+	#client: Client;
 	loggedIn = $state<boolean>(false);
 	loggedInSettled = $state<boolean>(false);
 	awaitLoggedIn: Promise<void> | null = null;
 
 	async checkLoggedIn(): Promise<void> {
-		try {
-			const user_info = await get<User>(
-				"users/info",
-				{},
-				{},
-				window.fetch,
-				true,
-			);
-			this.#userDataFromCheck = user_info;
+		//check with its own client because the global client has the login forward interceptor
+		const { data, error, response } = await usersInfo({ client: this.#client });
+		if (!error && response.status !== 401) {
+			this.#userDataFromCheck = data;
 			this.loggedIn = true;
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError && err.status === 401) {
-				this.loggedIn = false;
-			}
 		}
 		this.loggedInSettled = true;
 	}
 
 	constructor() {
-		this.awaitLoggedIn = this.checkLoggedIn();
+		this.#client = createClient({
+			...client.getConfig(),
+		});
+		if (browser) {
+			this.awaitLoggedIn = this.checkLoggedIn();
+		}
 	}
 
 	login() {
@@ -49,7 +47,7 @@ class AuthManager {
 		this.loggedIn = false;
 	}
 
-	getUserDataFromCheck(): User | null {
+	getUserDataFromCheck(): UserResponse | null {
 		const userData = this.#userDataFromCheck;
 		this.#userDataFromCheck = null;
 		return userData;

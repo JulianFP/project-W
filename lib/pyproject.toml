@@ -8,6 +8,7 @@ maintainers = [
 requires-python = ">=3.11"
 license = "AGPL-3.0-only"
 dependencies = [
+    "email-validator>=2.3.0",
     "platformdirs>=4.4.0",
     "pyaml-env>=1.2.2",
     "pydantic>=2.11.9",

@@ -1,6 +1,6 @@
 from enum import Enum
 from ipaddress import IPv4Interface
-from typing import Annotated, Self
+from typing import Annotated, Mapping, Self
 
 from pydantic import (
     BaseModel,
@@ -19,10 +19,13 @@ from pydantic import (
 )
 from pydantic_core import Url
 
-from .base import (
-    EmailValidated,
-    LocalAccountSettingsBase,
-    ProviderSettingsBase,
+from project_W_lib.models.base import EmailValidated
+from project_W_lib.models.response_models import (
+    ImprintResponse,
+    TosResponse,
+    LocalAccountOperationModeEnum,
+    LocalAccountResponse,
+    ProviderResponse,
 )
 
 
@@ -46,8 +49,32 @@ class ProvisionedUser(BaseModel):
     )
 
 
-class LocalAccountSettings(LocalAccountSettingsBase):
+class LocalAccountSettings(LocalAccountResponse):
     model_config = ConfigDict(extra="forbid")
+    mode: LocalAccountOperationModeEnum = Field(
+        default=LocalAccountOperationModeEnum.ENABLED,
+        description="""
+        To what extend local accounts should be enabled.
+        - enabled: Both login and signup possible and advertised in frontend to users (default).
+        - no_signup: Login possible and advertised to users, signup not. Thus users can only login using already existing accounts (created through provisioning or by signup before this setting was set). Use this for example if you want users to login using local accounts that you created for them through provisioning.
+        - no_signup_hidden: Login still possible but not advertised to users in the frontend. Especially helpful if the only local accounts should be provisioned admin accounts for administration purposes while normal users should only login using oidc or ldap accounts.
+        - disabled: no login, no signup, no provisioned accounts. Login only through ldap and oidc. Please note that in this case you need to provide admin accounts through ldap or oidc as well!
+        """,
+        validate_default=True,
+    )
+    allowed_email_domains: list[
+        Annotated[
+            str,
+            Field(
+                description="Allowed domains in email addresses. Users will only be able to sign up/change their email of their local accounts if their email address uses one of these domains (the part after the '@'). If left empty, then all email domains are allowed.",
+            ),
+        ]
+    ] = []
+    allow_creation_of_api_tokens: bool = Field(
+        default=True,
+        description="If set to true then users logged in with local accounts can create api tokens with infinite lifetime. They will get invalidated if the user gets deleted.",
+        validate_default=True,
+    )
     user_provisioning: Annotated[
         dict[int, ProvisionedUser],
         Field(
@@ -98,10 +125,29 @@ class TokenSettings(BaseModel):
         return self
 
 
-class ProviderSettings(ProviderSettingsBase):
+class ProviderSettings(ProviderResponse):
+    hidden: bool = Field(
+        default=False,
+        description="Whether this provider should not be advertised to the user on the frontend. Useful if this provider should only provide admin accounts.",
+        validate_default=True,
+    )
+    icon_url: HttpUrl | None = Field(
+        default=None,
+        description="URL to a square icon that will be shown to the user in the frontend next to the 'Login with <name>' to visually represent the account/identity provider. Should be a link to a square png with transparent background, or alternatively to a svg",
+        examples=[
+            "https://ssl.gstatic.com/images/branding/googleg/2x/googleg_standard_color_64dp.png"
+        ],
+        validate_default=True,
+    )
+    allow_creation_of_api_tokens: bool = Field(
+        default=True,
+        description="If set to true then users logged in from this identity provider can create api tokens with infinite lifetime. These tokens will be automatically invalidated if the user gets deleted from the identity provider ones the periodic background job gets called. Run the periodic background task more often to get user access revoked quicker.",
+        validate_default=True,
+    )
     ca_pem_file_path: FilePath | None = Field(
         default=None,
         description="Path to the pem certs file that includes the certificates that should be trusted for this provider (alternative certificate verification). Useful if the identity provider uses a self-signed certificate",
+        validate_default=True,
     )
 
 
@@ -364,7 +410,7 @@ class RedisConnection(BaseModel):
         return self
 
 
-class ImprintSettings(BaseModel):
+class ImprintSettings(ImprintResponse):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(
         description="The name of the person/institution hosting this instance",
@@ -385,26 +431,13 @@ class ImprintSettings(BaseModel):
         validate_default=True,
     )
 
-    @model_validator(mode="after")
-    def exactly_one_of_url_additional_imprint_html(self) -> Self:
-        if self.url is None and self.additional_imprint_html is None:
-            raise ValueError(
-                "You need to define one of 'url' or 'additional_imprint_html' if you want to have an imprint"
-            )
-        elif self.url is not None and self.additional_imprint_html is not None:
-            raise ValueError(
-                "You cannot define both 'url' and 'additional_imprint_html' at the same time, these options are mutually exclusive"
-            )
-        return self
 
-
-class TosSettings(BaseModel):
+class TosSettings(TosResponse):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(
         description="The name of this term of service. This will be shown as a title above the tos_html content in the frontend",
     )
     version: int = Field(
-        ge=1,
         description="The version of this term of service. Start by putting this to 1. When incremented then users will have to re-accept these terms.",
     )
     tos_html: str = Field(
@@ -516,10 +549,10 @@ class Settings(BaseModel):
     imprint: ImprintSettings | None = Field(
         description="Set the imprint/impressum of this instance",
         default=None,
-        validate_default=None,
+        validate_default=True,
     )
     terms_of_services: Annotated[
-        dict[int, TosSettings],
+        Mapping[int, TosSettings],
         Field(
             description="Attribute set of terms of services. The user will have to accept to every one of these separately before they can use the service. The name of the set will be id of the term of service, don't change it once set!",
         ),

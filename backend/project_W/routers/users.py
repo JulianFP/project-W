@@ -1,12 +1,16 @@
 from typing import Annotated, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from project_W_lib.models.generic_response_data import ErrorResponse
+from project_W_lib.models.response_models import (
+    ErrorResponse,
+    TokenInfoResponse,
+    UserResponse,
+    UserTypeEnum,
+)
 
 import project_W.dependencies as dp
 
-from ..models.internal import LoginContext
-from ..models.response_data import TokenInfo, User, UserTypeEnum
+from ..models.internal_models import LoginContext
 from ..security.auth import (
     auth_dependency_responses,
     unset_cookie,
@@ -122,7 +126,7 @@ async def get_all_token_info(
         LoginContext,
         Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
-) -> Sequence[TokenInfo]:
+) -> Sequence[TokenInfoResponse]:
     """
     Get a list of all token id's and names currently in use by this account, sorted by last usage timestamp.
     """
@@ -130,12 +134,12 @@ async def get_all_token_info(
 
 
 @router.get("/info")
-async def user_info(
+async def info(
     login_context: Annotated[
         LoginContext,
         Depends(validate_user(require_verified=False, require_admin=False, require_tos=False)),
     ],
-) -> User:
+) -> UserResponse:
     """
     This route returns all information about the currently logged in user.
     """
@@ -173,7 +177,7 @@ async def accept_tos(
 
 
 @router.delete("/delete")
-async def delete_user(
+async def delete(
     login_context: Annotated[
         LoginContext,
         Depends(

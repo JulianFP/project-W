@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { error } from "@sveltejs/kit";
+	import { error as svelte_error } from "@sveltejs/kit";
 	import {
 		Accordion,
 		AccordionItem,
@@ -14,22 +14,31 @@
 	} from "flowbite-svelte";
 	import { QuestionCircleOutline, UndoOutline } from "flowbite-svelte-icons";
 
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-	import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
+	import type {
+		InterpolateMethodEnum,
+		JobLangEnum,
+		JobModelEnum,
+		JobSettingsRequest,
+		JobSettingsResponse,
+	} from "$lib/generated";
 	import {
-		type components,
-		interpolateMethodEnumValues,
-		jobLangEnumValues,
-		jobModelEnumValues,
-	} from "$lib/utils/schema.d";
+		InterpolateMethodEnum as interpolateMethodObject,
+		JobLangEnum as jobLangEnumObject,
+		JobModelEnum as jobModelEnumObject,
+		jobsDefaultSettings,
+	} from "$lib/generated";
+	import { get_error_msg } from "$lib/utils/http_utils";
 	import RangeWithField from "./rangeWithField.svelte";
 	import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
-	type JobSettingsResp = components["schemas"]["JobSettings-Output"];
+	const jobLangEnumValues = Object.values(jobLangEnumObject);
+	const jobModelEnumValues = Object.values(jobModelEnumObject);
+	const interpolateMethodEnumValues = Object.values(interpolateMethodObject);
+
 	interface Props {
 		get_job_settings?: () => object;
 		re_query?: () => Promise<void>;
-		pre_filled_in_settings?: JobSettingsResp;
+		pre_filled_in_settings?: JobSettingsResponse;
 	}
 
 	let {
@@ -45,21 +54,19 @@
 	re_query = async () => {
 		await setToDefault(true);
 	};
-	let default_settings: JobSettingsResp | undefined = $state();
+	let default_settings: JobSettingsResponse | undefined = $state();
 	let wait_for_set: boolean = $state(false);
 
 	let translate: boolean = $state(false);
-	let language: components["schemas"]["JobLangEnum"] | "detect" =
-		$state("detect");
-	let model: components["schemas"]["JobModelEnum"] = $state("large");
+	let language: JobLangEnum | "detect" = $state("detect");
+	let model: JobModelEnum = $state("large");
 	let email_notification: boolean = $state(false);
 	let alignment: boolean = $state(true);
 	let alignment_processing_highlight_words: boolean = $state(false);
 	let alignment_processing_max_line_width: number | undefined = $state();
 	let alignment_processing_max_line_count: number | undefined = $state();
 	let alignment_return_char_alignments: boolean = $state(false);
-	let alignment_interpolate_method: components["schemas"]["InterpolateMethodEnum"] =
-		$state("nearest");
+	let alignment_interpolate_method: InterpolateMethodEnum = $state("nearest");
 	let diarization: boolean = $state(false);
 	let diarization_min_speakers: number | undefined = $state();
 	let diarization_max_speakers: number | undefined = $state();
@@ -79,37 +86,23 @@
 	let asr_suppress_numerals: boolean = $state(false);
 
 	//query default settings of account
-	async function queryDefaultValues(): Promise<
-		components["schemas"]["JobSettings-Output"]
-	> {
-		try {
-			return await getLoggedIn<components["schemas"]["JobSettings-Output"]>(
-				"jobs/default_settings",
-			);
-		} catch (err: unknown) {
-			let errorMsg = "Error occurred while fetching default account settings: ";
-			let errorCode = 400;
-			if (err instanceof BackendCommError) {
-				errorMsg += err.message;
-				errorCode = err.status;
-			} else {
-				errorMsg += "Unknown error";
-			}
-			error(errorCode, errorMsg);
+	async function queryDefaultValues(): Promise<JobSettingsResponse> {
+		const { data, error, response } = await jobsDefaultSettings();
+		if (error) {
+			let errorMsg = `Error occurred while fetching default account settings: ${get_error_msg(error)}`;
+			svelte_error(response.status, errorMsg);
 		}
+		return data;
 	}
 
-	function setStateFromJobSettingsResp(job_settings: JobSettingsResp) {
+	function setStateFromJobSettingsResp(job_settings: JobSettingsResponse) {
 		wait_for_set = true;
 		language =
-			job_settings.language === null || job_settings.language === undefined
-				? "detect"
-				: job_settings.language;
+			job_settings.language === null ? "detect" : job_settings.language;
 		translate = job_settings.task === "translate";
 		model = job_settings.model;
 		email_notification = job_settings.email_notification;
-		alignment =
-			job_settings.alignment !== undefined && job_settings.alignment !== null;
+		alignment = job_settings.alignment !== null;
 		if (job_settings.alignment) {
 			alignment_processing_highlight_words =
 				job_settings.alignment.processing.highlight_words;
@@ -125,9 +118,7 @@
 				job_settings.alignment.return_char_alignments;
 			alignment_interpolate_method = job_settings.alignment.interpolate_method;
 		}
-		diarization =
-			job_settings.diarization !== undefined &&
-			job_settings.diarization !== null;
+		diarization = job_settings.diarization !== null;
 		if (job_settings.diarization) {
 			diarization_min_speakers =
 				job_settings.diarization.min_speakers === null
@@ -152,8 +143,7 @@
 		asr_log_prob_threshold = job_settings.asr_settings.log_prob_threshold;
 		asr_no_speech_threshold = job_settings.asr_settings.no_speech_threshold;
 		asr_initial_prompt =
-			job_settings.asr_settings.initial_prompt === null ||
-			job_settings.asr_settings.initial_prompt === undefined
+			job_settings.asr_settings.initial_prompt === null
 				? ""
 				: job_settings.asr_settings.initial_prompt;
 		asr_suppressed_tokens = job_settings.asr_settings.suppress_tokens.join(",");
@@ -176,62 +166,57 @@
 		setToDefault();
 	}
 
-	let job_settings: components["schemas"]["JobSettings-Input"] = $derived.by(
-		() => {
-			let asr_suppress_tokens: number[] = [];
-			for (const token_id_string of asr_suppressed_tokens.split(",")) {
-				const parsed_int = Number.parseInt(token_id_string.trim(), 10);
-				if (!Number.isNaN(parsed_int)) {
-					asr_suppress_tokens.push(parsed_int);
-				}
+	let job_settings: JobSettingsRequest = $derived.by(() => {
+		let asr_suppress_tokens: number[] = [];
+		for (const token_id_string of asr_suppressed_tokens.split(",")) {
+			const parsed_int = Number.parseInt(token_id_string.trim(), 10);
+			if (!Number.isNaN(parsed_int)) {
+				asr_suppress_tokens.push(parsed_int);
 			}
-			return {
-				language: language === "detect" ? null : language,
-				task: translate ? "translate" : "transcribe",
-				model: model,
-				email_notification: email_notification,
-				alignment: alignment
-					? {
-							processing: {
-								highlight_words: alignment_processing_highlight_words,
-								max_line_width: alignment_processing_max_line_width,
-								max_line_count: alignment_processing_max_line_count,
-							},
-							return_char_alignments: alignment_return_char_alignments,
-							interpolate_method: alignment_interpolate_method,
-						}
-					: null,
-				diarization: diarization
-					? {
-							min_speakers:
-								diarization_min_speakers !== undefined
-									? diarization_min_speakers
-									: null,
-							max_speakers: diarization_max_speakers,
-						}
-					: null,
-				vad_settings: {
-					vad_onset: vad_onset,
-					vad_offset: vad_offset,
-					chunk_size: vad_chunk_size,
-				},
-				asr_settings: {
-					beam_size: asr_beam_size,
-					patience: asr_patience,
-					length_penalty: asr_length_penalty,
-					temperature: asr_temperature,
-					temperature_increment_on_fallback:
-						asr_temperature_increment_on_fallback,
-					compression_ratio_threshold: asr_compression_ratio_threshold,
-					log_prob_threshold: asr_log_prob_threshold,
-					no_speech_threshold: asr_no_speech_threshold,
-					initial_prompt: asr_initial_prompt ? asr_initial_prompt : null,
-					suppress_tokens: asr_suppress_tokens,
-					suppress_numerals: asr_suppress_numerals,
-				},
-			};
-		},
-	);
+		}
+		return {
+			language: language === "detect" ? null : language,
+			task: translate ? "translate" : "transcribe",
+			model: model,
+			email_notification: email_notification,
+			alignment: alignment
+				? {
+						processing: {
+							highlight_words: alignment_processing_highlight_words,
+							max_line_width: alignment_processing_max_line_width ?? null,
+							max_line_count: alignment_processing_max_line_count ?? null,
+						},
+						return_char_alignments: alignment_return_char_alignments,
+						interpolate_method: alignment_interpolate_method,
+					}
+				: null,
+			diarization: diarization
+				? {
+						min_speakers: diarization_min_speakers ?? null,
+						max_speakers: diarization_max_speakers ?? null,
+					}
+				: null,
+			vad_settings: {
+				vad_onset: vad_onset,
+				vad_offset: vad_offset,
+				chunk_size: vad_chunk_size,
+			},
+			asr_settings: {
+				beam_size: asr_beam_size,
+				patience: asr_patience,
+				length_penalty: asr_length_penalty,
+				temperature: asr_temperature,
+				temperature_increment_on_fallback:
+					asr_temperature_increment_on_fallback,
+				compression_ratio_threshold: asr_compression_ratio_threshold,
+				log_prob_threshold: asr_log_prob_threshold,
+				no_speech_threshold: asr_no_speech_threshold,
+				initial_prompt: asr_initial_prompt ? asr_initial_prompt : null,
+				suppress_tokens: asr_suppress_tokens,
+				suppress_numerals: asr_suppress_numerals,
+			},
+		};
+	});
 
 	const supportedAlignmentLangs = [
 		"en",

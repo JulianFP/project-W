@@ -3,13 +3,15 @@
 	import { MailBoxSolid } from "flowbite-svelte-icons";
 	import type { Snippet } from "svelte";
 	import WaitingSubmitButton from "$lib/components/waitingSubmitButton.svelte";
+	import {
+		localAccountResendActivationEmail,
+		type UserResponse,
+	} from "$lib/generated";
 	import { alerts } from "$lib/utils/global_state.svelte";
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-	import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-	import type { components } from "$lib/utils/schema";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	type Data = {
-		user_info: components["schemas"]["User"];
+		user_info: UserResponse;
 	};
 	interface Props {
 		data: Data;
@@ -26,18 +28,12 @@
 		resendError = false;
 		resendErrorMsg = "";
 
-		try {
-			let resendResponse = await getLoggedIn<string>(
-				"local-account/resend_activation_email",
-			);
-			alerts.push({ msg: resendResponse, color: "green" });
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				resendErrorMsg = err.message;
-			} else {
-				resendErrorMsg = "Unknown error";
-			}
+		const { data, error } = await localAccountResendActivationEmail();
+		if (error) {
+			resendErrorMsg = get_error_msg(error);
 			resendError = true;
+		} else {
+			alerts.push({ msg: data, color: "green" });
 		}
 
 		waitingForResend = false;

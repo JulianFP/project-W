@@ -6,12 +6,12 @@ from bonsai.asyncio import AIOConnectionPool, AIOLDAPConnection
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 from project_W_lib.logger import get_logger
+from project_W_lib.models.base import EmailValidated
 
 import project_W.dependencies as dp
 
-from ..models.base import EmailValidated
-from ..models.internal import LdapTokenInfoInternal, LdapUserInfo
-from ..models.settings import LdapProviderSettings
+from ..models.internal_models import LdapTokenInfoInternal, LdapUserInfo
+from ..models.setting_models import LdapProviderSettings
 
 http_exc = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,

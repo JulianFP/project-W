@@ -6,14 +6,18 @@
 	import FormPage from "$lib/components/formPage.svelte";
 	import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 	import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
+	import {
+		type AuthSettingsResponse,
+		localAccountLogin,
+		localAccountSignup,
+	} from "$lib/generated";
 	import { auth } from "$lib/utils/global_state.svelte";
-	import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
-	import type { components } from "$lib/utils/schema";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	let email: string = $state("");
 	let password: string = $state("");
 
-	let error = $state(false);
+	let errorOccurred = $state(false);
 	let errorMsg: string = $state("");
 
 	let waitingForPromise = $state(false);
@@ -23,49 +27,28 @@
 		event.preventDefault(); //disable page reload after form submission
 
 		//send post request and wait for response
-		try {
-			await post<string>("local-account/signup", {
-				email: email,
-				password: password,
+		const { error } = await localAccountSignup({
+			body: { email: email, password: password },
+		});
+		if (error) {
+			errorMsg = get_error_msg(error);
+			errorOccurred = true;
+		} else {
+			const { error } = await localAccountLogin({
+				body: { grant_type: "password", username: email, password: password },
 			});
-
-			try {
-				await post<string>(
-					"local-account/login",
-					{
-						grant_type: "password",
-						username: email,
-						password: password,
-					},
-					true,
-					{},
-					{},
-					window.fetch,
-					true,
-				);
-				auth.login();
-			} catch (err: unknown) {
-				if (err instanceof BackendCommError) {
-					errorMsg = `Account created, however automatic login failed: ${err.message}`;
-				} else {
-					errorMsg =
-						"Account created, however automatic login failed: Unknown error";
-				}
-				error = true;
-			}
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				errorMsg = err.message;
+			if (error) {
+				errorMsg = `Account created, however automatic login failed: ${get_error_msg(error)}`;
+				errorOccurred = true;
 			} else {
-				errorMsg = "Unknown error";
+				auth.login();
 			}
-			error = true;
 		}
 		waitingForPromise = false;
 	}
 
 	type Data = {
-		auth_settings: components["schemas"]["AuthSettings"];
+		auth_settings: AuthSettingsResponse;
 	};
 	interface Props {
 		data: Data;
@@ -81,10 +64,10 @@
 
 <FormPage backButtonUri="#/auth" heading="Signup for Project-W account">
   <form class="mx-auto max-w-lg" onsubmit={postSignup}>
-    <EmailField bind:value={email} bind:error={error} helper_text={helper_text} tabindex={1}/>
-    <PasswordWithRepeatField bind:value={password} bind:error={error} bind:errorMsg={errorMsg} tabindex={2}/>
+    <EmailField bind:value={email} bind:error={errorOccurred} helper_text={helper_text} tabindex={1}/>
+    <PasswordWithRepeatField bind:value={password} bind:error={errorOccurred} bind:errorMsg={errorMsg} tabindex={2}/>
 
-    {#if error}
+    {#if errorOccurred}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMsg}</Helper>
     {/if}
 

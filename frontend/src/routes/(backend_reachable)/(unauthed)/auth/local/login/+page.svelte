@@ -6,12 +6,12 @@
 	import FormPage from "$lib/components/formPage.svelte";
 	import PasswordField from "$lib/components/passwordField.svelte";
 	import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
+	import { type AuthSettingsResponse, localAccountLogin } from "$lib/generated";
 	import { auth } from "$lib/utils/global_state.svelte";
-	import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
-	import type { components } from "$lib/utils/schema";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	type Data = {
-		auth_settings: components["schemas"]["AuthSettings"];
+		auth_settings: AuthSettingsResponse;
 	};
 
 	interface Props {
@@ -19,7 +19,7 @@
 	}
 	let { data }: Props = $props();
 
-	let error: boolean = $state(false);
+	let errorOccurred: boolean = $state(false);
 	let errorMsg: string = $state("");
 	let waitingForPromise = $state(false);
 	let email: string = $state("");
@@ -30,28 +30,14 @@
 		event.preventDefault(); //disable page reload after form submission
 
 		//send post request and wait for response
-		try {
-			await post<string>(
-				"local-account/login",
-				{
-					grant_type: "password",
-					username: email,
-					password: password,
-				},
-				true,
-				{},
-				{},
-				window.fetch,
-				true,
-			);
+		const { error } = await localAccountLogin({
+			body: { grant_type: "password", username: email, password: password },
+		});
+		if (error) {
+			errorMsg = get_error_msg(error);
+			errorOccurred = true;
+		} else {
 			auth.login();
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				errorMsg = err.message;
-			} else {
-				errorMsg = "Unknown error";
-			}
-			error = true;
 		}
 		waitingForPromise = false;
 	}
@@ -59,10 +45,10 @@
 
 <FormPage backButtonUri="#/auth" heading="Login with Project-W account">
   <form class="mx-auto max-w-lg" onsubmit={postLogin}>
-    <EmailField bind:value={email} bind:error={error} tabindex={1}/>
-    <PasswordField bind:value={password} bind:error={error} tabindex={2}>Password</PasswordField>
+    <EmailField bind:value={email} bind:error={errorOccurred} tabindex={1}/>
+    <PasswordField bind:value={password} bind:error={errorOccurred} tabindex={2}>Password</PasswordField>
 
-    {#if error}
+    {#if errorOccurred}
       <Helper class="mt-2" color="red"><span class="font-medium">Login failed!</span> {errorMsg}</Helper>
     {/if}
 

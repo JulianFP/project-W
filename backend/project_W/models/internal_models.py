@@ -1,55 +1,39 @@
-from enum import Enum
-
 from pydantic import BaseModel, Field
-from project_W_lib.models.runner_request_data import RunnerRegisterRequest
-
-from .base import (
-    AdditionalUserInfo,
-    EmailValidated,
-    InProcessJobBase,
-    JobBase,
-    UserInDb,
+from enum import Enum
+from project_W_lib.models.base import EmailValidated, UserBase
+from project_W_lib.models.response_models import (
+    InProcessJobResponse,
+    JobAndSettingsResponse,
+    JobResponse,
+    TokenInfoResponse,
+    UserResponse,
 )
-from .request_data import JobSettings
-from .response_data import TokenInfo, User
+from project_W_lib.models.request_models import JobSettingsResponse, RunnerRegisterRequest
 
 
-# user models for the database
-class LocalUserInDb(UserInDb):
+class LocalUserInternal(UserBase):
     password_hash: str
     is_admin: bool
     is_verified: bool
     provision_number: int | None
 
 
-class LocalUserInDbAll(LocalUserInDb, AdditionalUserInfo):
-    pass
-
-
-class OidcUserInDb(UserInDb):
+class OidcUserInternal(UserBase):
     iss: str
     sub: str
 
 
-class OidcUserInDbAll(OidcUserInDb, AdditionalUserInfo):
-    pass
-
-
-class LdapUserInDb(UserInDb):
+class LdapUserInternal(UserBase):
     provider_name: str
     uid: str
 
 
-class LdapUserInDbAll(LdapUserInDb, AdditionalUserInfo):
-    pass
-
-
-class RunnerInDb(BaseModel):
+class RunnerInternal(BaseModel):
     id: int
     token_hash: str
 
 
-class JobInDb(JobBase):
+class JobInternal(JobResponse):
     aborting: bool
     user_id: int
     job_settings_id: int | None = None
@@ -57,15 +41,20 @@ class JobInDb(JobBase):
     nonce: str | None = None
 
 
-class JobAndSettingsInDb(JobInDb):
-    settings: JobSettings = JobSettings()
+class JobSettingsResponseWrapped(BaseModel):
+    settings: JobSettingsResponse
 
 
-class JobSettingsInDb(BaseModel):
-    settings: JobSettings
+class JobAndSettingsInternal(JobAndSettingsResponse, JobInternal):
+    pass
 
 
-class TokenInfoInternal(TokenInfo):
+class InProcessJobInternal(InProcessJobResponse):
+    progress: float = 0.0
+    abort: bool = False
+
+
+class TokenInfoInternal(TokenInfoResponse):
     user_id: int
     oidc_refresh_token_id: int | None = None
 
@@ -81,7 +70,7 @@ class OidcTokenInfoInternal(TokenInfoInternal):
 
 
 class LoginContext(BaseModel):
-    user: User
+    user: UserResponse
     token: TokenInfoInternal
 
 
@@ -106,7 +95,7 @@ class JobSortKey(str, Enum):
     FILENAME = "filename"
 
 
-class InProcessJob(InProcessJobBase):
+class InProcessJob(InProcessJobResponse):
     """
     Represents a job that is currently being processed by a runner.
     Instances of this are created as soon as the runner retrieves the

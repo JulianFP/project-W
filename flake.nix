@@ -108,6 +108,7 @@
             biome = {
               enable = true;
               files = "^frontend/";
+              excludes = [ "^frontend/src/lib/generated/" ];
               types_or = [ ];
             };
             ruff = {
@@ -121,7 +122,7 @@
             codespell = {
               enable = true;
               name = "codespell";
-              entry = "${pkgsFor.${system}.codespell}/bin/codespell -w --ignore-words-list=delet --skip=frontend/src/lib/utils/schema.d.ts,frontend/pnpm-lock.yaml,frontend/package.json";
+              entry = "${pkgsFor.${system}.codespell}/bin/codespell -w --ignore-words-list=delet --skip=frontend/src/lib/generated/**,frontend/pnpm-lock.yaml,frontend/package.json";
             };
             nixfmt-rfc-style.enable = true;
           };

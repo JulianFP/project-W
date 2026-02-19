@@ -2,27 +2,28 @@
 	import { Spinner } from "flowbite-svelte";
 
 	import { invalidate } from "$app/navigation";
+	import { localAccountActivate } from "$lib/generated";
 	import { alerts, routing } from "$lib/utils/global_state.svelte";
-	import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	async function activate(): Promise<void> {
 		//send get request and wait for response
-		try {
-			await post<null>(
-				"local-account/activate",
-				{},
-				false,
-				Object.fromEntries(routing.querystring),
-			);
-			alerts.push({
-				msg: "Account activation successful!",
-				color: "green",
-			});
-		} catch (err: unknown) {
-			let errorMsg = "Unknown error";
-			if (err instanceof BackendCommError) {
-				errorMsg = err.message;
+		let errorMsg: string | undefined;
+		const token = routing.querystring.get("token");
+		if (token) {
+			const { error } = await localAccountActivate({ query: { token: token } });
+			if (error) {
+				errorMsg = get_error_msg(error);
+			} else {
+				alerts.push({
+					msg: "Account activation successful!",
+					color: "green",
+				});
 			}
+		} else {
+			errorMsg = "No activation token was provided";
+		}
+		if (errorMsg) {
 			alerts.push({
 				msg: `Error occurred during account activation: ${errorMsg}`,
 				color: "red",

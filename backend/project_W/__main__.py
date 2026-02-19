@@ -12,7 +12,7 @@ from project_W_lib.logger import get_logger
 import project_W.dependencies as dp
 
 from ._version import __commit_id__, __version__
-from .models.settings import Settings, SecretKeyValidated
+from .models.setting_models import Settings, SecretKeyValidated
 from .cli_tasks import (
     execute_background_tasks,
     perform_database_encrypted_content_deletion,

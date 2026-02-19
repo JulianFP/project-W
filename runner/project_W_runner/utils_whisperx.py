@@ -7,14 +7,14 @@ import torch
 import whisperx
 from whisperx import alignment, asr, diarize, utils
 from whisperx.vads import pyannote
-from project_W_lib.models.job_settings import (
+from project_W_lib.models.response_models import (
     AlignmentProcessingSettings,
     JobModelEnum,
-    JobSettingsBase,
+    JobSettingsResponse,
     supported_alignment_languages,
 )
 from project_W_lib.logger import get_logger
-from .models.settings import ModelPrefetchingEnum, WhisperSettings
+from .models.setting_models import ModelPrefetchingEnum, WhisperSettings
 
 logger = get_logger("project-W-runner")
 
@@ -121,7 +121,7 @@ class ProgressCallbackClass:
 
 def transcribe(
     audio_file: str,
-    job_settings: JobSettingsBase,
+    job_settings: JobSettingsResponse,
     whisper_settings: WhisperSettings,
     progress_callback: Callable[[float], None],
 ) -> dict[str, StringIO]:
@@ -169,6 +169,7 @@ def transcribe(
     in_memory_files = {}
 
     def new_result_writer_call(self, result: dict, audio_path: str, options: dict):
+        _ = audio_path  # in this function we don't use audio_path, but because we overwrite below the function signature must be like this
         self.in_memory_file = StringIO()
         in_memory_files[self.extension] = self.in_memory_file
         self.write_result(result, file=self.in_memory_file, options=options)
@@ -268,11 +269,12 @@ def transcribe(
     result = dict(result)
     result["language"] = used_language
     writer = utils.get_writer("all", ".")
-    # this function is actually supposed to take a str instead of a TextIO. The error is due to an incorrect type annotation in whisperx upstream, see https://github.com/m-bain/whisperX/pull/1144 for the pending fix
     options = (
         job_settings.alignment.processing.model_dump()
         if job_settings.alignment is not None
-        else AlignmentProcessingSettings().model_dump()
+        else AlignmentProcessingSettings(
+            highlight_words=False, max_line_count=None, max_line_width=None
+        ).model_dump()
     )
     writer(result, "file", options)
 
