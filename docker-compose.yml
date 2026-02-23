@@ -1,9 +1,13 @@
+volumes:
+  postgres-data:
+  mailpit-data:
 services:
   mailpit:
     image: docker.io/axllent/mailpit
+    profiles: ["smtp", "dev"]
     restart: unless-stopped
     volumes:
-      - ./project-W-data/mailpit:/data
+      - mailpit-data:/data
     ports:
       - 8025:8025
       - 1025:1025
@@ -12,19 +16,33 @@ services:
       MP_DATABASE: /data/mailpit.db
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 15s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
   postgres:
-    image: docker.io/postgres:17
+    image: docker.io/postgres:${POSTGRES_VERSION:-18}
     restart: unless-stopped
     environment:
       POSTGRES_USER: project_w
+      POSTGRES_DB: project_w
       POSTGRES_HOST_AUTH_METHOD: trust
     command: ["postgres", "-c", "log_statement=all", "-c", "log_connections=true", "-c", "log_disconnections=true"]
     volumes:
-      - ./project-W-data/postgres/:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     ports:
       - 5432:5432
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "project_w", "-d", "project_w"]
+      interval: 15s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
   pgadmin:
     image: docker.io/dpage/pgadmin4
+    profiles: ["dev"]
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: user@example.com
@@ -37,12 +55,19 @@ services:
     ports:
       - 8080:80
   redis:
-    image: docker.io/redis:8
+    image: docker.io/redis:${REDIS_VERSION:-8}
     restart: unless-stopped
     ports:
       - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
   redisinsight:
     image: docker.io/redis/redisinsight
+    profiles: ["dev"]
     restart: unless-stopped
     environment:
       RI_DATABASE_MANAGEMENT: false
@@ -65,6 +90,12 @@ services:
       - 3000:389
     command:
       --copy-service --loglevel debug
+    healthcheck:
+      test: ["CMD", "cat", "/run/slapd/slapd.pid"]
+      interval: 15s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
   keycloak:
     image: quay.io/keycloak/keycloak
     restart: unless-stopped
@@ -77,5 +108,12 @@ services:
       - start-dev
       - --import-realm
       - --log-level=debug
+      - --health-enabled=true
     ports:
       - 8081:8080
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c \"{ printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000\""]
+      interval: 15s
+      retries: 20
+      start_period: 20s
+      timeout: 10s

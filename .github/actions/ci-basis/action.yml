@@ -1,0 +1,25 @@
+name: Basic CI setup
+inputs:
+  redis_version:
+    required: true
+    default: "8"
+  postgres_version:
+    required: true
+    default: "18"
+  docker_compose_profile:
+    required: true
+    default: "ci"
+runs:
+  using: "composite"
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+
+    - name: Run service containers
+      run: |
+        docker compose --profile ${COMPOSE_PROFILE} up -d --wait
+      shell: bash
+      env:
+        POSTGRES_VERSION: ${{ inputs.postgres_version }}
+        REDIS_VERSION: ${{ inputs.redis_version }}
+        COMPOSE_PROFILE: ${{ inputs.docker_compose_profile }}

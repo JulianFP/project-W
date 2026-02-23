@@ -61,7 +61,7 @@ def secret_key():
 def backend(request, smtpd, secret_key, helper_functions):
     BACKEND_BASE_URL = "https://localhost:5000"
 
-    postgres_conn = "postgresql://test:test@localhost:5432/test_db"
+    postgres_conn = "postgresql://project_w@localhost:5432"
     redis_conn = "redis://localhost:6379/project-W"
 
     settings = {
