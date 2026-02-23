@@ -8,12 +8,12 @@ from redis.asyncio.client import Pipeline
 from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 from project_W_lib.logger import get_logger
-from project_W_lib.models.runner_request_data import RunnerRegisterRequest
+from project_W_lib.models.request_models import RunnerRegisterRequest
 
 import project_W.dependencies as dp
 
-from .models.internal import InProcessJob, OnlineRunner, SSEEvent
-from .models.settings import RedisConnection
+from .models.internal_models import InProcessJob, OnlineRunner, SSEEvent
+from .models.setting_models import RedisConnection
 from .utils import hash_token
 
 

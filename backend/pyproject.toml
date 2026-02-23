@@ -21,7 +21,6 @@ dependencies = [
     "authlib>=1.6.3",
     "bonsai>=1.5.4",
     "click>=8.2.1",
-    "email-validator>=2.3.0",
     "fastapi>=0.116.1",
     "granian[pname]>=2.5.2",
     "httpx>=0.28.1",

@@ -29,7 +29,7 @@ def test_about(get_client):
         content.get("description")
         == "A self-hostable platform on which users can create transcripts of their audio files (speech-to-text) using Whisper AI"
     )
-    assert content.get("source_code") == "https://github.com/JulianFP/project-W"
+    assert content.get("source_code") == "https://github.com/JulianFP/project-W/tree/main/backend"
     version_splitted = content.get("version").split(".")
     assert (
         version_splitted[0] != "0" or version_splitted[1] != "0"

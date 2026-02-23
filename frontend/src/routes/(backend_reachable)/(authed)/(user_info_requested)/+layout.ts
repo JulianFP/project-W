@@ -1,11 +1,8 @@
-import { error } from "@sveltejs/kit";
+import { error as svelte_error } from "@sveltejs/kit";
+import { usersInfo } from "$lib/generated";
 import { auth } from "$lib/utils/global_state.svelte";
-import { BackendCommError } from "$lib/utils/httpRequests.svelte";
-import { getLoggedIn } from "$lib/utils/httpRequestsAuth.svelte";
-import type { components } from "$lib/utils/schema";
+import { get_error_msg } from "$lib/utils/http_utils";
 import type { LayoutLoad } from "./$types";
-
-type User = components["schemas"]["User"];
 
 export const load: LayoutLoad = async ({ fetch, depends }) => {
 	depends("app:user_info");
@@ -17,18 +14,10 @@ export const load: LayoutLoad = async ({ fetch, depends }) => {
 		return { user_info: user_info_from_check };
 	}
 	if (auth.loggedIn) {
-		try {
-			const user_info = await getLoggedIn<User>("users/info", {}, {}, fetch);
-			return { user_info: user_info };
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				error(err.status, err.message);
-			} else {
-				error(
-					400,
-					"Unknown error occurred while querying user info from backend",
-				);
-			}
-		}
+		const { data, error, response } = await usersInfo({
+			fetch: (input, init) => fetch(input, { ...init, credentials: "include" }),
+		});
+		if (error) svelte_error(response.status, get_error_msg(error));
+		return { user_info: data };
 	}
 };

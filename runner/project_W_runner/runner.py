@@ -9,14 +9,14 @@ from typing import Any, Callable, TypeVar
 import certifi
 import httpx
 from pydantic import ValidationError
-from project_W_lib.models.job_settings import JobSettingsBase
-from project_W_lib.models.runner_request_data import (
+from project_W_lib.models.request_models import (
     HeartbeatRequest,
     RunnerRegisterRequest,
     RunnerSubmitResultRequest,
     Transcript,
 )
-from project_W_lib.models.runner_response_data import (
+from project_W_lib.models.response_models import (
+    JobSettingsResponse,
     HeartbeatResponse,
     RegisteredResponse,
     RunnerJobInfoResponse,
@@ -24,13 +24,13 @@ from project_W_lib.models.runner_response_data import (
 from project_W_lib.logger import get_logger
 
 from ._version import __version__
-from .models.internal import (
+from .models.internal_models import (
     BackendError,
     JobData,
     ResponseNotJson,
     ShutdownSignal,
 )
-from .models.settings import Settings, WhisperSettings
+from .models.setting_models import Settings, WhisperSettings
 
 logger = get_logger("project-W-runner")
 
@@ -45,7 +45,7 @@ PydanticModel = TypeVar("PydanticModel", covariant=True)
 
 class Runner:
     transcribe: Callable[
-        [str, JobSettingsBase, WhisperSettings, Callable[[float], None]], dict[str, StringIO]
+        [str, JobSettingsResponse, WhisperSettings, Callable[[float], None]], dict[str, StringIO]
     ]
     config: Settings
     git_hash: str

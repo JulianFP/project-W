@@ -14,27 +14,25 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordRequestForm
 from itsdangerous import BadSignature, SignatureExpired
 from pydantic import SecretStr, ValidationError
-from project_W_lib.models.generic_response_data import ErrorResponse
-
-from project_W import dependencies as dp
-
-from ..models.base import (
+from project_W_lib.models.response_models import ErrorResponse
+from project_W_lib.models.base import (
     EmailValidated,
-    LocalAccountOperationModeEnum,
     PasswordValidated,
 )
-from ..models.internal import (
-    AccountActivationTokenData,
-    LoginContext,
-    PasswordResetTokenData,
-)
-from ..models.request_data import PasswordResetData, SignupData
-from ..models.response_data import UserTypeEnum
+from project_W_lib.models.request_models import PasswordResetRequest, SignupRequest
+from project_W_lib.models.response_models import UserTypeEnum, LocalAccountOperationModeEnum
 from ..security.auth import (
     auth_dependency_responses,
     check_admin_privileges,
     set_token_cookie,
     validate_user,
+)
+
+from project_W import dependencies as dp
+from ..models.internal_models import (
+    AccountActivationTokenData,
+    LoginContext,
+    PasswordResetTokenData,
 )
 
 
@@ -146,7 +144,7 @@ async def login(
         },
     },
 )
-async def signup(data: SignupData, background_tasks: BackgroundTasks) -> str:
+async def signup(data: SignupRequest, background_tasks: BackgroundTasks) -> str:
     """
     Create a new local Project-W account. The provided email must be valid and the password must adhere to certain criteria (must contain at least one lowercase letter, uppercase letter, number, special character and at least 12 characters in total) and the email can't already be in use by another account.
     """
@@ -314,7 +312,7 @@ async def request_password_reset(email: str, background_tasks: BackgroundTasks) 
         401: {"model": ErrorResponse, "description": "Password reset token invalid"},
     },
 )
-async def reset_password(password_reset: PasswordResetData) -> str:
+async def reset_password(password_reset: PasswordResetRequest) -> str:
     """
     Resets the password of an account to the provided password. The token is the one from the password reset email that can be requested with the /request_password_reset route.
     """

@@ -2,13 +2,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from project_W_lib.models.runner_request_data import (
+from project_W_lib.models.request_models import (
     HeartbeatRequest,
     RunnerRegisterRequest,
     RunnerSubmitResultRequest,
 )
-from project_W_lib.models.generic_response_data import ErrorResponse
-from project_W_lib.models.runner_response_data import (
+from project_W_lib.models.response_models import (
+    ErrorResponse,
     HeartbeatResponse,
     RegisteredResponse,
     RunnerJobInfoResponse,
@@ -16,7 +16,7 @@ from project_W_lib.models.runner_response_data import (
 
 import project_W.dependencies as dp
 
-from ..models.internal import OnlineRunner
+from ..models.internal_models import OnlineRunner
 from ..security.auth import (
     online_runner_dependency_responses,
     runner_dependency_responses,
@@ -64,7 +64,7 @@ async def register(
 
 
 @router.post("/unregister")
-async def unregister_runner(
+async def unregister(
     runner_id: Annotated[int, Depends(validate_runner)],
 ) -> str:
     """
@@ -255,11 +255,11 @@ async def heartbeat(
                 "Redis data invalid: OnlineRunner has in_process_job set but the jobs key doesn't exist"
             )
         if in_process_job.abort:
-            return HeartbeatResponse(abort=True)
+            return HeartbeatResponse(abort=True, job_assigned=False)
         if in_process_job.progress != req.progress:
             await dp.ch.report_progress_of_in_process_job(
                 online_runner.assigned_job_id, req.progress
             )
     if online_runner.assigned_job_id:
-        return HeartbeatResponse(job_assigned=True)
-    return HeartbeatResponse()
+        return HeartbeatResponse(abort=False, job_assigned=True)
+    return HeartbeatResponse(abort=False, job_assigned=False)

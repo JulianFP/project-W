@@ -1,19 +1,18 @@
 <script lang="ts">
 	import { Helper, Modal, P } from "flowbite-svelte";
-
-	import { BackendCommError } from "$lib/utils/httpRequests.svelte";
+	import { get_error_msg } from "$lib/utils/http_utils";
 	import PasswordField from "./passwordField.svelte";
 	import WaitingSubmitButton from "./waitingSubmitButton.svelte";
 
 	let waitingForPromise = $state(false);
 	let errorMsg = $state("");
-	let error = $state(false);
+	let errorOccurred = $state(false);
 
 	interface Props {
 		open?: boolean;
 		value: string;
-		onerror: (err: BackendCommError) => void;
-		action: () => Promise<void>;
+		onerror: (error: unknown) => void;
+		action: () => Promise<{ error: unknown; response: Response }>;
 		children?: import("svelte").Snippet;
 	}
 
@@ -27,27 +26,22 @@
 
 	async function submitAction(): Promise<void> {
 		waitingForPromise = true;
-		error = false;
+		errorOccurred = false;
 		errorMsg = "";
 
-		try {
-			await action();
-			value = "";
-			open = false;
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				if (err.status === 403) {
-					errorMsg = err.message;
-					error = true;
-				} else {
-					value = "";
-					open = false;
-					onerror(err);
-				}
+		const { error, response } = await action();
+		if (error) {
+			if (response.status === 403) {
+				errorMsg = get_error_msg(error);
+				errorOccurred = true;
 			} else {
-				errorMsg = "Unknown error!";
-				error = true;
+				value = "";
+				open = false;
+				onerror(error);
 			}
+		} else {
+			open = false;
+			value = "";
 		}
 
 		waitingForPromise = false;
@@ -63,8 +57,8 @@
 
 <Modal form title="Confirm by entering your password" bind:open={open} onaction={onAction} class="w-fit">
   <P>{@render children?.()}</P>
-  <PasswordField bind:value={value} bind:error={error}>Your password</PasswordField>
-  {#if error}
+  <PasswordField bind:value={value} bind:error={errorOccurred}>Your password</PasswordField>
+  {#if errorOccurred}
     <Helper color="red">{errorMsg}</Helper>
   {/if}
   <WaitingSubmitButton value="submit" class="w-full" waiting={waitingForPromise}>Confirm</WaitingSubmitButton>

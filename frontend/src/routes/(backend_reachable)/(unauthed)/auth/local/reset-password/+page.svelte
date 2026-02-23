@@ -4,52 +4,50 @@
 	import FormPage from "$lib/components/formPage.svelte";
 	import PasswordWithRepeatField from "$lib/components/passwordWithRepeatField.svelte";
 	import WaitingButton from "$lib/components/waitingSubmitButton.svelte";
-
+	import { localAccountResetPassword } from "$lib/generated";
 	import { alerts, routing } from "$lib/utils/global_state.svelte";
-	import { BackendCommError, post } from "$lib/utils/httpRequests.svelte";
+	import { get_error_msg } from "$lib/utils/http_utils";
 
 	let waitingForPromise = $state(false);
 	let newPassword: string = $state("");
 
-	let error: boolean = $state(false);
+	let errorOccurred: boolean = $state(false);
 	let errorMsg: string = $state("");
 
 	async function resetPassword(event: Event): Promise<void> {
 		waitingForPromise = true; //show loading button
 		event.preventDefault(); //disable page reload after form submission
 
-		try {
-			await post<null>(
-				"local-account/reset_password",
-				Object.assign(
-					{ new_password: newPassword },
-					Object.fromEntries(routing.querystring),
-				),
-			);
-			alerts.push({ msg: "Password reset successful", color: "green" });
-			await routing.set({
-				destination: "#/",
-				params: {},
-				overwriteParams: true,
-				history: true,
+		const token = routing.querystring.get("token");
+		if (token) {
+			const { error } = await localAccountResetPassword({
+				body: { token: token, new_password: newPassword },
 			});
-		} catch (err: unknown) {
-			if (err instanceof BackendCommError) {
-				errorMsg = err.message;
+			if (error) {
+				errorMsg = get_error_msg(error);
+				errorOccurred = true;
 			} else {
-				errorMsg = "Unknown error";
+				alerts.push({ msg: "Password reset successful", color: "green" });
+				await routing.set({
+					destination: "#/",
+					params: {},
+					overwriteParams: true,
+					history: true,
+				});
 			}
-			error = true;
-			waitingForPromise = false;
+		} else {
+			errorMsg = "No password reset token was provided";
+			errorOccurred = true;
 		}
+		waitingForPromise = false;
 	}
 </script>
 
 <FormPage backButtonUri="#/auth/local/login" heading="Reset password of your Project-W account">
   <form class="mx-auto max-w-lg" onsubmit={resetPassword}>
-    <PasswordWithRepeatField bind:value={newPassword} bind:error={error} bind:errorMsg={errorMsg} tabindex={1}/>
+    <PasswordWithRepeatField bind:value={newPassword} bind:error={errorOccurred} bind:errorMsg={errorMsg} tabindex={1}/>
 
-    {#if error}
+    {#if errorOccurred}
       <Helper class="mt-2" color="red"><span class="font-medium"></span> {errorMsg}</Helper>
     {/if}
 
