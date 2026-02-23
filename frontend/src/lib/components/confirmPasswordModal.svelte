@@ -39,6 +39,9 @@
 				open = false;
 				onerror(error);
 			}
+		} else {
+			open = false;
+			value = "";
 		}
 
 		waitingForPromise = false;
