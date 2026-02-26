@@ -95,8 +95,38 @@
 			.map(([key]) => key),
 	);
 	let headerCheckboxSelected = $state(false);
-	let selectedAbortButtonDisabled = $state(true);
-	let selectedDeleteButtonDisabled = $state(true);
+	let selectedAbortButtonDisabled = $derived.by(() => {
+		if (selectedItems.length === 0) return true;
+		else {
+			for (const job of jobs_info.values()) {
+				if (
+					selectedItems.includes(job.id) &&
+					![
+						"not_queued",
+						"pending_runner",
+						"runner_assigned",
+						"runner_in_progress",
+					].includes(job.step)
+				)
+					return true;
+			}
+			return false;
+		}
+	});
+	let selectedDeleteButtonDisabled = $derived.by(() => {
+		if (selectedItems.length === 0) return true;
+		else {
+			for (const job of jobs_info.values()) {
+				if (
+					selectedItems.includes(job.id) &&
+					!["success", "downloaded", "failed"].includes(job.step)
+				)
+					return true;
+			}
+			return false;
+		}
+	});
+
 	let openRow: number | null = $state(null);
 
 	//modal stuff
@@ -346,7 +376,6 @@
 	}
 
 	function updateHeaderCheckbox(job: Job | null = null) {
-		//update headerCheckbox
 		if (
 			jobs_ordered_selected.size === 0 ||
 			(job != null && !jobs_ordered_selected.get(job.id))
@@ -361,33 +390,6 @@
 				}
 			}
 			headerCheckboxSelected = allSelected;
-		}
-
-		//update disabled states
-		if (selectedItems.length === 0) {
-			selectedAbortButtonDisabled = true;
-			selectedDeleteButtonDisabled = true;
-		} else {
-			let includesNotRunning = false;
-			let includesNotDone = false;
-			for (const job of jobs_info.values()) {
-				if (selectedItems.includes(job.id)) {
-					if (
-						![
-							"not_queued",
-							"pending_runner",
-							"runner_assigned",
-							"runner_in_progress",
-						].includes(job.step)
-					)
-						includesNotRunning = true;
-					if (!["success", "downloaded", "failed"].includes(job.step))
-						includesNotDone = true;
-				}
-				if (includesNotRunning && includesNotDone) break;
-			}
-			selectedAbortButtonDisabled = includesNotRunning;
-			selectedDeleteButtonDisabled = includesNotDone;
 		}
 	}
 
