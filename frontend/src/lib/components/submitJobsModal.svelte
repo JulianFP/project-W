@@ -125,7 +125,7 @@
 	}
 </script>
 
-<Modal form title={all_files.size > 1 ? `Submit ${all_files.size.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction} onclose={() => all_files.clear()}>
+<Modal form classes={{ form: "overflow-y-auto overscroll-contain" }} title={all_files.size > 1 ? `Submit ${all_files.size.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction} onclose={() => all_files.clear()}>
   <JobSettingsForm bind:get_job_settings={get_job_settings} pre_filled_in_settings={pre_filled_in_settings}/>
   <div class="flex gap-2 items-center">
     <Checkbox id="make_new_account_defaults" bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>
