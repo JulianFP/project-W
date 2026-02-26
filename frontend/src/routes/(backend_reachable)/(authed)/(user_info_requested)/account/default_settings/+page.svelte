@@ -37,7 +37,7 @@
 </script>
 
 <CenterPage title="Account default job settings">
-  <form onsubmit={async () => {await submitAction(false);}}>
+  <form onsubmit={async (event) => {event.preventDefault(); await submitAction(false);}}>
     <JobSettingsForm bind:get_job_settings={get_job_settings} bind:re_query={requery_job_settings}/>
     {#if errorOccurred}
       <Helper class="mb-2" color="red">{errorMsg}</Helper>
