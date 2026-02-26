@@ -119,7 +119,6 @@
 	function process_job(job: Job) {
 		const creation_date_getter = () => {
 			const date = jobs_info.get(job.id)?.creation_date;
-			if (!date) throw new Error();
 			return date;
 		};
 		const creation_date_since_setter = (date_since: string) => {
@@ -136,7 +135,7 @@
 		if (job.finish_timestamp) {
 			const finish_date_getter = () => {
 				const date = jobs_info.get(job.id)?.finish_date;
-				if (!date) throw new Error();
+				if (date === null) throw new Error();
 				return date;
 			};
 			const finish_date_since_setter = (date_since: string) => {
