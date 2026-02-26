@@ -13,7 +13,7 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.1
+    rev: v0.15.2
     hooks:
       - id: ruff-check
         files: "^backend/|^runner/"
@@ -22,7 +22,7 @@ repos:
         files: "^backend/|^runner/"
 
   - repo: https://github.com/biomejs/pre-commit
-    rev: v2.3.15
+    rev: v2.4.4
     hooks:
       - id: biome-check
         files: "^frontend/"
