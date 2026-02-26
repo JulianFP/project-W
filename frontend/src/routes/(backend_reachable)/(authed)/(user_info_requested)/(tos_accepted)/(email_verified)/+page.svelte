@@ -636,7 +636,7 @@
     </PaginationNav>
   </div>
 
-  <Banner open={selectedItems.length > 0} innerClass="w-full max-w-screen-md flex flex-row justify-between items-center" type="bottom" transition={slide} dismissable={false}>
+  <Banner open={selectedItems.length > 0} classes={{ insideDiv: "w-full max-w-screen-md flex flex-row justify-between items-center" }} type="bottom" transition={slide} dismissable={false}>
     <P>{selectedItems.length} selected</P>
     <div class="flex items-center gap-2">
       <Button class="!p-2" size="xs" color="red" onclick={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>

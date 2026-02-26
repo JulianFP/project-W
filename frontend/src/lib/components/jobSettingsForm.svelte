@@ -350,7 +350,7 @@
   {/if}
 
   <Accordion>
-    <AccordionItem contentClass="flex flex-col gap-8">
+    <AccordionItem classes={{ content: "flex flex-col gap-8" }}>
       {#snippet header()}Advanced settings{/snippet}
       <div>
         <div class="flex gap-2 items-center mb-1.5">

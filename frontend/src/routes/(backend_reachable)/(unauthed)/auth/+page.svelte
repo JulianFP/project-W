@@ -37,7 +37,7 @@
   {/each}
   {#if data.auth_settings.local_account.mode === "enabled" || data.auth_settings.local_account.mode === "no_signup"}
     {#if Object.keys(data.auth_settings.oidc_providers).length + Object.keys(data.auth_settings.ldap_providers).length > 0}
-      <Hr innerDivClass="bg-slate-200 dark:bg-slate-950" class="bg-primary-700 dark:bg-primary-700 w-96 h-1 rounded"><P>or</P></Hr>
+      <Hr classes={{ content: "bg-slate-200 dark:bg-slate-950", bg: "bg-primary-700 dark:bg-primary-700 "}} class="w-96 h-1 rounded"><P>or</P></Hr>
     {/if}
     <Button color="alternative" class="flex-none justify-start h-11 my-2" href="#/auth/local/login">
       <img src="/favicon.png" alt="Icon of Project-W" width="32" height="32" class="mr-4">

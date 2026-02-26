@@ -25,7 +25,7 @@
 
 <div class="mb-6 w-full">
   <Label for={id} color={error ? "red" : "gray"} class="mb-2">{@render children?.()}</Label>
-  <Input class="ps-9" wrapperClass="w-full" type={passwordVisible ? "text" : "password"} {id} name="password" autocomplete={password_new ? "new-password" : "current-password"} color={error ? "red" : "default"} placeholder={passwordVisible ? "alice's password" : "••••••••••••••••"} required oninput={disableError} {...rest} bind:value={value}>
+  <Input class="ps-9" type={passwordVisible ? "text" : "password"} {id} name="password" autocomplete={password_new ? "new-password" : "current-password"} color={error ? "red" : "default"} placeholder={passwordVisible ? "alice's password" : "••••••••••••••••"} required oninput={disableError} {...rest} bind:value={value}>
     {#snippet left()}
       <LockSolid class="h-5 w-5"/>
     {/snippet}

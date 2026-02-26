@@ -106,7 +106,7 @@
 	}
 </script>
 
-<Modal form title={`Download transcript of job ${job_id}`} bodyClass="flex flex-col gap-4" bind:open={open} onaction={onAction}>
+<Modal form title={`Download transcript of job ${job_id}`} classes={{ body: "flex flex-col gap-4" }} bind:open={open} onaction={onAction}>
   <div>
     <Label class="mb-2">Format of the transcript</Label>
     <ButtonGroup class="w-full">
