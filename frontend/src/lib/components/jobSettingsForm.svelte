@@ -1,4 +1,8 @@
 <script lang="ts">
+	//required because some browsers don't supply all languages (mostly chromium based browsers)
+	import "@formatjs/intl-displaynames/polyfill.js";
+	import "@formatjs/intl-displaynames/locale-data/en";
+
 	import { error as svelte_error } from "@sveltejs/kit";
 	import {
 		Accordion,
