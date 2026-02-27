@@ -63,7 +63,6 @@
 	function process_token_info(token: TokenInfoResponse) {
 		const date_getter = () => {
 			const date = token_infos.get(token.id)?.last_usage_date;
-			if (!date) throw new Error();
 			return date;
 		};
 		const date_since_setter = (date_since: string) => {

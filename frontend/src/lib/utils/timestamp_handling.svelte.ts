@@ -41,7 +41,7 @@ export function timeAgo(date: Date): [string, number | null] {
 }
 
 export function autoupdate_date_since(
-	date_getter: () => Date,
+	date_getter: () => Date | undefined,
 	date_since_setter: (date_since: string) => void,
 	first_time_date: Date | null = null,
 ): string {
@@ -49,7 +49,12 @@ export function autoupdate_date_since(
 	if (first_time_date != null) {
 		date = first_time_date;
 	} else {
-		date = date_getter();
+		const date_obj = date_getter();
+		if (date_obj === undefined) {
+			//date object has been deleted
+			return "";
+		}
+		date = date_obj;
 	}
 	const [date_since, date_next_update] = timeAgo(date);
 	date_since_setter(date_since);

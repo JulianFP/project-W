@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Helper, Input, Label, Span } from "flowbite-svelte";
 	import { CloseOutline, PenSolid } from "flowbite-svelte-icons";
+	import { onMount } from "svelte";
 	import { localAccountChangeUserEmail } from "$lib/generated";
 	import { alerts } from "$lib/utils/global_state.svelte";
 	import { get_error_msg } from "$lib/utils/http_utils";
@@ -13,8 +14,12 @@
 
 	let { defaultValue, ...rest }: Props = $props();
 
+	let email: string = $state("");
+	onMount(() => {
+		email = defaultValue;
+	});
+
 	let lockedInput = $state(true);
-	let email: string = $state(defaultValue);
 	let disabledSubmit: boolean = $derived(email === defaultValue); //make submit only possible if value has changed
 	let password: string = $state("");
 	let errorOccurred = $state(false);

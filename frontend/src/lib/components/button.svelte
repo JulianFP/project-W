@@ -3,7 +3,6 @@
 	import { Button } from "flowbite-svelte";
 
 	const props: ButtonProps = $props();
-	const { class: string, disabled, color, ...rest } = props;
 	let classes = $derived.by(() => {
 		let returnVal: string;
 		if (props.color === "alternative") {
@@ -19,4 +18,4 @@
 		return returnVal;
 	});
 </script>
-<Button class={classes} disabled={props.disabled} color={props.color} {...rest}/>
+<Button {...props} class={classes}/>

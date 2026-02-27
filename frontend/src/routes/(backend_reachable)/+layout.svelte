@@ -78,7 +78,7 @@
         {/if}
       </div>
       {#if auth.loggedIn}
-        <Dropdown simple placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
+        <Dropdown simple class="whitespace-nowrap" placement="bottom" triggeredBy="#avatar-menu" activeUrl={routing.location} bind:isOpen={dropDownOpen}>
           <DropdownItem href="#/account/info" onclick={() => {dropDownOpen = false}}><UserEditSolid class="inline mr-2"/>Account</DropdownItem>
           <DropdownItem href="#/account/security" onclick={() => {dropDownOpen = false}}><LockSolid class="inline mr-2"/>Security</DropdownItem>
           <DropdownItem href="#/account/default_settings" onclick={() => {dropDownOpen = false}}><AdjustmentsHorizontalSolid class="inline mr-2"/>Default settings</DropdownItem>

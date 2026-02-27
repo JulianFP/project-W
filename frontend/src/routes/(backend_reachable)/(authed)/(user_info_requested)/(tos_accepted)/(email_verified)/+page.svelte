@@ -95,8 +95,38 @@
 			.map(([key]) => key),
 	);
 	let headerCheckboxSelected = $state(false);
-	let selectedAbortButtonDisabled = $state(true);
-	let selectedDeleteButtonDisabled = $state(true);
+	let selectedAbortButtonDisabled = $derived.by(() => {
+		if (selectedItems.length === 0) return true;
+		else {
+			for (const job of jobs_info.values()) {
+				if (
+					selectedItems.includes(job.id) &&
+					![
+						"not_queued",
+						"pending_runner",
+						"runner_assigned",
+						"runner_in_progress",
+					].includes(job.step)
+				)
+					return true;
+			}
+			return false;
+		}
+	});
+	let selectedDeleteButtonDisabled = $derived.by(() => {
+		if (selectedItems.length === 0) return true;
+		else {
+			for (const job of jobs_info.values()) {
+				if (
+					selectedItems.includes(job.id) &&
+					!["success", "downloaded", "failed"].includes(job.step)
+				)
+					return true;
+			}
+			return false;
+		}
+	});
+
 	let openRow: number | null = $state(null);
 
 	//modal stuff
@@ -119,7 +149,6 @@
 	function process_job(job: Job) {
 		const creation_date_getter = () => {
 			const date = jobs_info.get(job.id)?.creation_date;
-			if (!date) throw new Error();
 			return date;
 		};
 		const creation_date_since_setter = (date_since: string) => {
@@ -136,7 +165,7 @@
 		if (job.finish_timestamp) {
 			const finish_date_getter = () => {
 				const date = jobs_info.get(job.id)?.finish_date;
-				if (!date) throw new Error();
+				if (date === null) throw new Error();
 				return date;
 			};
 			const finish_date_since_setter = (date_since: string) => {
@@ -347,7 +376,6 @@
 	}
 
 	function updateHeaderCheckbox(job: Job | null = null) {
-		//update headerCheckbox
 		if (
 			jobs_ordered_selected.size === 0 ||
 			(job != null && !jobs_ordered_selected.get(job.id))
@@ -362,33 +390,6 @@
 				}
 			}
 			headerCheckboxSelected = allSelected;
-		}
-
-		//update disabled states
-		if (selectedItems.length === 0) {
-			selectedAbortButtonDisabled = true;
-			selectedDeleteButtonDisabled = true;
-		} else {
-			let includesNotRunning = false;
-			let includesNotDone = false;
-			for (const job of jobs_info.values()) {
-				if (selectedItems.includes(job.id)) {
-					if (
-						![
-							"not_queued",
-							"pending_runner",
-							"runner_assigned",
-							"runner_in_progress",
-						].includes(job.step)
-					)
-						includesNotRunning = true;
-					if (!["success", "downloaded", "failed"].includes(job.step))
-						includesNotDone = true;
-				}
-				if (includesNotRunning && includesNotDone) break;
-			}
-			selectedAbortButtonDisabled = includesNotRunning;
-			selectedDeleteButtonDisabled = includesNotDone;
 		}
 	}
 
@@ -636,7 +637,7 @@
     </PaginationNav>
   </div>
 
-  <Banner open={selectedItems.length > 0} innerClass="w-full max-w-screen-md flex flex-row justify-between items-center" type="bottom" transition={slide} dismissable={false}>
+  <Banner open={selectedItems.length > 0} classes={{ insideDiv: "w-full max-w-screen-md flex flex-row justify-between items-center" }} type="bottom" transition={slide} dismissable={false}>
     <P>{selectedItems.length} selected</P>
     <div class="flex items-center gap-2">
       <Button class="!p-2" size="xs" color="red" onclick={() => openAbortModal(selectedItems)} disabled={selectedAbortButtonDisabled}>

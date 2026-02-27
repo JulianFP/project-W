@@ -5,6 +5,7 @@
 		Dropzone,
 		Label,
 		Modal,
+		P,
 		Tooltip,
 	} from "flowbite-svelte";
 	import { FileMusicSolid, QuestionCircleOutline } from "flowbite-svelte-icons";
@@ -124,7 +125,7 @@
 	}
 </script>
 
-<Modal form title={all_files.size > 1 ? `Submit ${all_files.size.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction} onclose={() => all_files.clear()}>
+<Modal form classes={{ form: "overflow-y-auto overscroll-contain" }} title={all_files.size > 1 ? `Submit ${all_files.size.toString()} new transcription jobs` : "Submit a new transcription job"} bind:open={open} onaction={onAction} onclose={() => all_files.clear()}>
   <JobSettingsForm bind:get_job_settings={get_job_settings} pre_filled_in_settings={pre_filled_in_settings}/>
   <div class="flex gap-2 items-center">
     <Checkbox id="make_new_account_defaults" bind:checked={makeNewDefaults}>Make these job settings the new account defaults</Checkbox>
@@ -132,8 +133,8 @@
     <Tooltip placement="bottom" class="max-w-lg">The current job settings will become the new account-wide default. Every job you create in the future will have these settings set by default. You can view, change and reset the defaults in the account settings at any time.</Tooltip>
   </div>
   <div>
-    <Label for="staging_files" class="mb-1.5">Upload staging area. A transcription job will be created for each of the listed files.</Label>
-    <div id="staging_files" class="max-h-64 overflow-y-auto overflow-x-hidden p-2 flex flex-col items-center gap-2 bg-gray-200 dark:bg-gray-700 rounded-lg">
+    <P class="text-sm rtl:text-right font-medium block mb-1.5">Upload staging area. A transcription job will be created for each of the listed files.</P>
+    <div class="max-h-64 overflow-y-auto overflow-x-hidden p-2 flex flex-col items-center gap-2 bg-gray-200 dark:bg-gray-700 rounded-lg">
       {#if all_files.size === 0}
         <p class="text-gray-500 dark:text-gray-400">No files staged for upload</p>
       {/if}

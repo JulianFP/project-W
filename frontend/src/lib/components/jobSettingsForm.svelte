@@ -1,4 +1,8 @@
 <script lang="ts">
+	//required because some browsers don't supply all languages (mostly chromium based browsers)
+	import "@formatjs/intl-displaynames/polyfill.js";
+	import "@formatjs/intl-displaynames/locale-data/en";
+
 	import { error as svelte_error } from "@sveltejs/kit";
 	import {
 		Accordion,
@@ -13,7 +17,7 @@
 		Tooltip,
 	} from "flowbite-svelte";
 	import { QuestionCircleOutline, UndoOutline } from "flowbite-svelte-icons";
-
+	import { onMount } from "svelte";
 	import type {
 		InterpolateMethodEnum,
 		JobLangEnum,
@@ -160,11 +164,13 @@
 		setStateFromJobSettingsResp(default_settings);
 	}
 
-	if (pre_filled_in_settings) {
-		setStateFromJobSettingsResp(pre_filled_in_settings);
-	} else {
-		setToDefault();
-	}
+	onMount(() => {
+		if (pre_filled_in_settings) {
+			setStateFromJobSettingsResp(pre_filled_in_settings);
+		} else {
+			setToDefault();
+		}
+	});
 
 	let job_settings: JobSettingsRequest = $derived.by(() => {
 		let asr_suppress_tokens: number[] = [];
@@ -348,7 +354,7 @@
   {/if}
 
   <Accordion>
-    <AccordionItem contentClass="flex flex-col gap-8">
+    <AccordionItem classes={{ content: "flex flex-col gap-8" }}>
       {#snippet header()}Advanced settings{/snippet}
       <div>
         <div class="flex gap-2 items-center mb-1.5">
