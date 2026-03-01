@@ -6,7 +6,6 @@ from authlib.integrations.starlette_client import OAuth
 from fastapi import HTTPException, status
 from httpx import AsyncClient, HTTPError, HTTPStatusError
 from pydantic import SecretStr
-from project_W_lib.logger import get_logger
 from project_W_lib.models.base import EmailValidated
 
 import project_W.dependencies as dp
@@ -24,15 +23,13 @@ local_oidc_prov: dict[
 oauth_iss_to_config: dict[str, dict] = {}
 oauth_iss_to_ctx: dict[str, ssl.SSLContext] = {}
 
-logger = get_logger("project-W")
-
 
 async def register_with_oidc_providers(config: Settings):
     oidc_prov = config.security.oidc_providers
     if oidc_prov == {}:
         raise Exception("Tried to use oidc router even though oidc is disabled in config!")
     for name, idp in oidc_prov.items():
-        logger.info(f"Trying to connect with OIDC provider {name}...")
+        dp.logger.info(f"Trying to connect with OIDC provider {name}...")
         # normalize provider name
         norm_name = name.lower().strip()
         local_oidc_prov[norm_name] = idp
@@ -74,7 +71,7 @@ async def register_with_oidc_providers(config: Settings):
             oauth_iss_to_name[issuer] = norm_name
             oauth_iss_to_config[issuer] = oidc_config
             oauth_iss_to_ctx[issuer] = ctx
-        logger.info(f"Connected with OIDC provider {name}")
+        dp.logger.info(f"Connected with OIDC provider {name}")
 
 
 def has_role(role_conf: OidcRoleSettings, user) -> bool:
@@ -177,7 +174,7 @@ async def invalidate_token_if_oidc_user_lost_privileges(token: OidcTokenInfoInte
         or (refresh_token := await dp.db.get_oidc_refresh_token_of_token(token.id)) is None
     ):
         await dp.db.delete_token_of_user(token.user_id, token.id)
-        logger.info(
+        dp.logger.info(
             f"Invalidated token with id {token.id} of OIDC user {token.user_id} because token didn't have refresh token attached to it"
         )
         return
@@ -201,12 +198,12 @@ async def invalidate_token_if_oidc_user_lost_privileges(token: OidcTokenInfoInte
             is_admin = validate_oidc_attributes(name, userinfo_resp)
             if not is_admin and token.admin_privileges:
                 await dp.db.delete_token_of_user(token.user_id, token.id)
-                logger.info(
+                dp.logger.info(
                     f"Invalidated admin token with id {token.id} of OIDC user {token.user_id} because user doesn't have admin privileges anymore"
                 )
             await dp.db.replace_oidc_refresh_token(token.oidc_refresh_token_id, new_refresh_token)
         except (HTTPStatusError, JSONDecodeError):
             await dp.db.delete_token_of_user(token.user_id, token.id)
-            logger.info(
+            dp.logger.info(
                 f"Invalidated token with id {token.id} of OIDC user {token.user_id} because user couldn't be found at OIDC provider with all necessary attributes"
             )

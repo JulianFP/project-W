@@ -27,6 +27,7 @@ from project_W_lib.models.response_models import (
     LocalAccountResponse,
     ProviderResponse,
 )
+from project_W_lib.models.shared_setting_models import BaseSettings
 
 
 class ProvisionedUser(BaseModel):
@@ -522,7 +523,7 @@ class CleanupSettings(BaseModel):
     )
 
 
-class Settings(BaseModel):
+class Settings(BaseSettings):
     model_config = ConfigDict(extra="forbid")
     client_url: str = Field(
         pattern=r"^(http|https):\/\/(([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+|localhost)(:[0-9]+)?((\/[a-zA-Z0-9\-]+)+)?(\/#)?$",

@@ -7,8 +7,9 @@ from aiosmtplib import (
     SMTPRecipientsRefused,
     SMTPServerDisconnected,
 )
-from project_W_lib.logger import get_logger
 from project_W_lib.models.base import EmailValidated
+
+import project_W.dependencies as dp
 
 from .models.setting_models import SMTPSecureEnum, SMTPServerSettings
 
@@ -17,7 +18,6 @@ class SmtpClient:
     client: SMTP
     starttls: bool
     smtp_settings: SMTPServerSettings
-    logger = get_logger("project-W")
 
     def __init__(self, smtp_settings: SMTPServerSettings) -> None:
         self.smtp_settings = smtp_settings
@@ -31,7 +31,7 @@ class SmtpClient:
         )
 
     async def open(self):
-        self.logger.info("Trying to connect to SMTP server...")
+        dp.logger.info("Trying to connect to SMTP server...")
         await self.client.connect()
         if self.starttls:
             await self.client.starttls()
@@ -40,10 +40,10 @@ class SmtpClient:
                 self.smtp_settings.username, self.smtp_settings.password.get_secret_value()
             )
 
-        self.logger.info("Connected to SMTP server")
+        dp.logger.info("Connected to SMTP server")
 
     async def close(self):
-        self.logger.info("Closing SMTP connection...")
+        dp.logger.info("Closing SMTP connection...")
         self.client.close()
 
     async def send_email(
@@ -74,7 +74,7 @@ class SmtpClient:
             await self.client.send_message(msg)
         except (SMTPRecipientRefused, SMTPRecipientsRefused) as e:
             # this error is likely due to the users email becoming invalid i.e. because the mail account got deleted
-            self.logger.error(
+            dp.logger.error(
                 f"The SMTP server refused the send email to recipient {receiver_logs}: {e}"
             )
             return
@@ -85,12 +85,10 @@ class SmtpClient:
                 await self.client.send_message(msg)
             except (SMTPRecipientRefused, SMTPRecipientsRefused) as e:
                 # this error is likely due to the users email becoming invalid i.e. because the mail account got deleted
-                self.logger.error(
+                dp.logger.error(
                     f"The SMTP server refused the recipient email address {receiver_logs}: {e}"
                 )
                 return
-
-        self.logger.info(f"-> Sent {msg_type} email to {receiver_logs}")
 
     async def send_account_activation_email(
         self, receiver: EmailValidated, token: str, client_url: str

@@ -1,3 +1,4 @@
+import logging
 import platform
 from pathlib import Path
 
@@ -7,9 +8,10 @@ from granian.log import LogLevels
 from granian.server import Server
 from itsdangerous import URLSafeTimedSerializer
 from project_W_lib.config import load_config
-from project_W_lib.logger import get_logger
+from project_W_lib.logger import configure_logging
 
 import project_W.dependencies as dp
+from project_W_lib.models.shared_setting_models import LoggingEnum
 
 from ._version import __commit_id__, __version__
 from .models.setting_models import Settings, SecretKeyValidated
@@ -20,7 +22,6 @@ from .cli_tasks import (
 )
 
 program_name = "project-W"
-logger = get_logger(program_name)
 
 
 @click.command()
@@ -80,16 +81,6 @@ def main(
     development: bool,
     root_static_files: Path | None,
 ):
-    # post application version for debug purposes and bug reports
-    logger.info(f"Running application version {__version__}")
-    if __commit_id__ is None:
-        raise Exception(
-            "Couldn't read git hash from _version.py file. Make sure to install this package from a working git repository!"
-        )
-    dp.git_hash = __commit_id__.removeprefix("g")
-    logger.info(f"Application was built from git hash {dp.git_hash}")
-    logger.info(f"Python version: {platform.python_version()}")
-
     dp.client_path = root_static_files
 
     # parse config file
@@ -98,9 +89,23 @@ def main(
         if custom_config_path
         else load_config(program_name, Settings)
     )
+
+    # now we can setup the logger and secret key
+    logging_dict = configure_logging(dp.config.logging)
+    dp.logger = logging.getLogger(program_name)
     dp.auth_s = URLSafeTimedSerializer(
         dp.config.security.secret_key.root.get_secret_value(), "Project-W"
     )
+
+    # post application version for debug purposes and bug reports
+    dp.logger.info(f"Running application version {__version__}")
+    if __commit_id__ is None:
+        raise Exception(
+            "Couldn't read git hash from _version.py file. Make sure to install this package from a working git repository!"
+        )
+    dp.git_hash = __commit_id__.removeprefix("g")
+    dp.logger.info(f"Application was built from git hash {dp.git_hash}")
+    dp.logger.info(f"Python version: {platform.python_version()}")
 
     if run_periodic_tasks:
         execute_background_tasks()
@@ -121,6 +126,16 @@ def main(
             perform_database_encrypted_content_deletion()
         return
 
+    # define granian access log settings
+    debug_enabled_anywhere = False
+    access_log_handlers = []
+    if dp.config.logging.console.level == LoggingEnum.DEBUG:
+        debug_enabled_anywhere = True
+        access_log_handlers.append("console")
+    if dp.config.logging.file.level == LoggingEnum.DEBUG:
+        debug_enabled_anywhere = True
+        access_log_handlers.append("file")
+
     granian_options = {
         "target": "project_W.app",
         "interface": Interfaces.ASGI,
@@ -130,6 +145,25 @@ def main(
         "address": str(dp.config.web_server.address.ip),
         "port": dp.config.web_server.port,
         "workers": dp.config.web_server.worker_count,
+        "log_enabled": True,
+        "log_level": LogLevels.debug if debug_enabled_anywhere else LogLevels.debug,
+        "log_access_format": '%(addr)s - "%(method)s %(path)s %(protocol)s" %(status)d %(dt_ms).3f',
+        "log_access": debug_enabled_anywhere,
+        "log_dictconfig": {
+            **logging_dict,
+            "loggers": {
+                "_granian": {
+                    "handlers": list(logging_dict["handlers"].keys()),
+                    "level": "DEBUG" if debug_enabled_anywhere else "INFO",
+                    "propagate": False,
+                },
+                "granian.access": {
+                    "handlers": access_log_handlers,
+                    "level": "DEBUG" if debug_enabled_anywhere else "INFO",
+                    "propagate": False,
+                },
+            },
+        },
     }
 
     if dp.config.web_server.ssl:
@@ -145,8 +179,6 @@ def main(
         )
 
     if development:
-        granian_options["log_level"] = LogLevels.debug
-        granian_options["log_access"] = True
         granian_options["reload"] = True
         granian_options["reload_paths"] = [Path(__file__).parent.absolute()]
 

@@ -16,7 +16,6 @@ from psycopg.rows import class_row, dict_row, scalar_row
 from psycopg.types.json import Jsonb
 from psycopg_pool.pool_async import AsyncConnectionPool
 from pydantic import SecretStr, ValidationError
-from project_W_lib.logger import get_logger
 from project_W_lib.models.base import EmailValidated, PasswordValidated
 from project_W_lib.models.request_models import JobSettingsRequest, Transcript, TranscriptTypeEnum
 from project_W_lib.models.response_models import (
@@ -55,7 +54,6 @@ class DatabaseAdapter(ABC):
     """
 
     hasher = PasswordHasher()
-    logger = get_logger("project-W")
 
     @abstractmethod
     def __init__(self, connection_string: str) -> None:
@@ -733,14 +731,14 @@ class PostgresAdapter(DatabaseAdapter):
         )
 
     async def open(self):
-        self.logger.info("Trying to connect to PostgreSQL database...")
+        dp.logger.info("Trying to connect to PostgreSQL database...")
 
         # make sure libpq version is at least the minimal supported one. Do this first because it doesn't even require connecting to the database
         self.__ensure_psycopg_libpq_version()
 
         await self.apool.open()
         await self.apool.wait()  # this waits until all connections are established. This makes sure that the backend can properly talk to the database before it accepts clients
-        self.logger.info("Successfully connected to database. Preparing database now...")
+        dp.logger.info("Successfully connected to database. Preparing database now...")
 
         async with self.apool.connection() as conn:
             # get lock first to prevent race conditions. Otherwise multiple workers/pods would try to create the database/tables at the same time which would throw errors due to violated uniqueness constraints once the first worker/pod commits their transaction
@@ -792,10 +790,10 @@ class PostgresAdapter(DatabaseAdapter):
                 # check when the last cleanups were performed and warn the user if it was too long ago
                 await self.__warn_about_missing_cleanups()
 
-        self.logger.info("Database is ready to use")
+        dp.logger.info("Database is ready to use")
 
     async def close(self):
-        self.logger.info("Closing PostgreSQL connections...")
+        dp.logger.info("Closing PostgreSQL connections...")
         await self.apool.close()
 
     async def __acquire_advisory_lock(self, conn: AsyncConnection):
@@ -820,7 +818,7 @@ class PostgresAdapter(DatabaseAdapter):
                 raise Exception(
                     f"The version of the specified PostgreSQL database is {version_string} while the minimal required version is {self.minimal_required_postgres_version}"
                 )
-            self.logger.info(f"PostgreSQL server is on version {version_string}")
+            dp.logger.info(f"PostgreSQL server is on version {version_string}")
 
     def __ensure_psycopg_libpq_version(self):
         version_string = pq.version()
@@ -828,12 +826,12 @@ class PostgresAdapter(DatabaseAdapter):
             raise Exception(
                 f"The version of libpq loaded by psycopg is {version_string} while the minimal required version is {self.minimal_required_postgres_version}"
             )
-        self.logger.info(f"PostgreSQL libpq is on version {version_string}")
+        dp.logger.info(f"PostgreSQL libpq is on version {version_string}")
 
     async def __check_schema_exists(
         self, conn: AsyncConnection, schema_name: LiteralString
     ) -> bool:
-        self.logger.info(f"Checking if schema {schema_name} exists...")
+        dp.logger.info(f"Checking if schema {schema_name} exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -852,7 +850,7 @@ class PostgresAdapter(DatabaseAdapter):
                 return False
 
     async def __check_table_exists(self, conn: AsyncConnection, table_name: LiteralString):
-        self.logger.info(f"Checking if {table_name} table exists...")
+        dp.logger.info(f"Checking if {table_name} table exists...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             await cur.execute(
                 f"""
@@ -873,7 +871,7 @@ class PostgresAdapter(DatabaseAdapter):
                 return False
 
     async def __create_schema(self, conn: AsyncConnection, schema_name: LiteralString):
-        self.logger.info(f"Schema {schema_name} was missing. Creating it now...")
+        dp.logger.info(f"Schema {schema_name} was missing. Creating it now...")
         async with conn.cursor() as cur:
             await cur.execute(
                 f"""
@@ -887,7 +885,7 @@ class PostgresAdapter(DatabaseAdapter):
         Nothing references the metadata table however we cannot support tables existing without it because the application gets the used schema version from the metadata table
         """
         async with conn.cursor() as cur:
-            self.logger.info("Creating metadata table...")
+            dp.logger.info("Creating metadata table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.metadata (
@@ -922,7 +920,7 @@ class PostgresAdapter(DatabaseAdapter):
                 [Jsonb(cleanup_metadata)],
             )
 
-            self.logger.info("Creating users table...")
+            dp.logger.info("Creating users table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.users (
@@ -933,7 +931,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating site_data table...")
+            dp.logger.info("Creating site_data table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.site_data (
@@ -945,7 +943,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating tokens table...")
+            dp.logger.info("Creating tokens table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.oidc_refresh_tokens (
@@ -975,7 +973,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating local_accounts table...")
+            dp.logger.info("Creating local_accounts table...")
             # according to https://www.rfc-editor.org/errata/eid1003 the upper limit for mail address forward paths is 256 octets (2 of which are angle brackets and thus not part of the address itself). When using UTF-8 this might translate in even less characters, but is still a good upper limit
             await cur.execute(
                 f"""
@@ -992,7 +990,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating oidc_accounts table...")
+            dp.logger.info("Creating oidc_accounts table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.oidc_accounts (
@@ -1006,7 +1004,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating ldap_accounts table...")
+            dp.logger.info("Creating ldap_accounts table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.ldap_accounts (
@@ -1020,7 +1018,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating runners table...")
+            dp.logger.info("Creating runners table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.runners (
@@ -1031,7 +1029,7 @@ class PostgresAdapter(DatabaseAdapter):
             """
             )
 
-            self.logger.info("Creating job_settings table...")
+            dp.logger.info("Creating job_settings table...")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.job_settings (
@@ -1054,7 +1052,7 @@ class PostgresAdapter(DatabaseAdapter):
                 """
             )
 
-            self.logger.info("Creating jobs table")
+            dp.logger.info("Creating jobs table")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.jobs (
@@ -1134,7 +1132,7 @@ class PostgresAdapter(DatabaseAdapter):
                 """
             )
 
-            self.logger.info("Creating transcripts table")
+            dp.logger.info("Creating transcripts table")
             await cur.execute(
                 f"""
                 CREATE TABLE {self.schema}.transcripts (
@@ -1156,7 +1154,7 @@ class PostgresAdapter(DatabaseAdapter):
             )
 
     async def __update_database_schema_if_needed(self, conn: AsyncConnection):
-        self.logger.info("Checking application version in database metadata...")
+        dp.logger.info("Checking application version in database metadata...")
         async with conn.cursor(row_factory=scalar_row) as cur:
             # first check if last_used_version is newer than the current version
             # this would mean that another instance of the application (e.g. another Kubernetes pod) is running on a newer version than this one
@@ -1205,7 +1203,7 @@ class PostgresAdapter(DatabaseAdapter):
                     """,
                         (Jsonb(version), Jsonb(version_tuple)),
                     )
-                    self.logger.info(f"Database successfully migrated to version {version}")
+                    dp.logger.info(f"Database successfully migrated to version {version}")
 
                 elif parsed_version_tuple < parsed_db_version_tuple:
                     if parsed_version_tuple[0] < parsed_db_version_tuple[0]:
@@ -1215,12 +1213,12 @@ class PostgresAdapter(DatabaseAdapter):
                         )
 
                 else:
-                    self.logger.info("No database schema migration required")
+                    dp.logger.info("No database schema migration required")
 
     async def __warn_about_missing_cleanups(self):
         async with self.apool.connection() as conn:
             async with conn.cursor() as cur:
-                self.logger.info("Checking cleanup metadata...")
+                dp.logger.info("Checking cleanup metadata...")
                 await cur.execute(
                     f"""
                         SELECT data['general_last_cleanup'], data['users_last_cleanup'], data['jobs_last_cleanup']
@@ -1242,7 +1240,7 @@ class PostgresAdapter(DatabaseAdapter):
                 time_since_general_last_cleanup = datetime.now() - general_last_cleanup
                 # check for 25h instead of 24h to give cron (or similar tool) some flexibility in running the job
                 if time_since_general_last_cleanup.total_seconds() > 90000:
-                    self.logger.warning(
+                    dp.logger.warning(
                         "It's more than 24 hours ago since the general database cleanup was last executed. This may indicate a mistake in your server setup, the general cleanup should always run at least once a day!"
                     )
 
@@ -1250,14 +1248,14 @@ class PostgresAdapter(DatabaseAdapter):
                     users_last_cleanup = datetime.fromisoformat(users_last_cleanup_isoformat)
                     time_since_users_last_cleanup = datetime.now() - users_last_cleanup
                     if time_since_users_last_cleanup.total_seconds() > 90000:
-                        self.logger.warning(
+                        dp.logger.warning(
                             "It's more than 24 hours ago since the users database cleanup was last executed, even though you enabled user database cleanups in the config. This may indicate a mistake in your server setup, the user cleanup should run at least once a day if enabled!"
                         )
                 if dp.config.cleanup.finished_job_retention_in_days is not None:
                     jobs_last_cleanup = datetime.fromisoformat(jobs_last_cleanup_isoformat)
                     time_since_jobs_last_cleanup = datetime.now() - jobs_last_cleanup
                     if time_since_jobs_last_cleanup.total_seconds() > 90000:
-                        self.logger.warning(
+                        dp.logger.warning(
                             "It's more than 24 hours ago since the jobs database cleanup was last executed, even though you enabled finished jobs database cleanups in the config. This may indicate a mistake in your server setup, the finished job cleanup should run at least once a day if enabled!"
                         )
 
@@ -1773,7 +1771,7 @@ class PostgresAdapter(DatabaseAdapter):
                     try:
                         validated_email_list.append(EmailValidated.model_validate(email))
                     except ValidationError:
-                        self.logger.error(
+                        dp.logger.error(
                             f"Database contained invalid email address {email}, ignoring..."
                         )
                 return validated_email_list
@@ -2378,7 +2376,7 @@ class PostgresAdapter(DatabaseAdapter):
     async def general_cleanup(self):
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
-                self.logger.info("Starting general database cleanup...")
+                dp.logger.info("Starting general database cleanup...")
                 await cur.execute(
                     f"""
                     SELECT data['general_last_cleanup']
@@ -2395,12 +2393,12 @@ class PostgresAdapter(DatabaseAdapter):
                 time_since_last_cleanup = datetime.now() - last_cleanup
                 # check for 23h instead of 24h to give cron (or similar tool) some flexibility in running the job
                 if time_since_last_cleanup.total_seconds() < 82800:
-                    self.logger.info(
+                    dp.logger.info(
                         "General cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
                     )
                     return
 
-                self.logger.info("Cleaning up orphaned large objects...")
+                dp.logger.info("Cleaning up orphaned large objects...")
                 await cur.execute(
                     f"""
                     SELECT lo_unlink(lo.oid)
@@ -2415,7 +2413,7 @@ class PostgresAdapter(DatabaseAdapter):
                     """
                 )
 
-                self.logger.info("Cleaning up orphaned job settings rows...")
+                dp.logger.info("Cleaning up orphaned job settings rows...")
                 await cur.execute(
                     f"""
                     DELETE FROM {self.schema}.job_settings job_settings
@@ -2428,7 +2426,7 @@ class PostgresAdapter(DatabaseAdapter):
                     """
                 )
 
-                self.logger.info("Cleaning up expired auth tokens...")
+                dp.logger.info("Cleaning up expired auth tokens...")
                 # don't delete most recently used token so that it can still be used for user cleanup
                 await cur.execute(
                     f"""
@@ -2463,13 +2461,13 @@ class PostgresAdapter(DatabaseAdapter):
                 """,
                     (Jsonb(datetime.now().isoformat()),),
                 )
-        self.logger.info("General database cleanup complete")
+        dp.logger.info("General database cleanup complete")
 
     async def user_cleanup(self, retention_time_in_days: int):
         assert dp.config.cleanup.user_retention_in_days is not None
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
-                self.logger.info("Starting user database cleanup...")
+                dp.logger.info("Starting user database cleanup...")
                 await cur.execute(
                     f"""
                     SELECT data['users_last_cleanup']
@@ -2485,12 +2483,12 @@ class PostgresAdapter(DatabaseAdapter):
                 last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
                 time_since_last_cleanup = datetime.now() - last_cleanup
                 if time_since_last_cleanup.total_seconds() < 82800:
-                    self.logger.info(
+                    dp.logger.info(
                         "User cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
                     )
                     return
 
-                self.logger.info(
+                dp.logger.info(
                     f"Cleaning up users that haven't logged in {retention_time_in_days} days..."
                 )
                 # first send emails out to users who's accounts will be deleted in 30 days/7 days
@@ -2583,35 +2581,35 @@ class PostgresAdapter(DatabaseAdapter):
                     try:
                         users_30_days_notif_validated.append(EmailValidated.model_validate(email))
                     except ValidationError:
-                        self.logger.error(
+                        dp.logger.error(
                             f"Database contained invalid email address {email}, ignoring..."
                         )
                 if len(users_30_days_notif_validated) > 0:
                     await dp.smtp.send_account_deletion_reminder(
                         users_30_days_notif_validated, dp.config.client_url, 30
                     )
-                    self.logger.info(
+                    dp.logger.info(
                         f"Sent 30 day account deletion reminder to {len(users_30_days_notif_validated)} users"
                     )
                 else:
-                    self.logger.info("Didn't have to send any 30 day account deletion reminders")
+                    dp.logger.info("Didn't have to send any 30 day account deletion reminders")
                 users_7_days_notif_validated = []
                 for email in users_7_days_notif:
                     try:
                         users_7_days_notif_validated.append(EmailValidated.model_validate(email))
                     except ValidationError:
-                        self.logger.error(
+                        dp.logger.error(
                             f"Database contained invalid email address {email}, ignoring..."
                         )
                 if len(users_7_days_notif_validated) > 0:
                     await dp.smtp.send_account_deletion_reminder(
                         users_7_days_notif_validated, dp.config.client_url, 7
                     )
-                    self.logger.info(
+                    dp.logger.info(
                         f"Sent 7 day account deletion reminder to {len(users_7_days_notif_validated)} users"
                     )
                 else:
-                    self.logger.info("Didn't have to send any 7 day account deletion reminders")
+                    dp.logger.info("Didn't have to send any 7 day account deletion reminders")
 
                 await cur.execute(
                     f"""
@@ -2645,12 +2643,12 @@ class PostgresAdapter(DatabaseAdapter):
                 """,
                     (Jsonb(datetime.now().isoformat()),),
                 )
-        self.logger.info("User database cleanup complete")
+        dp.logger.info("User database cleanup complete")
 
     async def job_cleanup(self, retention_time_in_days: int):
         async with self.apool.connection() as conn:
             async with conn.cursor(row_factory=scalar_row) as cur:
-                self.logger.info("Starting job database cleanup...")
+                dp.logger.info("Starting job database cleanup...")
                 await cur.execute(
                     f"""
                     SELECT data['jobs_last_cleanup']
@@ -2666,12 +2664,12 @@ class PostgresAdapter(DatabaseAdapter):
                 last_cleanup = datetime.fromisoformat(last_cleanup_isoformat)
                 time_since_last_cleanup = datetime.now() - last_cleanup
                 if time_since_last_cleanup.total_seconds() < 82800:
-                    self.logger.info(
+                    dp.logger.info(
                         "Job cleanup was already executed in the last 24 hours. Not executing again, skipped cleanup"
                     )
                     return
 
-                self.logger.info(
+                dp.logger.info(
                     f"Cleaning up jobs that have finished more than {retention_time_in_days} days ago..."
                 )
                 await cur.execute(
@@ -2691,7 +2689,7 @@ class PostgresAdapter(DatabaseAdapter):
                 """,
                     (Jsonb(datetime.now().isoformat()),),
                 )
-        self.logger.info("Job database cleanup complete")
+        dp.logger.info("Job database cleanup complete")
 
     async def get_ldap_tokens(self) -> list[LdapTokenInfoInternal]:
         async with self.apool.connection() as conn:

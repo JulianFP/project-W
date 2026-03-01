@@ -1,14 +1,16 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+from logging import getLogger
 from project_W_lib.models.response_models import LocalAccountOperationModeEnum
 
 import project_W.dependencies as dp
+from project_W_lib.models.shared_setting_models import LoggingEnum
 
 from ._version import __version__
 from .caching import RedisAdapter
@@ -171,6 +173,40 @@ app = FastAPI(
     terms_of_service=f"{dp.config.client_url}/tos" if dp.config.terms_of_services else None,
     generate_unique_id_function=custom_generate_unique_id,
 )
+# logging middleware for debug mode
+if (
+    dp.config.logging.console.level == LoggingEnum.DEBUG
+    or dp.config.logging.file.level == LoggingEnum.DEBUG
+):
+    middleware_logger = getLogger("project-W.middleware")
+
+    @app.middleware("http")
+    async def logging_middleware(request: Request, call_next):
+        middleware_logger.debug(
+            "Incoming request",
+            extra={
+                "url_path": request.url.path,
+                "url_host": request.url.hostname,
+                "scheme": request.url.scheme,
+                "method": request.method,
+                "headers": dict(request.headers),
+                "query_params": request.query_params,
+                "path_params": request.path_params,
+                "cookies": request.cookies,
+                "client": request.client,
+            },
+        )
+        response = await call_next(request)
+        middleware_logger.debug(
+            "Outgoing response",
+            extra={
+                "status": response.status_code,
+                "headers": dict(response.headers),
+            },
+        )
+        return response
+
+
 # middleware required by authlib for oidc
 app.add_middleware(
     SessionMiddleware,

@@ -1,5 +1,6 @@
 import gc
 from io import StringIO
+import logging
 from typing import Callable
 
 import numpy as np
@@ -13,10 +14,9 @@ from project_W_lib.models.response_models import (
     JobSettingsResponse,
     supported_alignment_languages,
 )
-from project_W_lib.logger import get_logger
 from .models.setting_models import ModelPrefetchingEnum, WhisperSettings
 
-logger = get_logger("project-W-runner")
+logger = logging.getLogger("project-W-runner.utils_whisperx")
 
 
 def model_cleanup(model):

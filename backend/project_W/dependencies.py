@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from itsdangerous import URLSafeTimedSerializer
@@ -14,3 +15,4 @@ git_hash: str
 smtp: SmtpClient
 client_path: Path
 auth_s: URLSafeTimedSerializer
+logger: logging.Logger
