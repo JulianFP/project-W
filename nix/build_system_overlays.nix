@@ -1,7 +1,7 @@
 { self, pkgs }:
 final: prev:
 let
-  version_string = "0.4.2";
+  version_string = "0.6.0";
   inherit (final) resolveBuildSystem;
   inherit (builtins) mapAttrs;
 
