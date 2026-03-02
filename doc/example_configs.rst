@@ -216,3 +216,30 @@ Of course you can also decide to activate only one of user or job deletion witho
 If a job gets deleted this means that all data attached to that job, most notably the transcript, will also be deleted. Since the transcript is almost as sensitive as the audio files themselves you might want to setup your Project-W instance to store jobs only very briefly to minimize the amount of sensitive data stored on the backend at every given time (e.g. to 7 days like in this example). If job deletion is active the users will be informed about that on the job submission page so that they can make sure to download the transcript of a finished job before it gets deleted.
 
 If a user gets deleted this means that all data attached to that user, most notably all of their jobs, transcripts and their account information and email address, will also be deleted. An email will be sent to affected users both 30 days and 7 days before their account will be deleted which gives them a chance to login to Project-W again and thus save their account from deletion.
+
+Configure logging
+-----------------
+
+You may want to configure how logs are handled, e.g.:
+
+- Enable file logging
+- Change the general format of the logs
+- Change how dates are formatted in the logs
+- Enable json logs for machine readability (e.g. for logging aggregation software like Grafana Loki)
+- Set the log level
+
+We provide a logging stack that can do all of this. It is also shared across the backend and the runner, meaning the following example configuration is valid for both the backend's and the runner's config file.
+
+   .. code-block:: yaml
+
+      logging:
+        console:
+          fmt: "<%(levelname)s> [%(asctime)s | %(name)s] %(message)s"
+          datefmt: "%m/%d/%Y %I:%M%p"
+          level: WARNING
+        file:
+          path: ./file.log
+          json_fmt: true
+          level: DEBUG
+
+This config snippet enables logging into the specified file.log file in json format while setting the log level to DEBUG for this. Please note that the DEBUG level will generate a lot of logs that will include sensitive data and that it may reduce application performance. At the same time, the snippet also changes the format of the console logging, and sets the log level for the console to WARNING. As you can see, you can change console logging settings and file logging settings independently from each other.

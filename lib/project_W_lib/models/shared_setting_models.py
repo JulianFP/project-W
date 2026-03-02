@@ -13,7 +13,7 @@ class BaseLoggingSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     level: LoggingEnum = Field(
         default=LoggingEnum.INFO,
-        description="What kind of log messages should be printed to the console. All messages with lower severity than this will not be logged. Possible values in order of severity: 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'",
+        description="What kind of log messages should be printed to the console. All messages with lower severity than this will not be logged. Possible values in order of severity: 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'. Warning: The 'DEBUG' level will result in a large amount of logs that will include sensitive information like tokens and user data, as well as in a slight performance decrease. For production systems only use it temporarily to triage a bug, and remove the logs afterwards.",
         validate_default=True,
     )
     fmt: str = Field(

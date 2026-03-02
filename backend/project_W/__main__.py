@@ -90,9 +90,22 @@ def main(
         else load_config(program_name, Settings)
     )
 
-    # now we can setup the logger and secret key
+    # now we can setup the logger and everything else
     logging_dict = configure_logging(dp.config.logging)
     dp.logger = logging.getLogger(program_name)
+    debug_enabled_anywhere = False
+    access_log_handlers = []  # for granian
+    if dp.config.logging.console.level == LoggingEnum.DEBUG:
+        debug_enabled_anywhere = True
+        access_log_handlers.append("console")
+    if dp.config.logging.file.level == LoggingEnum.DEBUG:
+        debug_enabled_anywhere = True
+        access_log_handlers.append("file")
+    if debug_enabled_anywhere:
+        dp.logger.warning(
+            "The level of at least one of the loggers has been set to 'DEBUG'. This will produce A LOT of logs which WILL INCLUDE SENSITIVE INFORMATION like tokens or user data, as well as result in slightly lower performance. If this is a production system, then please change the log level as soon as possible after you are done triaging a bug."
+        )
+
     dp.auth_s = URLSafeTimedSerializer(
         dp.config.security.secret_key.root.get_secret_value(), "Project-W"
     )
@@ -125,16 +138,6 @@ def main(
         ):
             perform_database_encrypted_content_deletion()
         return
-
-    # define granian access log settings
-    debug_enabled_anywhere = False
-    access_log_handlers = []
-    if dp.config.logging.console.level == LoggingEnum.DEBUG:
-        debug_enabled_anywhere = True
-        access_log_handlers.append("console")
-    if dp.config.logging.file.level == LoggingEnum.DEBUG:
-        debug_enabled_anywhere = True
-        access_log_handlers.append("file")
 
     granian_options = {
         "target": "project_W.app",

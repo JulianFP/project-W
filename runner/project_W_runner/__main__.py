@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 from project_W_lib.config import load_config
 from project_W_lib.logger import configure_logging
+from project_W_lib.models.shared_setting_models import LoggingEnum
 
 from ._version import __commit_id__, __version__
 from .models.setting_models import Settings
@@ -47,6 +48,13 @@ def main(custom_config_path: Path | None, dummy: bool):
     configure_logging(config.logging)
     logger = logging.getLogger(program_name)
     logging.getLogger("httpx").setLevel(logging.DEBUG)
+    if (
+        config.logging.console.level == LoggingEnum.DEBUG
+        or config.logging.file.level == LoggingEnum.DEBUG
+    ):
+        logger.warning(
+            "The level of at least one of the loggers has been set to 'DEBUG'. This will produce A LOT of logs which WILL INCLUDE SENSITIVE INFORMATION like tokens or user data, as well as result in slightly lower performance. If this is a production system, then please change the log level as soon as possible after you are done triaging a bug."
+        )
 
     logger.info(f"Running application version {__version__}")
     if __commit_id__ is None:

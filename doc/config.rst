@@ -51,14 +51,20 @@ Description of backend config options
 
 The following gives an overview over all config options available to you on the backend. For an example config, please refer to :ref:`docker_backend_frontend-label`
 
-.. autopydantic_model:: project_W.models.settings.Settings
+.. autopydantic_model:: project_W.models.setting_models.Settings
+   :inherited-members: BaseModel, str
 
 Refer below to each of the fields and their subfields and subsubfields and so on:
 
-.. automodule:: project_W.models.settings
+.. automodule:: project_W.models.setting_models
    :members:
    :inherited-members: BaseModel, str
    :exclude-members: Settings
+
+.. automodule:: project_W_lib.models.shared_setting_models
+   :members:
+   :inherited-members: BaseModel, str
+   :exclude-members: BaseSettings
 
 .. _description_runner_config-label:
 
@@ -67,11 +73,17 @@ Description of runner config options
 
 The following gives an overview over all config options available to you on the runner:
 
-.. autopydantic_model:: project_W_runner.models.settings.Settings
+.. autopydantic_model:: project_W_runner.models.setting_models.Settings
+   :inherited-members: BaseModel, str
 
 Refer below to each of the fields and their subfields and subsubfields and so on:
 
-.. automodule:: project_W_runner.models.settings
+.. automodule:: project_W_runner.models.setting_models
    :members:
    :inherited-members: BaseModel, str
    :exclude-members: Settings
+
+.. automodule:: project_W_lib.models.shared_setting_models
+   :members:
+   :inherited-members: BaseModel, str
+   :exclude-members: BaseSettings
