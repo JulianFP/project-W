@@ -45,9 +45,6 @@ jobs:
         with:
           version: 10
 
-      - name: Run development containers
-        run: docker compose up -d
-
       - name: Install backend
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends git gcc libldap2-dev libsasl2-dev

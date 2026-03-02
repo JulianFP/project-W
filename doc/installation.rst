@@ -574,6 +574,7 @@ Here is an example config to get the Project-W runner up and running (using sops
 
 
 .. _manual_installation-label:
+
 Manual installation
 -------------------
 

@@ -1,18 +1,19 @@
 import asyncio
+import logging
 import os
 import platform
 from pathlib import Path
 
 import click
 from project_W_lib.config import load_config
-from project_W_lib.logger import get_logger
+from project_W_lib.logger import configure_logging
+from project_W_lib.models.shared_setting_models import LoggingEnum
 
 from ._version import __commit_id__, __version__
 from .models.setting_models import Settings
 from .runner import Runner
 
 program_name = "project-W-runner"
-logger = get_logger(program_name)
 
 
 @click.command()
@@ -36,6 +37,25 @@ logger = get_logger(program_name)
     help="Start in dummy mode. This will not load whisperx and not do any transcription but instead just simulate a transcription returning the same transcript every time. Only use for testing/development purposes, never in production!",
 )
 def main(custom_config_path: Path | None, dummy: bool):
+    # parse config file
+    config = (
+        load_config(program_name, Settings, [custom_config_path])
+        if custom_config_path
+        else load_config(program_name, Settings)
+    )
+
+    # now we can setup the logger
+    configure_logging(config.logging)
+    logger = logging.getLogger(program_name)
+    logging.getLogger("httpx").setLevel(logging.DEBUG)
+    if (
+        config.logging.console.level == LoggingEnum.DEBUG
+        or config.logging.file.level == LoggingEnum.DEBUG
+    ):
+        logger.warning(
+            "The level of at least one of the loggers has been set to 'DEBUG'. This will produce A LOT of logs which WILL INCLUDE SENSITIVE INFORMATION like tokens or user data, as well as result in slightly lower performance. If this is a production system, then please change the log level as soon as possible after you are done triaging a bug."
+        )
+
     logger.info(f"Running application version {__version__}")
     if __commit_id__ is None:
         raise Exception(
@@ -44,12 +64,6 @@ def main(custom_config_path: Path | None, dummy: bool):
     git_hash = __commit_id__.removeprefix("g")
     logger.info(f"Application was built from git hash {git_hash}")
     logger.info(f"Python version: {platform.python_version()}")
-
-    config = (
-        load_config(program_name, Settings, [custom_config_path])
-        if custom_config_path
-        else load_config(program_name, Settings)
-    )
 
     # set env vars first before importing Runner and prefetch code because that would trigger the code that reads the env var
     os.environ["PYANNOTE_CACHE"] = str(config.whisper_settings.model_cache_dir)
@@ -73,6 +87,7 @@ def main(custom_config_path: Path | None, dummy: bool):
         prefetch_models_as_configured(config.whisper_settings)
 
     runner = Runner(
+        logger=logger,
         transcribe_function=transcribe,
         config=config,
         git_hash=git_hash,

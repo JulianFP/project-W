@@ -1,5 +1,6 @@
 import asyncio
 import json
+from logging import Logger
 import ssl
 import time
 from io import StringIO
@@ -21,7 +22,6 @@ from project_W_lib.models.response_models import (
     RegisteredResponse,
     RunnerJobInfoResponse,
 )
-from project_W_lib.logger import get_logger
 
 from ._version import __version__
 from .models.internal_models import (
@@ -31,8 +31,6 @@ from .models.internal_models import (
     ShutdownSignal,
 )
 from .models.setting_models import Settings, WhisperSettings
-
-logger = get_logger("project-W-runner")
 
 # heartbeat interval in seconds.
 # this should be well below the heartbeat
@@ -48,6 +46,7 @@ class Runner:
         [str, JobSettingsResponse, WhisperSettings, Callable[[float], None]], dict[str, StringIO]
     ]
     config: Settings
+    logger: Logger
     git_hash: str
     backend_url: str
     source_code_url = "https://github.com/JulianFP/project-W/tree/main/runner"
@@ -64,9 +63,11 @@ class Runner:
         transcribe_function,
         config: Settings,
         git_hash: str,
+        logger: Logger,
     ):
         self.transcribe = transcribe_function
         self.config = config
+        self.logger = logger
         self.git_hash = git_hash
         self.backend_url = str(config.backend_settings.url)
         if self.backend_url[-1] != "/":
@@ -205,11 +206,11 @@ class Runner:
             )
             self.id = registered_response.id
             self.session_token = registered_response.session_token
-            logger.info(f"Runner registered, this runner has ID {self.id}")
+            self.logger.info(f"Runner registered, this runner has ID {self.id}")
         except BackendError as e:
             # if the runner was already online for some reason then try to unregister before crashing!
             if unregister_if_online and e.status_code == 403:
-                logger.warning(
+                self.logger.warning(
                     "Runner was already registered as online, trying to unregister and re-register again..."
                 )
                 await self.unregister()
@@ -229,9 +230,9 @@ class Runner:
             self.session_token = None
         except (httpx.HTTPError, ValidationError, ResponseNotJson) as e:
             # don't throw ShutdownSignal here because unregister is only called when the runner is already shutting down
-            logger.warning(f"Failed to unregister runner: {str(e)}")
+            self.logger.warning(f"Failed to unregister runner: {str(e)}")
             return
-        logger.info("Runner unregistered")
+        self.logger.info("Runner unregistered")
 
     def process_job(self, job_data: JobData, job_tmp_file: _TemporaryFileWrapper) -> Transcript:
         """
@@ -269,12 +270,12 @@ class Runner:
 
     def stop_processing(self):
         if not self.command_thread_to_exit:
-            logger.info("Shutting down the processing thread...")
+            self.logger.info("Shutting down the processing thread...")
             self.command_thread_to_exit = True
 
     def abort_job(self):
         if not self.current_job_aborted and self.current_job_data is not None:
-            logger.info("Received request to abort current job")
+            self.logger.info("Received request to abort current job")
             self.current_job_aborted = True
             self.stop_processing()
 
@@ -303,7 +304,7 @@ class Runner:
                         id=job_info.id,
                         settings=job_info.settings,
                     )
-                    logger.info(f"Job with ID {self.current_job_data.id} retrieved")
+                    self.logger.info(f"Job with ID {self.current_job_data.id} retrieved")
 
                 # process job
                 try:
@@ -314,11 +315,11 @@ class Runner:
                 except ShutdownSignal as e:
                     if self.current_job_aborted:
                         self.current_job_data.error_msg = "job was aborted"
-                        logger.info(f"Job with ID {self.current_job_data.id} was aborted")
+                        self.logger.info(f"Job with ID {self.current_job_data.id} was aborted")
                     else:
                         raise e
                 except Exception as e:
-                    logger.error(
+                    self.logger.error(
                         f"Error processing job {self.current_job_data.id}: {type(e).__name__}: '{str(e)}'"
                     )
                     self.current_job_data.error_msg = f"{type(e).__name__}: '{str(e)}'"
@@ -332,13 +333,13 @@ class Runner:
                 else:
                     # Sanity check if somehow neither transcript nor error is set.
                     data = RunnerSubmitResultRequest(error_msg="Unknown runner error")
-                    logger.error("Unknown error occurred while processing job")
+                    self.logger.error("Unknown error occurred while processing job")
 
                 try:
                     await self.post("/submit_job_result", data=data.model_dump())
                 except (httpx.HTTPError, ValidationError, ResponseNotJson) as e:
                     raise ShutdownSignal(f"Failed to submit job {self.current_job_data.id}", e)
-                logger.info(f"Result of job {self.current_job_data.id} submitted to backend")
+                self.logger.info(f"Result of job {self.current_job_data.id} submitted to backend")
 
                 self.current_job_aborted = False
                 self.current_job_data = None
@@ -369,7 +370,7 @@ class Runner:
                     if (time.time() - timestamp_of_last_heartbeat) < (
                         HEARTBEAT_TIMEOUT - HEARTBEAT_INTERVAL
                     ):
-                        logger.warning(
+                        self.logger.warning(
                             f"Heartbeat failed: {type(e).__name__}: '{str(e)}'! Retrying in next iteration..."
                         )
                         continue
@@ -379,7 +380,7 @@ class Runner:
 
                 if self.current_job_data is None:
                     if heartbeat_resp.job_assigned:
-                        logger.info("Job assigned")
+                        self.logger.info("Job assigned")
                         # Before fetching the actual job data, make sure that the field
                         # is not None, so that we don't process the same job twice.
                         # This is also expected to be the case by the job processing tasks
@@ -415,7 +416,7 @@ class Runner:
                     tg.create_task(self.job_handler_task())
             except ExceptionGroup as e:
                 if len(e.exceptions) == 1 and isinstance(e.exceptions[0], ShutdownSignal):
-                    logger.fatal(f"Shutting down: {e.exceptions[0].reason}")
+                    self.logger.fatal(f"Shutting down: {e.exceptions[0].reason}")
                 else:
                     raise e
             finally:

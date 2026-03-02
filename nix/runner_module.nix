@@ -78,6 +78,9 @@ in
         ]
         ++ lib.optional config.services.project-W.server.enable "project-W.service";
         wantedBy = [ "multi-user.target" ];
+        environment = {
+          TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD = "true";
+        };
         serviceConfig = {
           Type = "simple";
           User = cfg.user;

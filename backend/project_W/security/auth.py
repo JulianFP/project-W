@@ -4,7 +4,6 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException, Response, status
 from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
-from project_W_lib.logger import get_logger
 from project_W_lib.models.response_models import ErrorResponse, UserResponse, UserTypeEnum
 
 import project_W.dependencies as dp
@@ -18,8 +17,6 @@ from ..models.internal_models import (
 )
 from ..utils import hash_token
 from .oidc_deps import get_provider_name
-
-logger = get_logger("project-W")
 
 # define all possible HTTP responses here so that they can be included together with the dependency for the docs
 auth_dependency_responses: dict[int | str, dict[str, Any]] = {

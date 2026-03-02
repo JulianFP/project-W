@@ -1,5 +1,4 @@
 from enum import Enum
-
 from platformdirs import user_cache_path
 from pydantic import (
     BaseModel,
@@ -10,6 +9,7 @@ from pydantic import (
     HttpUrl,
     SecretStr,
 )
+from project_W_lib.models.shared_setting_models import BaseSettings
 
 program_name = "project-W-runner"
 
@@ -92,7 +92,7 @@ class RunnerAttributes(BaseModel):
     )
 
 
-class Settings(BaseModel):
+class Settings(BaseSettings):
     model_config = ConfigDict(extra="forbid")
     runner_attributes: RunnerAttributes = Field(description="General attributes of this runner")
     backend_settings: BackendSettings = Field(description="How to connect to the Project-W Backend")

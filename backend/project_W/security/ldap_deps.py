@@ -5,7 +5,6 @@ from bonsai import AuthenticationError, ConnectionError, LDAPClient, TimeoutErro
 from bonsai.asyncio import AIOConnectionPool, AIOLDAPConnection
 from fastapi import HTTPException, status
 from pydantic import ValidationError
-from project_W_lib.logger import get_logger
 from project_W_lib.models.base import EmailValidated
 
 import project_W.dependencies as dp
@@ -17,8 +16,6 @@ http_exc = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Incorrect username or password",
 )
-
-logger = get_logger("project-W")
 
 
 class LdapAdapter:
@@ -106,7 +103,7 @@ class LdapAdapter:
     ) -> LdapUserInfo:
         prov = self.ldap_prov[idp_name]
         if len(result) > 1:
-            logger.error(f"LDAP query returned more than one user in LDAP directory {idp_name}")
+            dp.logger.error(f"LDAP query returned more than one user in LDAP directory {idp_name}")
             raise http_exc
         elif (
             (user_uid := result[0].get(prov.uid_attribute))
@@ -126,7 +123,7 @@ class LdapAdapter:
                 dn=str(user_dn), uid=str(user_uid[0]), is_admin=is_admin, email=validated_email
             )
         else:
-            logger.error(
+            dp.logger.error(
                 f"Couldn't get uid or email address for LDAP user in LDAP directory {idp_name}"
             )
             raise http_exc
@@ -141,7 +138,7 @@ class LdapAdapter:
                     f"The Ldap provider {name} has neither user_query nor admin_query defined. Please define at least one of them."
                 )
 
-            logger.info(f"Trying to connect to LDAP server {name}...")
+            dp.logger.info(f"Trying to connect to LDAP server {name}...")
             ldap_client = LDAPClient(str(idp.server_address))
             if idp.ca_pem_file_path:
                 ldap_client.set_ca_cert(str(idp.ca_pem_file_path))
@@ -159,10 +156,10 @@ class LdapAdapter:
                 return await conn.whoami()
 
             ldap_service_user = await self.__exec_lambda(name, func)
-            logger.info(f"Connected to LDAP server {name} as user {ldap_service_user}")
+            dp.logger.info(f"Connected to LDAP server {name} as user {ldap_service_user}")
 
     async def close(self):
-        logger.info("Closing Ldap connections...")
+        dp.logger.info("Closing Ldap connections...")
         for pool in self.apools.values():
             await pool.close()
 
@@ -220,11 +217,11 @@ async def invalidate_token_if_ldap_user_lost_privileges(
         ldap_user = await ldap_adapter.query_user_with_uid(token.provider_name, token.uid)
         if not ldap_user.is_admin and token.admin_privileges:
             await dp.db.delete_token_of_user(token.user_id, token.id)
-            logger.info(
+            dp.logger.info(
                 f"Invalidated admin token with id {token.id} of LDAP user {token.user_id} because user doesn't have admin privileges anymore"
             )
     except HTTPException:
         await dp.db.delete_token_of_user(token.user_id, token.id)
-        logger.info(
+        dp.logger.info(
             f"Invalidated token with id {token.id} of LDAP user {token.user_id} because user couldn't be found at LDAP provider with all necessary attributes"
         )

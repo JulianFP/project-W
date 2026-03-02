@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from redis.asyncio.client import Pipeline
 from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
-from project_W_lib.logger import get_logger
 from project_W_lib.models.request_models import RunnerRegisterRequest
 
 import project_W.dependencies as dp
@@ -18,8 +17,6 @@ from .utils import hash_token
 
 
 class CachingAdapter(ABC):
-    logger = get_logger("project-W")
-
     @abstractmethod
     async def open(self, connection_obj):
         """
@@ -211,7 +208,7 @@ class RedisAdapter(CachingAdapter):
 
         await self.__check_server_version()
 
-        self.logger.info("Successfully connected to Redis")
+        dp.logger.info("Successfully connected to Redis")
 
     async def __check_server_version(self):
         query_result = await self.client.info("server")
@@ -227,10 +224,10 @@ class RedisAdapter(CachingAdapter):
             elif redis_version_split[i] > self.minimal_required_redis_version[i]:
                 break
 
-        self.logger.info(f"Redis server is on version {redis_version}")
+        dp.logger.info(f"Redis server is on version {redis_version}")
 
     async def close(self):
-        self.logger.info("Closing Redis connections...")
+        dp.logger.info("Closing Redis connections...")
         await self.client.close()
 
     async def register_new_online_runner(
@@ -279,7 +276,7 @@ class RedisAdapter(CachingAdapter):
             try:
                 return OnlineRunner.model_validate(runner_dict)
             except ValidationError:
-                self.logger.error(
+                dp.logger.error(
                     f"Validation error occurred while reading from redis! The following data was read instead of an OnlineRunner object: {runner_dict}. Continuing..."
                 )
                 return None
@@ -465,7 +462,7 @@ class RedisAdapter(CachingAdapter):
             try:
                 return InProcessJob.model_validate(job_dict)
             except ValidationError:
-                self.logger.error(
+                dp.logger.error(
                     f"Validation error occurred while reading from redis! The following data was read instead of an InProcessJob object: {job_dict}. Continuing..."
                 )
                 return None

@@ -4,6 +4,8 @@
   lib,
   nodejs_24,
   pnpm_10,
+  pnpmConfigHook,
+  fetchPnpmDeps,
   writeShellScriptBin,
 
   #needs to be supplied explicitly
@@ -12,7 +14,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "project_W_frontend";
-  version = "0.4.2";
+  version = "0.6.0";
 
   src = lib.fileset.toSource {
     root = ../frontend;
@@ -21,7 +23,8 @@ stdenv.mkDerivation (finalAttrs: {
 
   nativeBuildInputs = [
     nodejs_24
-    pnpm_10.configHook
+    pnpm_10
+    pnpmConfigHook
   ];
 
   buildInputs = [
@@ -34,10 +37,10 @@ stdenv.mkDerivation (finalAttrs: {
     '')
   ];
 
-  pnpmDeps = pnpm_10.fetchDeps {
+  pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) pname version src;
     fetcherVersion = 2;
-    hash = "sha256-+2nJypUjjPwU/r9YBujO1Dj0yRNNsyJFwtXFUH59Q4w=";
+    hash = "sha256-lYf00JGyR6TDMjMyi1GlZW7r+IFdRU9kcGjibsPGYMQ=";
   };
 
   buildPhase = ''
